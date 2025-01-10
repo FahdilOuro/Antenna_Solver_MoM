@@ -79,10 +79,10 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude):
     print(f"Fréquence de l'onde incidente : {frequency} Hz")
 
     # Calcul des courants de surface à partir du courant total
-    surface_current_density_plate = calculate_current_density(current, triangles, edges, vecteurs_rho)
+    surface_current_density = calculate_current_density(current, triangles, edges, vecteurs_rho)
 
     # Visualisation des courants de surface
     antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in receiving mode')
     print(f"{antennas_name} view is successfully created at frequency {frequency} Hz")
-    fig = visualize_surface_current(points, triangles, surface_current_density_plate, antennas_name)
+    fig = visualize_surface_current(points, triangles, surface_current_density, antennas_name)
     fig.show()
