@@ -4,9 +4,9 @@ from rwg.rwg3 import *
 from rwg.rwg4 import *
 from rwg.rwg5 import *
 
-def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude):
+def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_from_matlab=True):
     # Chargement du fichier de maillage
-    p, t = load_mesh_file(mesh1)
+    p, t = load_mesh_file(mesh1, load_from_matlab)
 
     # Définition des points et triangles à partir du maillage
     points = Points(p)
