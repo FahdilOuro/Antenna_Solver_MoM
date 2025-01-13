@@ -23,12 +23,12 @@ from rwg.rwg3 import *
 from rwg.rwg4 import *
 from rwg.rwg5 import *
 
-def scattering_algorithm(mesh1, frequency, wave_incident_direction, polarization):
+def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization, load_from_matlab=True):
     """
         Implémente l'algorithme de diffusion électromagnétique pour une antenne.
     """
     # Chargement du fichier de maillage
-    p, t = load_mesh_file(mesh1)
+    p, t = load_mesh_file(mesh,load_from_matlab)
 
     # Définition des points et triangles à partir du maillage
     points = Points(p)
@@ -39,7 +39,7 @@ def scattering_algorithm(mesh1, frequency, wave_incident_direction, polarization
     triangles.calculate_triangles_area_and_center(points)
 
     # Affiche les dimensions principales de l'antenne
-    base_name = os.path.splitext(os.path.basename(mesh1))[0]
+    base_name = os.path.splitext(os.path.basename(mesh))[0]
     print(f"length of antenna {base_name} = {points.length} meter")
     print(f"width of antenna {base_name} = {points.width} meter")
     print(f"height of antenna {base_name} = {points.height} meter")
@@ -53,7 +53,7 @@ def scattering_algorithm(mesh1, frequency, wave_incident_direction, polarization
 
     # Sauvegarde des données du maillage traité
     save_folder_name_mesh1 = '../../data/antennas_mesh1/'
-    save_file_name_mesh1 = DataManager_rwg1.save_data(mesh1, save_folder_name_mesh1, points, triangles, edges)
+    save_file_name_mesh1 = DataManager_rwg1.save_data(mesh, save_folder_name_mesh1, points, triangles, edges)
 
     # Chargement des données sauvegardées
     filename_mesh1_to_load = save_folder_name_mesh1 + save_file_name_mesh1
