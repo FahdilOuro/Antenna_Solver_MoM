@@ -46,8 +46,8 @@ def calculate_electric_magnetic_field_at_point(filename_mesh2_to_load, filename_
     base_name = base_name.replace('_mesh2', '')
 
     # 2. Chargement des données de maillage et des courants à partir des fichiers MAT
-    points, triangles, edges, barycentric_triangle, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh2_to_load)
-    frequency, omega, mu, epsilon, light_speed_c, eta, wave_incident_direction, polarization, voltage, current = DataManager_rwg4.load_data(filename_current_to_load)
+    _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
+    frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load)
 
     # 3. Calcul du nombre d'onde k et de sa composante complexe
     k = omega / light_speed_c    # Nombre d'onde (en rad/m)

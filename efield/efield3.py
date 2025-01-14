@@ -90,9 +90,9 @@ def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load
     base_name = base_name.replace('_mesh2', '')
 
     # Chargement des données nécessaires
-    points, triangles, edges, barycentric_triangle, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh2_to_load)
-    frequency, omega, mu, epsilon, light_speed_c, eta, wave_incident_direction, polarization, voltage, current = DataManager_rwg4.load_data(filename_current_to_load)
-    total_power, gain_linear, gain_logarithmic = load_gain_power_data(filename_gain_power_to_load)
+    _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
+    _, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load)
+    total_power, *_ = load_gain_power_data(filename_gain_power_to_load)
 
     # Calcul des paramètres fondamentaux
     k = omega / light_speed_c    # Nombre d'onde (en rad/m)

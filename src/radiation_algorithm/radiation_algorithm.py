@@ -30,7 +30,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     filter_complexes_jonctions(triangles, edges)
 
     # Sauvegarde des données du maillage traité
-    save_folder_name_mesh1 = '../../data/antennas_mesh1/'
+    save_folder_name_mesh1 = 'data/antennas_mesh1/'
     save_file_name_mesh1 = DataManager_rwg1.save_data(mesh1, save_folder_name_mesh1, points, triangles, edges)
 
     # Chargement des données sauvegardées
@@ -45,7 +45,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     vecteurs_rho.calculate_vecteurs_rho(points, triangles, edges, barycentric_triangles)
 
     # Sauvegarde des données des triangles barycentriques et vecteurs RHO
-    save_folder_name_mesh2 = '../../data/antennas_mesh2/'
+    save_folder_name_mesh2 = 'data/antennas_mesh2/'
     save_file_name_mesh2 = DataManager_rwg2.save_data(filename_mesh1_to_load, save_folder_name_mesh2, barycentric_triangles, vecteurs_rho)
 
     # Chargement des données pour le maillage traité
@@ -59,7 +59,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
                                                                             frequency)
 
     # Sauvegarde des données d'impédance
-    save_folder_name_impedance = '../../data/antennas_impedance/'
+    save_folder_name_impedance = 'data/antennas_impedance/'
     save_file_name_impedance = DataManager_rwg3.save_data(filename_mesh2_to_load, save_folder_name_impedance, frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z)
 
     # Chargement des données d'impédance
@@ -72,7 +72,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     print(f"La valeur de feed_power  = {feed_power}")
 
     # Sauvegarde des données de courant
-    save_folder_name_current = '../../data/antennas_current/'
+    save_folder_name_current = 'data/antennas_current/'
     save_file_name_current = DataManager_rwg4.save_data_for_radiation(filename_mesh2_to_load, save_folder_name_current, frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, impedance, feed_power)
     print(f"Sauvegarde du fichier : {save_file_name_current} effectué avec succès !")
 

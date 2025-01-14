@@ -50,7 +50,7 @@ def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incid
               normalisées pour garantir des résultats cohérents.
     """
     # Chargement des données maillées (points, triangles, arêtes, barycentres, vecteurs rho)
-    points, triangles, edges, barycentric_triangle, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh_2)
+    _, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh_2)
     # Chargement des données d'impédance (fréquence, paramètres électromagnétiques, matrice Z)
     frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z = DataManager_rwg3.load_data(filename_impedance)
 
@@ -132,7 +132,7 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
             * La résolution du système linéaire repose sur une matrice d'impédance correctement formée.
     """
     # Chargement des données maillées et d'impédance
-    points, triangles, edges, barycentric_triangle, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh_2)
+    points, _, edges, *_ = DataManager_rwg2.load_data(filename_mesh_2)
     frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z = DataManager_rwg3.load_data(filename_impedance)
 
     # Initialisation des variables
@@ -172,7 +172,7 @@ class DataManager_rwg4:
             * load_data : Chargement des données à partir d'un fichier MATLAB.
     """
     @staticmethod
-    def save_data_fro_scattering(filename_mesh2, save_folder_name, frequency,
+    def save_data_for_scattering(filename_mesh2, save_folder_name, frequency,
                                  omega, mu, epsilon, light_speed_c, eta,
                                  wave_incident_direction, polarization, voltage, current):
         """
@@ -313,7 +313,7 @@ class DataManager_rwg4:
                 polarization = data['polarization'].squeeze()
                 return frequency, omega, mu, epsilon, light_speed_c, eta, wave_incident_direction, polarization, voltage, current
 
-            if 'voltage' in data and 'current' in data:
+            if 'voltage' in data and 'feed_power' in data:
                 impedance = data['voltage'].squeeze()
                 feed_power = data['current'].squeeze()
                 return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, impedance, feed_power

@@ -214,8 +214,8 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
 
     # Chargement des fichiers contenant les données de maillage, courants et sphère
     data_sphere = loadmat(filename_sphere_to_load)
-    points, triangles, edges, barycentric_triangle, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh2_to_load)
-    frequency, omega, mu, epsilon, light_speed_c, eta, wave_incident_direction, polarization, voltage, current = DataManager_rwg4.load_data(filename_current_to_load)
+    _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
+    frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load)
 
     # Chargement des données de la sphère
     sphere_points = data_sphere['p'] * 100    # Les coordonnées de la sphère sont multipliées par 100 (rayon de 100 m).
