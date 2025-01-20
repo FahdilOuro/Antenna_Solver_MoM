@@ -1,19 +1,44 @@
-import numpy as np
 import triangle as tr
+import numpy as np
+import plotly.figure_factory as ff
 
-def is_in_refinement_zone(point, center, radius):
-    return np.linalg.norm(point - center) < radius
+# Définir les points (sommets)
+vertices = np.array([
+    [0, 0], [1, 0], [1, 1], [0, 1], [0.5, 1.5]
+])
 
-refinement_center = np.array([0.5, 0.5])
-refinement_radius = 0.5
+# Définir les segments (arêtes) par les indices des points
+segments = np.array([
+    [0, 1], [1, 2], [2, 3], [3, 0], [2, 4], [4, 3]
+])
 
-# Fonction pour estimer l'erreur basée sur la position des triangles
-def estimate_error(triangles, vertices, center, radius):
+# Préparer les données pour la bibliothèque Triangle
+antenna_data = {
+    'vertices': vertices,
+    'segments': segments
+}
+
+# Générer le maillage initial
+mesh = tr.triangulate(antenna_data, 'pq30a0.000001Yj')
+
+# Extraire les sommets et les triangles
+points = np.array(mesh['vertices']).T  # Convertir en numpy array pour faciliter le traitement
+triangles = np.array(mesh['triangles']).T
+
+# Exemple de courants de surface (à remplacer par les valeurs réelles)
+currents = np.random.rand(triangles.shape[1])
+
+# Calculer le courant moyen
+average_current = np.mean(currents)
+
+# Fonction pour estimer l'erreur basée sur les courants de surface
+def estimate_error(triangles, vertices, currents, average_current):
     errors = np.zeros(len(triangles.T))
     for i, tri in enumerate(triangles.T):
-        triangle_points = vertices[:, tri].T
-        if any(is_in_refinement_zone(point, center, radius) for point in triangle_points):
-            errors[i] = 1  # Marquer les triangles dans la zone de raffinement
+        # Calculer l'erreur pour les courants supérieurs au courant moyen
+        current_value = currents[i]
+        if current_value > average_current:
+            errors[i] = current_value - average_current
     return errors
 
 # Fonction pour raffiner le maillage
@@ -24,13 +49,17 @@ def refine_mesh(antenna_data, errors, threshold):
         midpoints = (vertices[triangle] + vertices[np.roll(triangle, -1)]) / 2
         vertices = np.vstack([vertices, midpoints])
     antenna_data['vertices'] = vertices
-    return tr.triangulate(antenna_data, 'pq30a0.0001Dj')
+    return tr.triangulate(antenna_data, 'pq30a0.000001Yj')
 
 # Boucle adaptative
-threshold = 0.5
+threshold = 0.0  # Seuil d'erreur pour raffinement
 for _ in range(5):  # Nombre d'itérations de raffinement
     mesh = tr.triangulate(antenna_data, 'pq30a0.000001Yj')
     points = np.array(mesh['vertices']).T  # Convertir en numpy array pour faciliter le traitement
     triangles = np.array(mesh['triangles']).T
-    errors = estimate_error(triangles, points, refinement_center, refinement_radius)
+    errors = estimate_error(triangles, points, currents, average_current)
     antenna_data = refine_mesh(antenna_data, errors, threshold)
+
+# Affichage du maillage final
+fig = ff.create_trisurf(x=points[0], y=points[1], simplices=triangles.T)
+fig.show()
