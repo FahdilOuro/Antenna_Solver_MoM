@@ -4,11 +4,8 @@ from rwg.rwg3 import *
 from rwg.rwg4 import *
 from rwg.rwg5 import *
 
-<<<<<<< HEAD
+
 def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_from_matlab=True):
-=======
-def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude):
->>>>>>> 8a2ef6938886d0afc49cf2bdb1b91456ced19c63
     # Chargement du fichier de maillage
     p, t = load_mesh_file(mesh1, load_from_matlab)
 
