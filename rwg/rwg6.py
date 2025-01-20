@@ -64,8 +64,8 @@ def plot_surface_current_distribution(filename_mesh_2, filename_current):
     Yi = interp_Y(yi)
 
     # Tracer les courbes
-    plt.plot(yi, Xi, label='Jx')
-    plt.plot(yi, Yi, '*', label='Jy')
+    plt.plot(yi, Xi, label='|Jx|')
+    plt.plot(yi, Yi, '*', label='|Jy|')
     plt.xlabel('Dipole length, m')
     plt.ylabel('Surface current density, A/m')
     plt.grid(True)
