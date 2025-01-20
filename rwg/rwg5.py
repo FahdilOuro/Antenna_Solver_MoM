@@ -47,7 +47,7 @@ def calculate_current_density(current, triangles, edges, vecteurs_rho):
 
     # Parcours de chaque triangle pour calculer la densité de courant
     for triangle in range(triangles.total_of_triangles):
-        current_density_for_triangle = 0 + 0j  # Initialisation du vecteur densité de courant pour ce triangle
+        current_density_for_triangle = np.array([0.0, 0.0, 0.0], dtype=complex)  # Initialisation en complexe  # Initialisation du vecteur densité de courant pour ce triangle
         for edge in range(edges.total_number_of_edges):
             current_times_edge = current[edge] * edges.edges_length[edge]   # I(m) * EdgeLength(m)
 

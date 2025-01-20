@@ -26,6 +26,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     # Définition des arêtes et calcul de leurs longueurs
     edges = triangles.get_edges()
     edges.compute_edges_length(points)
+    print(f"Total numbers of Edges is = {edges.total_number_of_edges}")
 
     # Filtrage des jonctions complexes pour simplifier la structure du maillage
     filter_complexes_jonctions(triangles, edges)
@@ -85,5 +86,5 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     # Visualisation des courants de surface
     antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in receiving mode')
     print(f"{antennas_name} view is successfully created at frequency {frequency} Hz")
-    fig = visualize_surface_current(points, triangles, surface_current_density, antennas_name)
+    fig = visualize_surface_current(points, triangles, surface_current_density / max(surface_current_density), antennas_name)
     fig.show()
