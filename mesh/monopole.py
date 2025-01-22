@@ -33,6 +33,7 @@ def create_figure(points, triangles, title="Antennas Mesh"):
         title=title,
         aspectratio=aspect_ratios,
     )
+
     return fig
 
 def data_save(filename, save_folder_name, points, triangle):
@@ -101,8 +102,7 @@ points = np.column_stack((coordonnees_x, coordonnees_y))
 
 print("points shape =", points.shape)
 
-# Triangulation de Delaunay
-# Peut etre replacer eventuellement ici par la fonction triangle
+# Triangulation de Delaunay; Peut etre replacer eventuellement ici par la fonction triangle
 triangulation = Delaunay(points)
 print("triangulation simplices shape =", triangulation.simplices.shape)
 t = np.zeros((4, triangulation.simplices.shape[0]), dtype=int)
@@ -111,12 +111,73 @@ print("t shape =", t.shape)
 p = np.zeros((3, points.shape[0]))
 p[:2, :] = points.T
 print("p shape =", p.shape)
-fig = create_figure(p, t, "pate ground")
-fig.show()
+"""fig = create_figure(p, t, "pate ground")
+fig.show()"""
+
 filename = "plate_ground"
 save_folder_name = 'data/antennas_mesh/'
 data_save(filename, save_folder_name, p, t)
 
+# Affichage de la grille 2D pour sélectionner les points d’alimentation
+plt.figure()
+plt.triplot(coordonnees_x, coordonnees_y, triangulation.simplices, color="gray")
+plt.scatter(coordonnees_x, coordonnees_y, color="red", marker="o", label="Points du maillage")
+plt.xlabel("X")
+plt.ylabel("Y")
+plt.title("Cliquez sur deux points d’alimentation, puis appuyez sur ENTRÉE")
+plt.legend()
+plt.show()
+
+# Sélection des points avec la souris
+FeedingTriangle = []
+while len(FeedingTriangle) < 2:
+    points_selected = plt.ginput(1, timeout=0)
+    if not points_selected:
+        break  # Si aucun point sélectionné, arrêter
+    xi, yi = points_selected[0]
+    TriangleNumber = triangulation.find_simplex([xi, yi])
+    
+    if TriangleNumber < 0:
+        print("Point hors du maillage, veuillez réessayer.")
+        continue
+    
+    FeedingTriangle.append(TriangleNumber)
+
+# Création du monopôle
+for n in range(len(FeedingTriangle) // 2):
+    FT = [FeedingTriangle[2 * n], FeedingTriangle[2 * n + 1]]
+    N, M = t[:3, FT[0]], t[:3, FT[1]]
+    
+    # Trouver le bord d'alimentation
+    a = np.isin(N, M)
+    Edge_B = M[a]
+
+    # Créer les points du haut du monopôle
+    p = np.hstack((p, p[:, Edge_B[0]].reshape(3, 1) + [[0], [0], [h]]))
+    p = np.hstack((p, p[:, Edge_B[1]].reshape(3, 1) + [[0], [0], [h]]))
+    
+    Edge_T = [p.shape[1] - 2, p.shape[1] - 1]
+    
+    # Construire les segments intermédiaires
+    Edge_MM = Edge_B
+    for k in range(1, Number):
+        new_point_1 = k / Number * (p[:, Edge_T[0]] - p[:, Edge_B[0]]) + p[:, Edge_B[0]]
+        new_point_2 = k / Number * (p[:, Edge_T[1]] - p[:, Edge_B[1]]) + p[:, Edge_B[1]]
+        p = np.hstack((p, new_point_1.reshape(3, 1), new_point_2.reshape(3, 1)))
+
+        Edge_M = [p.shape[1] - 2, p.shape[1] - 1]
+        t = np.hstack((t, np.array([[Edge_MM[0]], [Edge_MM[1]], [Edge_M[1]], [1]])))
+        t = np.hstack((t, np.array([[Edge_MM[0]], [Edge_M[0]], [Edge_M[1]], [1]])))
+        
+        Edge_MM = Edge_M
+
+    # Dernière couche du monopôle
+    t = np.hstack((t, np.array([[Edge_M[0]], [Edge_M[1]], [Edge_T[1]], [1]])))
+    t = np.hstack((t, np.array([[Edge_M[0]], [Edge_T[0]], [Edge_T[1]], [1]])))
+
+# Affichage final du monopôle
+fig = create_figure(p, t, "Monopole Antenna")
+fig.show()
 
 # Affichage pour vérifier la triangulation
 """
