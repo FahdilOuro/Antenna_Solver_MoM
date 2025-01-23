@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import plotly.figure_factory as ff
 import scipy.io as sio
@@ -41,17 +42,27 @@ def compute_aspect_ratios(points):
 def calculate_mesh_dimension(points):
     point_x_min = min(points[0])
     point_x_max = max(points[0])
+
     point_y_min = min(points[1])
     point_y_max = max(points[1])
+
+    point_z_min = min(points[2])
+    point_z_max = max(points[2])
+
     longueur_mesh_x = point_x_max - point_x_min
-    hauteur_mesh_y = point_y_max - point_y_min
-    return longueur_mesh_x, hauteur_mesh_y
+    largeur_mesh_y = point_y_max - point_y_min
+    hauteur_mesh_y = point_z_max - point_z_min
+
+    return longueur_mesh_x, largeur_mesh_y, hauteur_mesh_y
 
 
-def create_figure(points, triangles, title="Antennas Mesh"):
+def create_figure(points, triangles, create_from_matlab, title="Antennas Mesh"):
     """Crée une figure 3D Plotly à partir des points et triangles."""
     x_, y_, z_ = points
-    simplices = (triangles[:3, :].T - 1)  # Ajuster pour indices Python
+    if create_from_matlab:
+        simplices = triangles[:3, :].T - 1
+    else:
+        simplices = triangles[:3, :].T
 
     aspect_ratios = compute_aspect_ratios(points)
 
@@ -68,7 +79,7 @@ def create_figure(points, triangles, title="Antennas Mesh"):
     return fig
 
 
-def viewer(filename):
+def viewer(filename, create_from_matlab=True):
 
     """Charge, filtre et visualise un fichier de maillage."""
     print(f"Chargement du fichier : {filename}")
@@ -82,11 +93,11 @@ def viewer(filename):
     print(f"Filtered Triangles shape: {triangles.shape}")
 
     # Calcul des dimensions du mesh
-    longueur, hauteur = calculate_mesh_dimension(points)
-    print(f"Votre mesh a une dimension de {longueur} * {hauteur} metre")     # Nous déduisons que le mesh doit avoir une dimension en metre
-    print(f"Longueur suivant l'axe x = {longueur} metre \nHauteur suivant l'axe y = {hauteur} metre")
+    longueur, largeur, hauteur = calculate_mesh_dimension(points)
+    print(f"Votre mesh a une dimension de {longueur} * {largeur} * {hauteur} metre")     # Nous déduisons que le mesh doit avoir une dimension en metre
+    print(f"Longueur suivant l'axe x = {longueur} metre\nlargeur suivant l'axe y = {largeur} metre\nHauteur suivant l'axe z = {hauteur} metre")
 
     # Créer et afficher la figure
-    antennas_file_name = re.split('[./]', filename)[2]  + ' antenna mesh'
-    fig = create_figure(points, triangles, antennas_file_name)
+    antennas_file_name = os.path.splitext(os.path.basename(filename))[0]  + ' antenna mesh'
+    fig = create_figure(points, triangles, create_from_matlab, antennas_file_name)
     fig.show()
