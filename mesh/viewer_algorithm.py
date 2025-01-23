@@ -79,7 +79,7 @@ def create_figure(points, triangles, create_from_matlab, title="Antennas Mesh"):
     return fig
 
 
-def viewer(filename, create_from_matlab=True):
+def viewer(filename, apply_filter_triangles=True, create_from_matlab=True):
 
     """Charge, filtre et visualise un fichier de maillage."""
     print(f"Chargement du fichier : {filename}")
@@ -88,9 +88,12 @@ def viewer(filename, create_from_matlab=True):
     print(f"Points shape: {points.shape}")
     print(f"Triangles shape: {triangles.shape}")
 
-    # Filtrer les triangles invalides
-    triangles = filter_triangles(triangles)
-    print(f"Filtered Triangles shape: {triangles.shape}")
+    if apply_filter_triangles:
+        # Filtrer les triangles invalides --------- A commenter. N'est pas tres utile
+        triangles = filter_triangles(triangles)
+        print(f"Filtered Triangles shape: {triangles.shape}")
+    else:
+        print("Aucun triangle n'as ete filtrer")
 
     # Calcul des dimensions du mesh
     longueur, largeur, hauteur = calculate_mesh_dimension(points)
