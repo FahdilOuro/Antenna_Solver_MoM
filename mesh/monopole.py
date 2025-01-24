@@ -98,151 +98,62 @@ coordonnees_y = np.append(coordonnees_y, y1)
 print("longueur de la taille coordonnees_x =", coordonnees_x.shape)
 print("longueur de la taille coordonnees_y =", coordonnees_y.shape)
 
-points = np.column_stack((coordonnees_x, coordonnees_y))
+points_base = np.column_stack((coordonnees_x, coordonnees_y))
 
-print("points shape =", points.shape)
+print("points shape =", points_base.shape)
 
 # Triangulation de Delaunay; Peut etre replacer eventuellement ici par la fonction triangle
-triangulation = Delaunay(points)
+triangulation = Delaunay(points_base)
 print("triangulation simplices shape =", triangulation.simplices.shape)
 t = np.zeros((4, triangulation.simplices.shape[0]), dtype=int)
 t[:3, :] = triangulation.simplices.T
 print("t shape =", t.shape)
-p = np.zeros((3, points.shape[0]))
-p[:2, :] = points.T
+p = np.zeros((3, points_base.shape[0]))
+p[:2, :] = points_base.T
 print("p shape =", p.shape)
-"""fig = create_figure(p, t, "pate ground")
-fig.show()"""
-
+fig = create_figure(p, t, "pate ground")
+fig.show()
+"""
 filename = "plate_ground"
 save_folder_name = 'data/antennas_mesh/'
 data_save(filename, save_folder_name, p, t)
+"""
 
-# Affichage de la grille 2D pour sélectionner les points d’alimentation
-plt.figure()
-plt.triplot(coordonnees_x, coordonnees_y, triangulation.simplices, color="gray")
-plt.scatter(coordonnees_x, coordonnees_y, color="red", marker="o", label="Points du maillage")
-plt.xlabel("X")
-plt.ylabel("Y")
-plt.title("Cliquez sur deux points d’alimentation, puis appuyez sur ENTRÉE")
-plt.legend()
-plt.show()
+# Paramètres
+h = 1.0       # Hauteur du monopôle
+W_h = 0.04     # Largeur du monopole
+Nx_h = 7       # Discrétisation en x
+Ny_h = 1       # Discrétisation en y
 
-# Sélection des points avec la souris
-FeedingTriangle = []
-while len(FeedingTriangle) < 2:
-    points_selected = plt.ginput(1, timeout=0)
-    if not points_selected:
-        break  # Si aucun point sélectionné, arrêter
-    xi, yi = points_selected[0]
-    TriangleNumber = triangulation.find_simplex([xi, yi])
-    
-    if TriangleNumber < 0:
-        print("Point hors du maillage, veuillez réessayer.")
-        continue
-    
-    FeedingTriangle.append(TriangleNumber)
+# Créer les sommets du plan de masse
+epsilon = 1e-6
+coordonnees_x = []
+coordonnees_y = []
 
-# Création du monopôle
-for n in range(len(FeedingTriangle) // 2):
-    FT = [FeedingTriangle[2 * n], FeedingTriangle[2 * n + 1]]
-    N, M = t[:3, FT[0]], t[:3, FT[1]]
-    
-    # Trouver le bord d'alimentation
-    a = np.isin(N, M)
-    Edge_B = M[a]
+for i in range(Nx_h + 1):
+    for j in range(Ny_h + 1):
+        x_val = 0 + (i / Nx_h) * h
+        y_val = -W_h/2 + (j / Ny_h) * W_h - (epsilon * x_val)
+        coordonnees_x.append(x_val)
+        coordonnees_y.append(y_val)
 
-    # Créer les points du haut du monopôle
-    p = np.hstack((p, p[:, Edge_B[0]].reshape(3, 1) + [[0], [0], [h]]))
-    p = np.hstack((p, p[:, Edge_B[1]].reshape(3, 1) + [[0], [0], [h]]))
-    
-    Edge_T = [p.shape[1] - 2, p.shape[1] - 1]
-    
-    # Construire les segments intermédiaires
-    Edge_MM = Edge_B
-    for k in range(1, Number):
-        new_point_1 = k / Number * (p[:, Edge_T[0]] - p[:, Edge_B[0]]) + p[:, Edge_B[0]]
-        new_point_2 = k / Number * (p[:, Edge_T[1]] - p[:, Edge_B[1]]) + p[:, Edge_B[1]]
-        p = np.hstack((p, new_point_1.reshape(3, 1), new_point_2.reshape(3, 1)))
+# Convertir en numpy array
+coordonnees_x = np.array(coordonnees_x)
+coordonnees_y = np.array(coordonnees_y)
 
-        Edge_M = [p.shape[1] - 2, p.shape[1] - 1]
-        t = np.hstack((t, np.array([[Edge_MM[0]], [Edge_MM[1]], [Edge_M[1]], [1]])))
-        t = np.hstack((t, np.array([[Edge_MM[0]], [Edge_M[0]], [Edge_M[1]], [1]])))
-        
-        Edge_MM = Edge_M
+points_base_monopole = np.column_stack((coordonnees_x, coordonnees_y))
 
-    # Dernière couche du monopôle
-    t = np.hstack((t, np.array([[Edge_M[0]], [Edge_M[1]], [Edge_T[1]], [1]])))
-    t = np.hstack((t, np.array([[Edge_M[0]], [Edge_T[0]], [Edge_T[1]], [1]])))
+print("points shape =", points_base_monopole.shape)
 
-# Affichage final du monopôle
-fig = create_figure(p, t, "Monopole Antenna")
+# Triangulation de Delaunay; Peut etre replacer eventuellement ici par la fonction triangle
+triangulation_monopole = Delaunay(points_base_monopole)
+print("triangulation simplices shape =", triangulation_monopole.simplices.shape)
+t_monopole = np.zeros((4, triangulation_monopole.simplices.shape[0]), dtype=int)
+t_monopole[:3, :] = triangulation_monopole.simplices.T
+print("t shape =", t_monopole.shape)
+p_monopole = np.zeros((3, points_base_monopole.shape[0]))
+p_monopole[:2, :] = points_base_monopole.T
+print("p shape =", p_monopole.shape)
+fig = create_figure(p_monopole, t_monopole, "Monopole")
 fig.show()
 
-# Affichage pour vérifier la triangulation
-"""
-plt.triplot(points[:, 0], points[:, 1], triangulation.simplices, color='gray')
-plt.scatter(points[:, 0], points[:, 1], marker='o', color='red')
-plt.xlabel("X")
-plt.ylabel("Y")
-plt.title("Triangulation de Delaunay")
-plt.grid(True)
-plt.show()
-"""
-
-"""
-# Sélection des triangles d'alimentation avec clics de souris
-feeding_triangles = []
-fig, ax = plt.subplots()
-ax.set_aspect('equal')
-ax.triplot(points[:, 0], points[:, 1], triangulation.simplices, color='gray')
-
-def on_click(event):
-    if event.inaxes != ax:
-        return
-
-    xi, yi = event.xdata, event.ydata
-    simplex = triangulation.find_simplex([[xi, yi]])
-    
-    if simplex >= 0:  # Si le point appartient à un triangle
-        feeding_triangles.append(simplex)
-        simplex_points = points[triangulation.simplices[simplex]]
-        ax.fill(simplex_points[:, 0], simplex_points[:, 1], 'w', edgecolor='r')
-
-    plt.draw()
-
-fig.canvas.mpl_connect('button_press_event', on_click)
-plt.show()
-
-# Créer le monopôle (ajouter les segments verticaux)
-p = points.copy()  # Copie des points initiaux
-
-for n in range(len(feeding_triangles) // 2):
-    simplex_idx = feeding_triangles[2 * n: 2 * n + 2]
-    
-    for simplex in simplex_idx:
-        simplex_points = points[triangulation.simplices[simplex]]
-        Edge_B = simplex_points[:2]  # Prendre les deux premiers points
-
-        # Création des arêtes supérieures
-        Edge_T = Edge_B + np.array([[0, 0, h], [0, 0, h]])
-        p = np.vstack([p, Edge_T])
-
-        for k in range(1, Number):
-            new_edge = k / Number * (Edge_T - Edge_B) + Edge_B
-            p = np.vstack([p, new_edge])
-
-# Sauvegarde des données
-np.save('monopole.npy', p)
-
-# Visualisation du monopôle en 3D
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(p[:, 0], p[:, 1], np.zeros_like(p[:, 0]), c='b', marker='o')  # Base
-ax.scatter(p[:, 0], p[:, 1], p[:, 2], c='r', marker='^')  # Partie élevée
-
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
-ax.set_zlabel('Z')
-plt.show()
-"""
