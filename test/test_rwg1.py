@@ -39,7 +39,7 @@ print(f"Total number of edge = {edges_plate.total_number_of_edges}")
 edges_plate.compute_edges_length(points_plate)
 print("Edge length list =")
 print(edges_plate.edges_length)
-filter_complexes_jonctions(triangles_plate, edges_plate)
+filter_complexes_jonctions(points_plate, triangles_plate, edges_plate)
 # Sauvegarde des données
 save_folder_name = 'data/antennas_mesh1/'
 DataManager_rwg1.save_data(filename_plate, save_folder_name, points_plate, triangles_plate, edges_plate)

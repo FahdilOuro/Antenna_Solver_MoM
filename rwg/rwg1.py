@@ -280,7 +280,7 @@ def load_mesh_file(filename, load_from_matlab = True):
 
     return points, triangles  # Retourne les données extraites
 
-def filter_complexes_jonctions(triangle_data, edge_data):
+def filter_complexes_jonctions(point_data, triangle_data, edge_data):
     """
         Filtre les jonctions complexes (spécifiquement les jonctions en T) dans un maillage.
 
@@ -330,6 +330,7 @@ def filter_complexes_jonctions(triangle_data, edge_data):
         # Mets à jour les données des arêtes et triangles après suppression
         edge_data.set_edges(edges[0], edges[1])
         triangle_data.set_triangles_plus_minus(triangles_plus, triangles_minus)
+        edge_data.compute_edges_length(point_data)
     else: print("Aucune jonction complexe trouvée....")  # Si aucune jonction complexe n'est trouvée, affiche un message
 
 

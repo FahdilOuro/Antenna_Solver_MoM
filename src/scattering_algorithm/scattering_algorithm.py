@@ -49,7 +49,7 @@ def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization,
     edges.compute_edges_length(points)
 
     # Filtrage des jonctions complexes pour simplifier la structure du maillage
-    filter_complexes_jonctions(triangles, edges)
+    filter_complexes_jonctions(points, triangles, edges)
 
     # Sauvegarde des données du maillage traité
     save_folder_name_mesh1 = 'data/antennas_mesh1/'
