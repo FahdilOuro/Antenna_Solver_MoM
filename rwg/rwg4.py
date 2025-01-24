@@ -91,7 +91,7 @@ def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incid
     # Retourner les résultats principaux
     return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current
 
-def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point, voltage_amplitude):
+def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point, voltage_amplitude, monopole=False):
     """
         Calcule les courants, l'impédance d'entrée et la puissance rayonnée d'une antenne.
 
@@ -143,7 +143,13 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
     for edge in range(edges.total_number_of_edges):
         # Calcul du point moyen de l'arête (milieu géométrique)
         distance[:, edge] = 0.5 * (points.points[:, edges.first_points[edge]] + points.points[:, edges.second_points[edge]]) - feed_point
-    index_feeding_edges = np.argmin(np.sum(distance ** 2, axis=0))      # Arête alimentée (minimisant la distance)
+    
+    if monopole:
+        index_feeding_edges = np.argsort(np.sum(distance ** 2, axis=0))[:2]  # Indices des deux arêtes minimisant les distances
+    else:
+        index_feeding_edges = np.argmin(np.sum(distance ** 2, axis=0))      # Arête alimentée (minimisant la distance)
+
+    
 
     # Définition du vecteur "voltage" au niveau de l'arête alimentée
     voltage[index_feeding_edges] = voltage_amplitude * edges.edges_length[index_feeding_edges]
