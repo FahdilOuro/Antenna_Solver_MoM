@@ -5,7 +5,7 @@ from rwg.rwg4 import *
 from rwg.rwg5 import *
 
 
-def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_from_matlab=True):
+def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_from_matlab=True, monopole=False):
     # Chargement du fichier de maillage
     p, t = load_mesh_file(mesh1, load_from_matlab)
 
@@ -68,7 +68,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     filename_impedance = save_folder_name_impedance + save_file_name_impedance
 
     # Calcul du courant induit sur l'antenne par l'onde incidente
-    frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, impedance, feed_power = calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude)
+    frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, impedance, feed_power = calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude, monopole)
 
     print(f"La valeur de l'impédance d'entrée de l'antenne {base_name} = {impedance.real : .7f} {"+" if impedance.imag >= 0 else "-"}{abs(impedance.imag) : .7f}i Ohm")
     print(f"La valeur de feed_power  = {feed_power}")
