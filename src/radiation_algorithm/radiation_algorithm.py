@@ -27,6 +27,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     edges = triangles.get_edges()
     edges.compute_edges_length(points)
     print(f"Total numbers of Edges is = {edges.total_number_of_edges}")
+    print(f"edges lenght shape = {edges.edges_length.shape}")
 
     # Filtrage des jonctions complexes pour simplifier la structure du maillage
     filter_complexes_jonctions(points, triangles, edges)
@@ -35,7 +36,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     print(f"triangle shape = {triangles.triangles.shape}")
     print(f"triangle plus shape = {triangles.triangles_plus.shape}")
     print(f"triangle minus shape = {triangles.triangles_minus.shape}")
-    print(f"edges shape = {edges.edges_length.shape}")
+    print(f"edges lenght shape = {edges.edges_length.shape}")
 
     # Sauvegarde des données du maillage traité
     save_folder_name_mesh1 = 'data/antennas_mesh1/'
