@@ -284,7 +284,7 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     print(f"Gain Logarithmic : {gain_logarithmic_max : 4f} dB")
 
     # Sauvegarde des résultats calculés
-    save_gain_power_folder_name = 'data/antennas_gain_power'
+    save_gain_power_folder_name = 'data/antennas_gain_power/'
     save_gain_power_file_name = base_name + '_gain_power.mat'
     save_gain_power_data(save_gain_power_folder_name, save_gain_power_file_name, total_power, gain_linear_max, gain_logarithmic_max)
 
