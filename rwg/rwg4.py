@@ -149,7 +149,7 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
     else:
         index_feeding_edges = np.argmin(np.sum(distance ** 2, axis=0))      # Arête alimentée (minimisant la distance)
 
-    
+    print("index_feeding_edges near to the feed_point =", index_feeding_edges)
 
     # Définition du vecteur "voltage" au niveau de l'arête alimentée
     voltage[index_feeding_edges] = voltage_amplitude * edges.edges_length[index_feeding_edges]
