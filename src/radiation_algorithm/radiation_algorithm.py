@@ -83,14 +83,16 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     filename_impedance = save_folder_name_impedance + save_file_name_impedance
 
     # Calcul du courant induit sur l'antenne par l'onde incidente
-    frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, impedance, feed_power = calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude, monopole)
+    frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power = calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude, monopole)
 
     print(f"La valeur de l'impédance d'entrée de l'antenne {base_name} = {impedance.real : .7f} {"+" if impedance.imag >= 0 else "-"}{abs(impedance.imag) : .7f}i Ohm")
+    print(f"Gap current of {base_name} = {gap_current}")
+    print(f"Gap voltage of {base_name} = {gap_voltage}")
     print(f"La valeur de feed_power  = {feed_power}")
 
     # Sauvegarde des données de courant
     save_folder_name_current = 'data/antennas_current/'
-    save_file_name_current = DataManager_rwg4.save_data_for_radiation(filename_mesh2_to_load, save_folder_name_current, frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, impedance, feed_power)
+    save_file_name_current = DataManager_rwg4.save_data_for_radiation(filename_mesh2_to_load, save_folder_name_current, frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power)
     print(f"Sauvegarde du fichier : {save_file_name_current} effectué avec succès !")
 
     print(f"Fréquence de l'onde incidente : {frequency} Hz")

@@ -215,7 +215,7 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     # Chargement des fichiers contenant les données de maillage, courants et sphère
     data_sphere = loadmat(filename_sphere_to_load)
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
-    frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load)
+    frequency, omega, _, _, light_speed_c, eta, _, current, _, gap_current, *_= DataManager_rwg4.load_data(filename_current_to_load)
 
     # Chargement des données de la sphère
     sphere_points = data_sphere['p'] * 100    # Les coordonnées de la sphère sont multipliées par 100 (rayon de 100 m).
@@ -278,10 +278,12 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     gain_logarithmic = 10 * np.log10(gain_linear)
     gain_linear_max = 4 * np.pi * np.max(u) / total_power
     gain_logarithmic_max = 10 * np.log10(gain_linear_max)
+    radiation_resistance = 2 * total_power / abs(gap_current)**2
 
     print(f"Total Power : {total_power : 4f}")
     print(f"Gain Linear : {gain_linear_max : 4f}")
     print(f"Gain Logarithmic : {gain_logarithmic_max : 4f} dB")
+    print(f"Radiation Resistance : {radiation_resistance : 4f} Ohms")
 
     # Sauvegarde des résultats calculés
     save_gain_power_folder_name = 'data/antennas_gain_power/'

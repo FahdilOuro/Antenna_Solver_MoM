@@ -164,7 +164,7 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
     feed_power = 0.5 * np.real(gap_current * np.conj(gap_voltage))  # Puissance active fournie
 
     # Retourner les résultats
-    return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, impedance, feed_power
+    return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power
 
 
 class DataManager_rwg4:
@@ -237,7 +237,7 @@ class DataManager_rwg4:
     @staticmethod
     def save_data_for_radiation(filename_mesh2, save_folder_name, frequency, omega,
                                 mu, epsilon, light_speed_c, eta,
-                                voltage, current, impedance, feed_power):
+                                voltage, current, gap_current, gap_voltage, impedance, feed_power):
         """
             Sauvegarde les données liées à la radiation des ondes électromagnétiques dans un fichier MATLAB.
 
@@ -270,6 +270,8 @@ class DataManager_rwg4:
             'eta': eta,
             'voltage': voltage,
             'current': current,
+            'gap_current' : gap_current,
+            'gap_voltage' : gap_voltage,
             'impedance': impedance,
             'feed_power': feed_power
         }
@@ -319,10 +321,12 @@ class DataManager_rwg4:
                 polarization = data['polarization'].squeeze()
                 return frequency, omega, mu, epsilon, light_speed_c, eta, wave_incident_direction, polarization, voltage, current
 
-            if 'voltage' in data and 'feed_power' in data:
+            if  'feed_power' in data and 'impedance' in data and 'gap_voltage' in data and 'gap_current' in data:
                 impedance = data['voltage'].squeeze()
                 feed_power = data['current'].squeeze()
-                return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, impedance, feed_power
+                gap_voltage = data['gap_voltage'].squeeze()
+                gap_current = data['gap_current'].squeeze()
+                return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_voltage, gap_current, impedance, feed_power
 
         except FileNotFoundError as e:
             print(f"Error: {e}")
