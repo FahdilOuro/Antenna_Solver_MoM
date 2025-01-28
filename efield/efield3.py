@@ -73,7 +73,7 @@ def compute_polar(observation_point_list_phi, numbers_of_points, eta, complex_k,
     polar = 10 * np.log10(4 * np.pi * u / total_power)  # Conversion en dB
     return polar
 
-def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load, filename_gain_power_to_load):
+def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load, filename_gain_power_to_load, scattering = False, radiation = False):
     """
         Génère le diagramme de directivité d'une antenne dans les plans Phi = 0° et Phi = 90°.
 
@@ -91,7 +91,12 @@ def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load
 
     # Chargement des données nécessaires
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
-    _, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load)
+
+    if scattering :
+        frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)
+    elif radiation:
+        frequency, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=radiation)
+
     total_power, *_ = load_gain_power_data(filename_gain_power_to_load)
 
     # Calcul des paramètres fondamentaux

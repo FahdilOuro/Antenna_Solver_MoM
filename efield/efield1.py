@@ -11,7 +11,7 @@ from rwg.rwg2 import DataManager_rwg2
 from rwg.rwg4 import DataManager_rwg4
 from utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
 
-def calculate_electric_magnetic_field_at_point(filename_mesh2_to_load, filename_current_to_load, observation_point):
+def calculate_electric_magnetic_field_at_point(filename_mesh2_to_load, filename_current_to_load, observation_point, scattering = False, radiation = False):
     """
         Calcule et affiche les champs électriques, magnétiques, le vecteur de Poynting, l'énergie et la section efficace radar (RCS)
         à un point d'observation spécifié, à partir des données de maillage et des courants chargés depuis des fichiers .mat.
@@ -47,7 +47,11 @@ def calculate_electric_magnetic_field_at_point(filename_mesh2_to_load, filename_
 
     # 2. Chargement des données de maillage et des courants à partir des fichiers MAT
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
-    frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load)
+
+    if scattering :
+        frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)
+    elif radiation:
+        frequency, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=radiation)
 
     # 3. Calcul du nombre d'onde k et de sa composante complexe
     k = omega / light_speed_c    # Nombre d'onde (en rad/m)

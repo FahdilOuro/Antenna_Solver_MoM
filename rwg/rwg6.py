@@ -30,9 +30,9 @@ def surface_calculate_current_density(current, triangles, edges, vecteurs_rho):
     return surface_current_density
 
 
-def plot_surface_current_distribution(filename_mesh_2, filename_current):
+def plot_surface_current_distribution(filename_mesh_2, filename_current,  scattering = False, radiation = False):
     points, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh_2)
-    *_, current = DataManager_rwg4.load_data(filename_current)
+    *_, current = DataManager_rwg4.load_data(filename_current, radiation=radiation)
 
     total_of_triangles = triangles.total_of_triangles
 

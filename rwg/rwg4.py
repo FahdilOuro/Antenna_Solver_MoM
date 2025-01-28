@@ -284,7 +284,7 @@ class DataManager_rwg4:
         return save_file_name
 
     @staticmethod
-    def load_data(filename):
+    def load_data(filename, radiation = False, scattering = False):
         """
             Charge des données à partir d'un fichier MATLAB.
 
@@ -316,17 +316,21 @@ class DataManager_rwg4:
             current = data['current'].squeeze()
 
             # Extraction des champs spécifiques
-            if 'wave_incident_direction' in data and 'polarization' in data:
+            if 'wave_incident_direction' in data and 'polarization' in data and scattering:
                 wave_incident_direction = data['wave_incident_direction'].squeeze()
                 polarization = data['polarization'].squeeze()
                 return frequency, omega, mu, epsilon, light_speed_c, eta, wave_incident_direction, polarization, voltage, current
 
-            if  'feed_power' in data and 'impedance' in data and 'gap_voltage' in data and 'gap_current' in data:
+            if 'feed_power' in data and 'impedance' in data and 'gap_voltage' in data and 'gap_current' in data and radiation:
                 impedance = data['voltage'].squeeze()
                 feed_power = data['current'].squeeze()
                 gap_voltage = data['gap_voltage'].squeeze()
                 gap_current = data['gap_current'].squeeze()
                 return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_voltage, gap_current, impedance, feed_power
+            if not scattering and not radiation:
+                raise ValueError("Erreur : 'scattering' et 'radiation' ne peuvent pas être tous les deux False. Precision a ajouter")
+
+        
 
         except FileNotFoundError as e:
             print(f"Error: {e}")
