@@ -103,7 +103,8 @@ def calculate_electric_magnetic_field_at_point(filename_mesh2_to_load, filename_
     # C'est une quantité utilisée principalement dans les applications de radar pour décrire l'échelle de l'objet en termes de diffusion radar.
     # 10. Calcul de la section efficace radar (RCS)
     e_field_dot_conj = np.sum(np.real(e_field_total * np.conj(e_field_total)))
-    rcs = 4 * np.pi * (norm_observation_point ** 2) * e_field_dot_conj             # for scattering
+    if scattering:
+        rcs = 4 * np.pi * (norm_observation_point ** 2) * e_field_dot_conj
 
-    print('')
-    print(f"RCS = {rcs}")
+        print('')
+        print(f"RCS = {rcs}")
