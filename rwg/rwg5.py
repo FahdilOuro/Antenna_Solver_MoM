@@ -43,7 +43,9 @@ def calculate_current_density(current, triangles, edges, vecteurs_rho):
     """
 
     # Initialisation du tableau pour stocker la densité de courant surfacique
-    surface_current_density = np.zeros(triangles.total_of_triangles)  # Norme du courant pour chaque triangle
+    surface_current_density_abs_norm = np.zeros(triangles.total_of_triangles)  # Norme du courant pour chaque triangle
+    surface_current_density_norm = np.zeros(triangles.total_of_triangles)
+    surface_current_density_vector = np.zeros((3, triangles.total_of_triangles))
 
     # Parcours de chaque triangle pour calculer la densité de courant
     for triangle in range(triangles.total_of_triangles):
@@ -60,13 +62,25 @@ def calculate_current_density(current, triangles, edges, vecteurs_rho):
                 current_density_for_triangle += current_times_edge * vecteurs_rho.vecteur_rho_minus[:, edge] / (2 * triangles.triangles_area[triangles.triangles_minus[edge]])
 
         # Calcul de la norme de la densité de courant pour ce triangle
-        surface_current_density[triangle] = np.abs(np.linalg.norm(current_density_for_triangle))
+        # surface_current_density[triangle] = np.abs(np.linalg.norm(current_density_for_triangle))
+        surface_current_density_abs_norm[triangle] = np.abs(np.linalg.norm(current_density_for_triangle))  # abs(norm(i))
+        surface_current_density_norm[triangle] = np.linalg.norm(np.abs(current_density_for_triangle))  # norm(abs(i))
+        surface_current_density_vector[:, triangle] = current_density_for_triangle  # Stockage du vecteur courant
 
     # Densité de courant maximale
-    j_max_surface_current_norm = max(surface_current_density)
-    print(f"Max Current = {j_max_surface_current_norm} [A/m]")
+    j_max_surface_current_abs_norm = max(surface_current_density_abs_norm)
+    print(f"Max Current value = {j_max_surface_current_abs_norm} [A/m]")
 
-    return surface_current_density
+    # Trouver la valeur maximale et son indice
+    j_max_index = np.argmax(surface_current_density_norm)  # Renvoie l'indice du max
+
+    # Récupérer le vecteur correspondant
+    surface_currentMax = surface_current_density_vector[:, j_max_index]
+    print(f"CurrentMax in complex form = {surface_currentMax[0] :4f} [A/m]")
+    print(f"                             {surface_currentMax[1] :4f} [A/m]")
+    print(f"                             {surface_currentMax[2] :4f} [A/m]")
+
+    return surface_current_density_norm
 
 
 def compute_aspect_ratios(points):
@@ -151,7 +165,7 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
         z=z_,
         simplices=simplices,
         colormap="Rainbow",
-        color_func=surface_current_density,  # Utilisation de la densité de courant pour colorer
+        color_func=surface_current_density  / max(surface_current_density),  # Utilisation de la densité de courant pour colorer
         show_colorbar=True,
         title=title,
         aspectratio=aspect_ratios,
