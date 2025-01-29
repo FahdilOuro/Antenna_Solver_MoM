@@ -79,7 +79,7 @@ def visualize_surface_current(points_data, triangles_data, radiation_intensity, 
         z=z_,                            # Coordonnées Z des sommets
         simplices=simplices,             # Indices des sommets de chaque triangle
         colormap="Rainbow",              # Colormap pour la coloration de la surface
-        plot_edges=False,                # Ne pas afficher les bords des triangles
+        plot_edges=True,                # Ne pas afficher les bords des triangles
         color_func=radiation_intensity,  # Utilisation de la densité de courant normalisée pour colorer
         show_colorbar=True,              # Affichage de la barre de couleurs
         title=title,                     # Titre de la visualisation
