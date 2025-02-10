@@ -19,9 +19,9 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
 
     # Affiche les dimensions principales de l'antenne
     base_name = os.path.splitext(os.path.basename(mesh1))[0]
-    print(f"length of antenna {base_name} = {points.length} meter")
+    '''print(f"length of antenna {base_name} = {points.length} meter")
     print(f"width of antenna {base_name} = {points.width} meter")
-    print(f"height of antenna {base_name} = {points.height} meter")
+    print(f"height of antenna {base_name} = {points.height} meter")'''
 
     # Définition des arêtes et calcul de leurs longueurs
     edges = triangles.get_edges()
@@ -30,13 +30,13 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     print(f"Total numbers of Edges is = {edges.total_number_of_edges}")
 
     edges.compute_edges_length(points)
-    print(f"Total numbers of Edges is = {edges.total_number_of_edges}")
+    '''print(f"Total numbers of Edges is = {edges.total_number_of_edges}")
     print(f"edges lenght shape = {edges.edges_length.shape}")
     print(f"point shape = {points.points.shape}")
     print(f"triangle shape = {triangles.triangles.shape}")
     print(f"triangle plus shape = {triangles.triangles_plus.shape}")
     print(f"triangle minus shape = {triangles.triangles_minus.shape}")
-    print(f"edges lenght shape = {edges.edges_length.shape}")
+    print(f"edges lenght shape = {edges.edges_length.shape}")'''
     index = 0
     for area in triangles.triangles_area:
         if area == 0:
@@ -95,13 +95,17 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     save_file_name_current = DataManager_rwg4.save_data_for_radiation(filename_mesh2_to_load, save_folder_name_current, frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power)
     print(f"Sauvegarde du fichier : {save_file_name_current} effectué avec succès !")
 
-    print(f"Fréquence de l'onde incidente : {frequency} Hz")
+    print(f"Fréquence de rayonnement de l'antenne : {frequency} Hz")
 
     # Calcul des courants de surface à partir du courant total
     surface_current_density = calculate_current_density(current, triangles, edges, vecteurs_rho)
+
+    selected_triangles = calculate_seuil_surface_current_density(surface_current_density)
 
     # Visualisation des courants de surface
     antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in receiving mode')
     print(f"{antennas_name} view is successfully created at frequency {frequency} Hz")
     fig = visualize_surface_current(points, triangles, surface_current_density, antennas_name)
     fig.show()
+
+    return selected_triangles

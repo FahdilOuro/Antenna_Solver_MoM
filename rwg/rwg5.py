@@ -45,7 +45,7 @@ def calculate_current_density(current, triangles, edges, vecteurs_rho):
     # Initialisation du tableau pour stocker la densité de courant surfacique
     surface_current_density_abs_norm = np.zeros(triangles.total_of_triangles)  # Norme du courant pour chaque triangle
     surface_current_density_norm = np.zeros(triangles.total_of_triangles)
-    surface_current_density_vector = np.zeros((3, triangles.total_of_triangles))
+    surface_current_density_vector = np.zeros((3, triangles.total_of_triangles), dtype=complex)
 
     # Parcours de chaque triangle pour calculer la densité de courant
     for triangle in range(triangles.total_of_triangles):
@@ -82,7 +82,7 @@ def calculate_current_density(current, triangles, edges, vecteurs_rho):
     print(f"                             {surface_currentMax[2] :4f} [A/m]")
     """
 
-    return surface_current_density_norm
+    return surface_current_density_abs_norm
 
 
 def compute_aspect_ratios(points):
@@ -116,7 +116,7 @@ def compute_aspect_ratios(points):
     return {
         "x": (max(x_) - min(x_)) / fig_scale,
         "y": (max(y_) - min(y_)) / fig_scale,
-        "z": (max(z_) - min(z_)) / fig_scale,
+        "z": 0.3,
     }
 
 def visualize_surface_current(points_data, triangles_data, surface_current_density, title="Antennas Surface Current"):
@@ -173,3 +173,28 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
         aspectratio=aspect_ratios,
     )
     return fig
+
+def calculate_seuil_surface_current_density(surface_current_density):
+    factor=1.5
+    # Calcul de la médiane et de l'écart-type
+    median_value = np.median(surface_current_density)
+    std_dev = np.std(surface_current_density)
+
+    # Calculer la valeur maximale
+    max_value = np.max(surface_current_density)
+    
+    # Choisir un seuil basé sur la médiane ± facteur * écart-type
+    # seuil = median_value - factor * std_dev  # Ajustez le facteur selon vos besoins
+    seuil = 0.7 * max_value
+    
+    # Identifier les indices des éléments inférieurs au seuil
+    indices_below_seuil = np.where(surface_current_density < seuil)[0]
+    
+    # Afficher les résultats
+    # print("Valeur médiane de la densité de courant de surface:", median_value)
+    print("Seuil choisi basé sur la médiane et l'écart-type:", seuil)
+    print("Valeur maximale de la densité de courant de surface:", max_value)
+    print("Nombre d'éléments inférieurs au seuil:", len(indices_below_seuil))
+    print("Indices des éléments inférieurs au seuil:", indices_below_seuil)
+
+    return indices_below_seuil
