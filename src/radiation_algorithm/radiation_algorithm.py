@@ -108,4 +108,4 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     fig = visualize_surface_current(points, triangles, surface_current_density, antennas_name)
     fig.show()
 
-    return selected_triangles
+    return impedance, selected_triangles
