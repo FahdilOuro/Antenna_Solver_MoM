@@ -18,13 +18,15 @@ class AdaptiveMeshRefiner:
         """
         # Choix des options selon le niveau de raffinement
         options_map = {
+            "very_low": "p",
             "low": "pq20",
+            "moderate": "pq20a0.1",
             "medium": "pq20a0.01",
             "high": "pq20a0.00001"
         }
 
         # Vérifier si le niveau existe, sinon utiliser le mode "high" par défaut
-        options = options_map.get(refinement_level, options_map["high"])
+        options = options_map.get(refinement_level, options_map["very_low"])
 
         print(f"Utilisation des options de triangulation : {options}")
 
