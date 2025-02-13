@@ -14,7 +14,7 @@ class AdaptiveMeshRefiner:
         """
         Effectue la triangulation initiale sur l'antenne avec un niveau de raffinage sélectionnable.
         
-        - refinement_level : "low", "medium", "high" (défaut) pour changer les options de `triangle`.
+        - refinement_level : "low", "medium", "high" (défaut), etc... pour changer les options de `triangle`.
         """
         # Choix des options selon le niveau de raffinement
         options_map = {
@@ -22,7 +22,9 @@ class AdaptiveMeshRefiner:
             "low": "pq20",
             "moderate": "pq20a0.1",
             "medium": "pq20a0.01",
-            "high": "pq20a0.00001"
+            "average": "pq20a0.001",
+            "high": "pq20a0.0001",
+            "ultra": "pq20a0.00001"
         }
 
         # Vérifier si le niveau existe, sinon utiliser le mode "high" par défaut
