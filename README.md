@@ -37,7 +37,7 @@ The antenna mesh data files should be placed in the data/antennas_mesh/ director
 
     ```bash
     git clone https://github.com/FahdilOuro/Antenna_Solver_MoM.git
-    cd Antenna_solver_MoM_python
+    cd Antenna_solver_MoM
     ```
 
 2. **Set up a virtual environment**:
