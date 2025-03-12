@@ -42,7 +42,7 @@ def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization,
     base_name = os.path.splitext(os.path.basename(mesh))[0]
     print(f"length of antenna {base_name} = {points.length} meter")
     print(f"width of antenna {base_name} = {points.width} meter")
-    print(f"height of antenna {base_name} = {points.height} meter")
+    print(f"height of antenna {base_name} = {points.height} meter\n")
 
     # Définition des arêtes et calcul de leurs longueurs
     edges = triangles.get_edges()
@@ -97,15 +97,15 @@ def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization,
     save_file_name_current = DataManager_rwg4.save_data_for_scattering(filename_mesh2_to_load, save_folder_name_current, frequency,
                                                         omega, mu, epsilon, light_speed_c, eta, wave_incident_direction,
                                                         polarization, voltage, current)
-    print(f"Sauvegarde du fichier : {save_file_name_current} effectué avec succès !")
+    print(f"\nSauvegarde du fichier : {save_file_name_current} effectué avec succès !")
 
-    print(f"Fréquence de l'onde incidente : {frequency} Hz")
+    print(f"\nFréquence de l'onde incidente : {frequency} Hz")
 
     # Calcul des courants de surface à partir du courant total
     surface_current_density = calculate_current_density(current, triangles, edges, vecteurs_rho)
 
     # Visualisation des courants de surface
     antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in receiving mode')
-    print(f"{antennas_name} view is successfully created at frequency {frequency} Hz")
+    print(f"\n{antennas_name} view is successfully created at frequency {frequency} Hz")
     fig = visualize_surface_current(points, triangles, surface_current_density, antennas_name)
     fig.show()
