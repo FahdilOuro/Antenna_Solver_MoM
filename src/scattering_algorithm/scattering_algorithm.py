@@ -51,6 +51,8 @@ def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization,
     # Filtrage des jonctions complexes pour simplifier la structure du maillage
     filter_complexes_jonctions(points, triangles, edges)
 
+    print(f"\nNombre d'elements de maillage (edges) = {edges.total_number_of_edges}\n")
+
     # Sauvegarde des données du maillage traité
     save_folder_name_mesh1 = 'data/antennas_mesh1/'
     save_file_name_mesh1 = DataManager_rwg1.save_data(mesh, save_folder_name_mesh1, points, triangles, edges)

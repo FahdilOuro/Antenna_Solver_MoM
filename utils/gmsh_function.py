@@ -1,3 +1,4 @@
+import sys
 import gmsh
 import numpy as np
 import scipy.io as sio
@@ -5,7 +6,8 @@ import scipy.io as sio
 def open_mesh(file_msh_path):
     gmsh.initialize()
     gmsh.open(file_msh_path)
-    gmsh.fltk.run()
+    if '-nopopup' not in sys.argv:
+        gmsh.fltk.run()
     gmsh.finalize()
 
 def extract_msh_to_msh(file_msh_path, save_mat_path):
