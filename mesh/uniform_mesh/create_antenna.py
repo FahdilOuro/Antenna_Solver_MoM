@@ -1,7 +1,9 @@
 import os
 import gmsh
 
-def plate_gmsh(longueur, hauteur, mesh_name, save_mesh_folder, mesh_size=0.5):
+from utils.gmsh_function import feed_edge
+
+def plate_gmsh(longueur, hauteur, mesh_name, feed_point, length_feed_edge, angle, save_mesh_folder, mesh_size=0.5):
     # Initialisation de Gmsh
     gmsh.initialize()
     gmsh.model.add("plate_gmsh")
@@ -9,6 +11,8 @@ def plate_gmsh(longueur, hauteur, mesh_name, save_mesh_folder, mesh_size=0.5):
     # Utilisation d'Open Cascade pour créer un rectangle (x, y, z, largeur, hauteur)
     plate = gmsh.model.occ.addRectangle(0, 0, 0, longueur, hauteur)
     gmsh.model.occ.synchronize()
+
+    feed_edge(plate, feed_point, length_feed_edge, mesh_name, angle)
 
     Automatic = 2
     gmsh.option.setNumber("Mesh.Algorithm", Automatic)   # To set The "Automatic" algorithm / Change if necessary
@@ -21,7 +25,6 @@ def plate_gmsh(longueur, hauteur, mesh_name, save_mesh_folder, mesh_size=0.5):
         gmsh.model.mesh.setSize(gmsh.model.getEntities(0), mesh_size * longueur)
     else:
         gmsh.model.mesh.setSize(gmsh.model.getEntities(0), mesh_size * hauteur)
-
 
     # Génération du maillage 2D sur la surface
     gmsh.model.mesh.generate(2)
