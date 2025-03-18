@@ -44,7 +44,7 @@ def plate_gmsh(longueur, hauteur, mesh_name, feed_point, length_feed_edge, angle
 
     return output_path
 
-def plate_2_gmsh(longueur, hauteur, mesh_name, save_mesh_folder, refinement_order=4):
+def plate_2_gmsh(longueur, hauteur, mesh_name, feed_point, length_feed_edge, angle, save_mesh_folder, refinement_order=4):
     # Initialisation de Gmsh
     gmsh.initialize()
     gmsh.model.add("plate_gmsh")
@@ -52,6 +52,8 @@ def plate_2_gmsh(longueur, hauteur, mesh_name, save_mesh_folder, refinement_orde
     # Utilisation d'Open Cascade pour créer un rectangle (x, y, z, largeur, hauteur)
     plate = gmsh.model.occ.addRectangle(0, 0, 0, longueur, hauteur)
     gmsh.model.occ.synchronize()
+
+    feed_edge(plate, feed_point, length_feed_edge, mesh_name, angle)
 
     Automatic = 2
     gmsh.option.setNumber("Mesh.Algorithm", Automatic)   # To set The "Automatic" algorithm / Change if necessary
