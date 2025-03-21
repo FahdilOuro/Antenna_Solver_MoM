@@ -140,7 +140,7 @@ def slot_gmsh(longueur, hauteur, slot_longueur, slot_largeur, espacement, mesh_n
 
     return output_path
 
-def bowtie_gmsh(width, hight, width_finite, mesh_name, save_mesh_folder, mesh_size=0.5):
+def bowtie_gmsh(width, hight, width_finite, mesh_name, feed_point, length_feed_edge, angle, save_mesh_folder, mesh_size=0.5):
     # Initialisation de Gmsh
     gmsh.initialize()
     gmsh.model.add("bowtie_antenna")
@@ -165,8 +165,10 @@ def bowtie_gmsh(width, hight, width_finite, mesh_name, save_mesh_folder, mesh_si
     wire = gmsh.model.occ.addWire([l1, l2, l3, l4, l5, l6])
 
     # Création de la surface
-    surface = gmsh.model.occ.addPlaneSurface([wire])
+    bowtie = gmsh.model.occ.addPlaneSurface([wire])
     gmsh.model.occ.synchronize()
+
+    feed_edge(bowtie, feed_point, length_feed_edge, mesh_name, angle)
 
     Automatic = 2
     gmsh.option.setNumber("Mesh.Algorithm", Automatic)   # To set The "Automatic" algorithm / Change if necessary

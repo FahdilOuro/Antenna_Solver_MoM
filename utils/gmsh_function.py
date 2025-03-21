@@ -13,7 +13,7 @@ def open_mesh(file_msh_path):
         gmsh.fltk.run()
     gmsh.finalize()
 
-def extract_receiving_msh_to_msh(file_msh_path, save_mat_path):
+def extract_receiving_msh_to_mat(file_msh_path, save_mat_path):
     # Initialiser Gmsh
     gmsh.initialize()
 
@@ -56,7 +56,7 @@ def extract_receiving_msh_to_msh(file_msh_path, save_mat_path):
 
     print(f"matlab file stored in {save_mat_path} successfully")
 
-def extract_radiation_msh_to_msh(file_msh_path, mesh_name, save_mat_path):
+def extract_radiation_msh_to_mat(file_msh_path, mesh_name, save_mat_path):
     # Initialiser Gmsh
     gmsh.initialize()
 
@@ -138,12 +138,10 @@ def extract_radiation_msh_to_msh(file_msh_path, mesh_name, save_mat_path):
     #  Fermeture de Gmsh
     gmsh.finalize()
 
-    print(f"Nouveau fichier généré : {save_mat_path}")
+    print(f"matlab file stored in {save_mat_path} successfully")
 
 def feed_edge(surface_tag, feed_point, length_feed_edge, mesh_name, angle=0, plane="xy"):
     length_feed_edge -= 0.000001
-    # Identifier les arêtes avant l'ajout de l'arête interne
-    edges_before = set(gmsh.model.getEntities(1))
 
     # Point central de l'arête
     if not (isinstance(feed_point, (list, tuple)) and len(feed_point) == 3):
@@ -192,23 +190,16 @@ def feed_edge(surface_tag, feed_point, length_feed_edge, mesh_name, angle=0, pla
     gmsh.model.occ.fragment([(2, surface_tag)], [(1, feed_edge_tag)])
     gmsh.model.occ.synchronize()
 
-    # Identifier la nouvelle arête créée
-    edges_after = set(gmsh.model.getEntities(1))
-    new_edge = list(edges_after - edges_before)  # Trouver l'arête ajoutée
+    # Définir le chemin du fichier JSON
+    json_path = f'data/json/feed_edge_info_{os.path.splitext(mesh_name)[0]}.json'
 
-    if new_edge:
-        new_edge_tag = new_edge[0][1]  # Extraire le tag de la nouvelle arête
+    # Vérifier si le dossier "json" existe, sinon le créer
+    os.makedirs(os.path.dirname(json_path), exist_ok=True)
 
-        # Définir le chemin du fichier JSON
-        json_path = f'data/json/feed_edge_info_{os.path.splitext(mesh_name)[0]}.json'
-
-        # Vérifier si le dossier "json" existe, sinon le créer
-        os.makedirs(os.path.dirname(json_path), exist_ok=True)
-
-        # Sauvegarder l'ID de l'arête dans un fichier JSON pour éviter toute confusion
-        with open(json_path, "w") as f:
-            json.dump({"edge_tag": new_edge_tag}, f, indent=4)
+    # Sauvegarder l'ID de l'arête dans un fichier JSON pour éviter toute confusion
+    with open(json_path, "w") as f:
+        json.dump({"edge_tag": feed_edge_tag}, f, indent=4)
+    
+    print(f"Json File saved to the path : {json_path}")
 
     print("Ajout de feed_edge reussie ...!")
-
-    return feed_edge_tag
