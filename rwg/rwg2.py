@@ -281,6 +281,8 @@ class DataManager_rwg2:
             # Initialisation des objets avec les données chargées
             points = Points(points_data=data['points'].squeeze())
             triangles = Triangles(triangles_data=data['triangles'].squeeze())
+            points_feed = data['points_feed'].squeeze()
+            triangles_feed = data['triangles_feed'].squeeze()
             edges = Edges(first_points=data['edge_first_points'].squeeze(), second_points=data['edge_second_points'].squeeze())
             triangles.set_triangles_plus_minus(triangles_plus=data['triangles_plus'].squeeze(), triangles_minus=data['triangles_minus'].squeeze())
             triangles.set_triangles_area_and_center(triangles_area=data['triangles_area'].squeeze(), triangles_center=data['triangles_center'].squeeze())
@@ -293,7 +295,7 @@ class DataManager_rwg2:
                                           vecteur_rho_barycentric_plus=data['vecteur_rho_barycentric_plus'].squeeze(),
                                           vecteur_rho_barycentric_minus=data['vecteur_rho_barycentric_minus'].squeeze())
             print(f"Data loaded from {filename}")
-            return points, triangles, edges, barycentric_triangle, vecteurs_rho
+            return points, triangles, points_feed, triangles_feed, edges, barycentric_triangle, vecteurs_rho
         except FileNotFoundError as e:
             print(f"Error: {e}")
         except KeyError as e:

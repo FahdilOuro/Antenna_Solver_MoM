@@ -6,6 +6,7 @@ from scipy.io import savemat, loadmat
 
 from rwg.rwg2 import DataManager_rwg2
 from rwg.rwg3 import DataManager_rwg3
+from utils.feed_edge import *
 
 
 # Définition du champ incident
@@ -132,24 +133,27 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
             * La résolution du système linéaire repose sur une matrice d'impédance correctement formée.
     """
     # Chargement des données maillées et d'impédance
-    points, _, edges, *_ = DataManager_rwg2.load_data(filename_mesh_2)
+    points, _, points_feed, _, edges, *_ = DataManager_rwg2.load_data(filename_mesh_2)
     frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z = DataManager_rwg3.load_data(filename_impedance)
 
     # Initialisation des variables
     voltage = np.zeros(edges.total_number_of_edges, dtype=complex)  # Vecteur de tension
     distance = np.zeros((3, edges.total_number_of_edges))           # Distance entre le point d'alimentation et chaque arête
 
-    # Identification de l'arête la plus proche du point d'alimentation
+    """# Identification de l'arête la plus proche du point d'alimentation
     for edge in range(edges.total_number_of_edges):
         # Calcul du point moyen de l'arête (milieu géométrique)
-        distance[:, edge] = 0.5 * (points.points[:, edges.first_points[edge]] + points.points[:, edges.second_points[edge]]) - feed_point
+        distance[:, edge] = 0.5 * (points.points[:, edges.first_points[edge]] + points.points[:, edges.second_points[edge]]) - feed_point"""
     
     if monopole:
         index_feeding_edges = np.argsort(np.sum(distance ** 2, axis=0))[:2]  # Indices des deux arêtes minimisant les distances
     else:
-        index_feeding_edges = np.argmin(np.sum(distance ** 2, axis=0))      # Arête alimentée (minimisant la distance)
+        # Trouver les indices
+        indices_feed = find_feed_indices(points.points, points_feed)
+        edge_feed = create_edge_feed(indices_feed)
+        index_feeding_edges = find_matching_edges(edges, edge_feed)
 
-    print("index_feeding_edges near to the feed_point =", index_feeding_edges)
+    print("The index edge where the antenna is feed are : ", index_feeding_edges)
 
     # Définition du vecteur "voltage" au niveau de l'arête alimentée
     voltage[index_feeding_edges] = voltage_amplitude * edges.edges_length[index_feeding_edges]

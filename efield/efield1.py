@@ -46,7 +46,7 @@ def calculate_electric_magnetic_field_at_point(filename_mesh2_to_load, filename_
     base_name = base_name.replace('_mesh2', '')
 
     # 2. Chargement des données de maillage et des courants à partir des fichiers MAT
-    _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
+    _, triangles, _, _, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
 
     if scattering :
         frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)

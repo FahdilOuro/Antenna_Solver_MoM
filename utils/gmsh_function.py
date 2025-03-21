@@ -13,6 +13,13 @@ def open_mesh(file_msh_path):
         gmsh.fltk.run()
     gmsh.finalize()
 
+def sort_points(point):
+    """
+    Trie les points dans l'ordre croissant selon toutes leurs dimensions.
+    """
+    sorted_indices = np.lexsort(point[::-1])  # Trie en commençant par la dernière coordonnée
+    return point[:, sorted_indices]
+
 def extract_receiving_msh_to_mat(file_msh_path, save_mat_path):
     # Initialiser Gmsh
     gmsh.initialize()
@@ -113,6 +120,8 @@ def extract_radiation_msh_to_mat(file_msh_path, mesh_name, save_mat_path):
 
         if p_feed_indices:  # Vérifier qu'on a bien trouvé des indices
             p_feed = p[:, p_feed_indices]  # Extraire les coordonnées des points appartenant à l'arête
+    
+    p_feed = sort_points(p_feed)
 
     # Détection des triangles appartenant à l’arête interne (t_feed)**
     p_feed_set = {tuple(p_feed[:, i]) for i in range(p_feed.shape[1])}  # Création d’un set pour une recherche rapide

@@ -215,7 +215,7 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     # Chargement des fichiers contenant les données de maillage, courants et sphère
     data_sphere = loadmat(filename_sphere_to_load)
 
-    _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
+    _, triangles, _, _, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
 
     if scattering :
         frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)

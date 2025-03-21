@@ -19,32 +19,21 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
 
     # Affiche les dimensions principales de l'antenne
     base_name = os.path.splitext(os.path.basename(mesh1))[0]
-    '''print(f"length of antenna {base_name} = {points.length} meter")
-    print(f"width of antenna {base_name} = {points.width} meter")
-    print(f"height of antenna {base_name} = {points.height} meter")'''
 
     # Définition des arêtes et calcul de leurs longueurs
     edges = triangles.get_edges()
-    print(f"Total numbers of Edges is = {edges.total_number_of_edges}")
     filter_complexes_jonctions(points, triangles, edges)          # Filtrage des jonctions complexes pour simplifier la structure du maillage
-    print(f"Total numbers of Edges is = {edges.total_number_of_edges}")
+
+    print(f"\nNombre d'elements de maillage (edges) = {edges.total_number_of_edges}\n")
 
     edges.compute_edges_length(points)
-    '''print(f"Total numbers of Edges is = {edges.total_number_of_edges}")
-    print(f"edges lenght shape = {edges.edges_length.shape}")
-    print(f"point shape = {points.points.shape}")
-    print(f"triangle shape = {triangles.triangles.shape}")
-    print(f"triangle plus shape = {triangles.triangles_plus.shape}")
-    print(f"triangle minus shape = {triangles.triangles_minus.shape}")
-    print(f"edges lenght shape = {edges.edges_length.shape}")'''
+    
     index = 0
     for area in triangles.triangles_area:
         if area == 0:
             print(area)
             print("Aire du triangle nulle a la colonne :", index)
         index += 1
-
-
 
     # Sauvegarde des données du maillage traité
     save_folder_name_mesh1 = 'data/antennas_mesh1/'
@@ -85,10 +74,10 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     # Calcul du courant induit sur l'antenne par l'onde incidente
     frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power = calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude, monopole)
 
-    print(f"La valeur de l'impédance d'entrée de l'antenne {base_name} = {impedance.real : .7f} {"+" if impedance.imag >= 0 else "-"}{abs(impedance.imag) : .7f}i Ohm")
+    print(f"\nLa valeur de l'impédance d'entrée de l'antenne {base_name} = {impedance.real : .7f} {"+" if impedance.imag >= 0 else "-"}{abs(impedance.imag) : .7f}i Ohm")
     print(f"Gap current of {base_name} = {gap_current}")
     print(f"Gap voltage of {base_name} = {gap_voltage}")
-    print(f"La valeur de feed_power  = {feed_power}")
+    print(f"La valeur de feed_power  = {feed_power}\n")
 
     # Sauvegarde des données de courant
     save_folder_name_current = 'data/antennas_current/'
