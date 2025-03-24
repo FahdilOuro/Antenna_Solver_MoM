@@ -212,3 +212,30 @@ def feed_edge(surface_tag, feed_point, length_feed_edge, mesh_name, angle=0, pla
     print(f"Json File saved to the path : {json_path}")
 
     print("Ajout de feed_edge reussie ...!")
+
+def save_gmsh_log(mesh_name, output_path):
+    """Enregistre les logs de GMSH dans un fichier texte avec un format clair et structuré."""
+
+    model_name = os.path.splitext(os.path.basename(mesh_name))[0]
+
+    # Récupérer les logs
+    logs = gmsh.logger.get()
+
+    # Assurer l'existence du dossier de logs
+    log_dir = "data/gmsh_log"
+    os.makedirs(log_dir, exist_ok=True)
+
+    # Déterminer le chemin du fichier log
+    log_file = os.path.join(log_dir, f"mesh_log_{model_name}.txt")
+
+    with open(log_file, "w", encoding="utf-8") as f:
+        f.write(f"========== MESHING SUMMARY ==========\n\n")
+        f.write(f"Model: {model_name}\n")
+        f.write(f"Mesh file location: {os.path.abspath(output_path)}\n")
+        f.write(f"-------------------------------------\n\n")
+
+        # Écriture des logs de Gmsh
+        for log in logs:
+            f.write(log + "\n")
+
+    print(f"Log saved in: {log_file}")  # Confirmation en console

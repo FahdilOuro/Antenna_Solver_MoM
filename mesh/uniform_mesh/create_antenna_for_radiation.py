@@ -1,12 +1,12 @@
 import os
 import gmsh
 
-from utils.gmsh_function import feed_edge
+from utils.gmsh_function import feed_edge, save_gmsh_log
 
 def plate_gmsh(longueur, hauteur, mesh_name, feed_point, length_feed_edge, angle, save_mesh_folder, mesh_size=0.5):
     # Initialisation de Gmsh
     gmsh.initialize()
-    gmsh.model.add("plate_gmsh")
+    gmsh.model.add(os.path.splitext(os.path.basename(mesh_name))[0])
 
     # Utilisation d'Open Cascade pour créer un rectangle (x, y, z, largeur, hauteur)
     plate = gmsh.model.occ.addRectangle(0, 0, 0, longueur, hauteur)
@@ -39,6 +39,9 @@ def plate_gmsh(longueur, hauteur, mesh_name, feed_point, length_feed_edge, angle
     gmsh.write(output_path)
     print(f"{mesh_name} saved in {output_path} successfully")
 
+    # Sauvegarde des logs 
+    save_gmsh_log(mesh_name, output_path)
+
     # Fermeture de Gmsh
     gmsh.finalize()
 
@@ -47,7 +50,7 @@ def plate_gmsh(longueur, hauteur, mesh_name, feed_point, length_feed_edge, angle
 def plate_2_gmsh(longueur, hauteur, mesh_name, feed_point, length_feed_edge, angle, save_mesh_folder, refinement_order=4):
     # Initialisation de Gmsh
     gmsh.initialize()
-    gmsh.model.add("plate_gmsh")
+    gmsh.model.add(os.path.splitext(os.path.basename(mesh_name))[0])
 
     # Utilisation d'Open Cascade pour créer un rectangle (x, y, z, largeur, hauteur)
     plate = gmsh.model.occ.addRectangle(0, 0, 0, longueur, hauteur)
@@ -87,6 +90,9 @@ def plate_2_gmsh(longueur, hauteur, mesh_name, feed_point, length_feed_edge, ang
     gmsh.write(output_path)
     print(f"{mesh_name} saved in {output_path} successfully")
 
+    # Sauvegarde des logs 
+    save_gmsh_log(mesh_name, output_path)
+
     # Fermeture de Gmsh
     gmsh.finalize()
 
@@ -95,7 +101,7 @@ def plate_2_gmsh(longueur, hauteur, mesh_name, feed_point, length_feed_edge, ang
 def slot_gmsh(longueur, hauteur, slot_longueur, slot_largeur, espacement, mesh_name, save_mesh_folder, mesh_size=0.5):
     # Initialisation de Gmsh
     gmsh.initialize()
-    gmsh.model.add("plate_gmsh")
+    gmsh.model.add(os.path.splitext(os.path.basename(mesh_name))[0])
 
     # Utilisation d'Open Cascade pour créer un rectangle (x, y, z, largeur, hauteur)
     plate = gmsh.model.occ.addRectangle(-longueur/2, -hauteur/2, 0, longueur, hauteur)
@@ -135,6 +141,9 @@ def slot_gmsh(longueur, hauteur, slot_longueur, slot_largeur, espacement, mesh_n
     gmsh.write(output_path)
     print(f"{mesh_name} saved in {output_path} successfully")
 
+    # Sauvegarde des logs 
+    save_gmsh_log(mesh_name, output_path)
+
     # Fermeture de Gmsh
     gmsh.finalize()
 
@@ -143,7 +152,7 @@ def slot_gmsh(longueur, hauteur, slot_longueur, slot_largeur, espacement, mesh_n
 def bowtie_gmsh(width, hight, width_finite, mesh_name, feed_point, length_feed_edge, angle, save_mesh_folder, mesh_size=0.5):
     # Initialisation de Gmsh
     gmsh.initialize()
-    gmsh.model.add("bowtie_antenna")
+    gmsh.model.add(os.path.splitext(os.path.basename(mesh_name))[0])
 
     # Définition des points
     p0 = gmsh.model.occ.addPoint(-width/2, -hight/2, 0)
@@ -195,6 +204,9 @@ def bowtie_gmsh(width, hight, width_finite, mesh_name, feed_point, length_feed_e
     gmsh.write(output_path)
     print(f"{mesh_name} saved in {output_path} successfully")
 
+    # Sauvegarde des logs 
+    save_gmsh_log(mesh_name, output_path)
+
     # Fermeture de Gmsh
     gmsh.finalize()
 
@@ -203,7 +215,7 @@ def bowtie_gmsh(width, hight, width_finite, mesh_name, feed_point, length_feed_e
 def ifa_gmsh(Lenght, Hight, Small_Lenght, Small_Hight, gap_F, Tight_F, mesh_name, save_mesh_folder, mesh_size):
     # Initialisation de Gmsh
     gmsh.initialize()
-    gmsh.model.add("IFA_antenna")
+    gmsh.model.add(os.path.splitext(os.path.basename(mesh_name))[0])
 
     # Création du rectangle de base
     base = gmsh.model.occ.addRectangle(0, 0, 0, Lenght, Hight)
@@ -246,6 +258,9 @@ def ifa_gmsh(Lenght, Hight, Small_Lenght, Small_Hight, gap_F, Tight_F, mesh_name
     gmsh.write(output_path)
     print(f"{mesh_name} saved in {output_path} successfully")
 
+    # Sauvegarde des logs 
+    save_gmsh_log(mesh_name, output_path)
+
     # Fermeture de Gmsh
     gmsh.finalize()
 
@@ -254,7 +269,7 @@ def ifa_gmsh(Lenght, Hight, Small_Lenght, Small_Hight, gap_F, Tight_F, mesh_name
 def strip_gmsh(Longueur, largeur, mesh_name, save_mesh_folder, mesh_size):
     # Initialisation de Gmsh
     gmsh.initialize()
-    gmsh.model.add("Strip_Antenna")
+    gmsh.model.add(os.path.splitext(os.path.basename(mesh_name))[0])
 
     # Création des points
     p0 = gmsh.model.occ.addPoint(0, 0, 0)
@@ -297,6 +312,9 @@ def strip_gmsh(Longueur, largeur, mesh_name, save_mesh_folder, mesh_size):
 
     gmsh.write(output_path)
     print(f"{mesh_name} saved in {output_path} successfully")
+
+    # Sauvegarde des logs 
+    save_gmsh_log(mesh_name, output_path)
 
     # Fermeture de Gmsh
     gmsh.finalize()
