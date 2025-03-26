@@ -4,9 +4,9 @@ import gmsh
 from utils.gmsh_function import feed_edge, save_gmsh_log
 
 def plate_gmsh(longueur, hauteur, mesh_name, feed_point, length_feed_edge, angle, save_mesh_folder, mesh_size=0.5):
-    # Initialisation de Gmsh
+    '''# Initialisation de Gmsh
     gmsh.initialize()
-    gmsh.model.add(os.path.splitext(os.path.basename(mesh_name))[0])
+    gmsh.model.add(os.path.splitext(os.path.basename(mesh_name))[0])'''
 
     # Utilisation d'Open Cascade pour créer un rectangle (x, y, z, largeur, hauteur)
     plate = gmsh.model.occ.addRectangle(0, 0, 0, longueur, hauteur)
@@ -41,9 +41,6 @@ def plate_gmsh(longueur, hauteur, mesh_name, feed_point, length_feed_edge, angle
 
     # Sauvegarde des logs 
     save_gmsh_log(mesh_name, output_path)
-
-    # Fermeture de Gmsh
-    gmsh.finalize()
 
     return output_path
 

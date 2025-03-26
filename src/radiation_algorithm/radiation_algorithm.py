@@ -3,6 +3,7 @@ from rwg.rwg2 import *
 from rwg.rwg3 import *
 from rwg.rwg4 import *
 from rwg.rwg5 import *
+from utils.refinement_function import *
 
 
 def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_from_matlab=True, monopole=False):
@@ -25,6 +26,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     filter_complexes_jonctions(points, triangles, edges)          # Filtrage des jonctions complexes pour simplifier la structure du maillage
 
     print(f"\nNombre d'elements de maillage (edges) = {edges.total_number_of_edges}\n")
+    print(f"\nNombre de triangles = {triangles.total_of_triangles}\n")
 
     edges.compute_edges_length(points)
     
@@ -91,10 +93,19 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
 
     selected_triangles = calculate_seuil_surface_current_density(surface_current_density)
 
+    refinement_nodes = get_nodes_from_selected_edges(edges, selected_triangles)
+
+    print(f"\nshape de refinement_nodes = {refinement_nodes.shape}\n")
+    print(f"\nrefinement_nodes = {refinement_nodes}\n")
+
+    high_current_points_list = get_high_current_points_list(points, refinement_nodes)
+    
+    print(f"\nshape de high_current_points_list = {high_current_points_list.shape}\n")
+
     # Visualisation des courants de surface
     antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in receiving mode')
     print(f"{antennas_name} view is successfully created at frequency {frequency} Hz")
     fig = visualize_surface_current(points, triangles, surface_current_density, antennas_name)
     fig.show()
 
-    return impedance, selected_triangles
+    return impedance, high_current_points_list

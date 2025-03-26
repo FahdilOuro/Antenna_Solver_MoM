@@ -175,6 +175,9 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
     return fig
 
 def calculate_seuil_surface_current_density(surface_current_density):
+
+    print(f"\nNombre de triangles = {surface_current_density.shape}\n")
+
     # Calculer la valeur maximale
     max_value = np.max(surface_current_density)
     seuil = 0.7 * max_value
@@ -184,8 +187,8 @@ def calculate_seuil_surface_current_density(surface_current_density):
     
     # Afficher les résultats
     '''print("Seuil choisi basé sur la médiane et l'écart-type:", seuil)
-    print("Valeur maximale de la densité de courant de surface:", max_value)
-    print("Nombre d'éléments inférieurs au seuil:", len(indices_below_seuil))
-    print("Indices des éléments inférieurs au seuil:", indices_below_seuil)'''
+    print("Valeur maximale de la densité de courant de surface:", max_value)'''
+    print(f"\nNombre d'éléments inférieurs au seuil: {len(indices_below_seuil)}")
+    '''print("Indices des éléments inférieurs au seuil:", indices_below_seuil)'''
 
     return indices_below_seuil

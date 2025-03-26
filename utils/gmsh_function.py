@@ -239,3 +239,38 @@ def save_gmsh_log(mesh_name, output_path):
             f.write(log + "\n")
 
     print(f"Log saved in: {log_file}")  # Confirmation en console
+
+def adaptative_meshing(mesh_size, high_current_points, mesh_size_divide=5):
+    size_min = mesh_size / mesh_size_divide  # Taille réduite
+    size_max = mesh_size  # Taille normale
+    threshold = 0.15  # Rayon d'effet
+
+    # Liste pour stocker tous les champs de distance
+    distance_fields = []
+    
+    # Définir un champ de distance pour cette itération
+    f = gmsh.model.mesh.field.add("Distance")
+    gmsh.model.mesh.field.setNumbers(f, "PointsList", [
+        gmsh.model.geo.addPoint(x, y, z) for x, y, z in high_current_points
+    ])
+    distance_fields.append(f)
+
+    # Créer un champ de seuil lié à ce champ de distance
+    g = gmsh.model.mesh.field.add("Threshold")
+    gmsh.model.mesh.field.setNumber(g, "InField", f)
+    gmsh.model.mesh.field.setNumber(g, "SizeMin", size_min)
+    gmsh.model.mesh.field.setNumber(g, "SizeMax", size_max)
+    gmsh.model.mesh.field.setNumber(g, "DistMin", threshold / 2)
+    gmsh.model.mesh.field.setNumber(g, "DistMax", threshold)
+
+    distance_fields.append(g)
+
+    # Fusionner tous les raffinements
+    min_field = gmsh.model.mesh.field.add("Min")
+    gmsh.model.mesh.field.setNumbers(min_field, "FieldsList", distance_fields)
+
+    # Appliquer le champ de maillage fusionné
+    gmsh.model.mesh.field.setAsBackgroundMesh(min_field)
+
+    gmsh.model.geo.synchronize()
+    gmsh.model.mesh.generate(2)
