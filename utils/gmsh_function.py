@@ -222,7 +222,7 @@ def save_gmsh_log(mesh_name, output_path):
     logs = gmsh.logger.get()
 
     # Assurer l'existence du dossier de logs
-    log_dir = "data/gmsh_log"
+    log_dir = "data/gmsh_log/"
     os.makedirs(log_dir, exist_ok=True)
 
     # Déterminer le chemin du fichier log
@@ -240,37 +240,63 @@ def save_gmsh_log(mesh_name, output_path):
 
     print(f"Log saved in: {log_file}")  # Confirmation en console
 
-def adaptative_meshing(mesh_size, high_current_points, mesh_size_divide=5):
-    size_min = mesh_size / mesh_size_divide  # Taille réduite
-    size_max = mesh_size  # Taille normale
-    threshold = 0.15  # Rayon d'effet
+def point_on_segment(px, py, pz, x1, y1, z1, x2, y2, z2, tol=1e-6):
+    """
+    Vérifie si le point (px, py, pz) appartient au segment [(x1, y1, z1), (x2, y2, z2)]
+    avec une tolérance 'tol' pour compenser les erreurs numériques.
+    """
+    v = np.array([x2 - x1, y2 - y1, z2 - z1])
+    w = np.array([px - x1, py - y1, pz - z1])
+    cross_prod = np.linalg.norm(np.cross(v, w))
 
-    # Liste pour stocker tous les champs de distance
-    distance_fields = []
-    
-    # Définir un champ de distance pour cette itération
-    f = gmsh.model.mesh.field.add("Distance")
-    gmsh.model.mesh.field.setNumbers(f, "PointsList", [
-        gmsh.model.geo.addPoint(x, y, z) for x, y, z in high_current_points
-    ])
-    distance_fields.append(f)
+    v_norm = np.linalg.norm(v)
+    if v_norm < tol:
+        return False  # Segment dégénéré
 
-    # Créer un champ de seuil lié à ce champ de distance
-    g = gmsh.model.mesh.field.add("Threshold")
-    gmsh.model.mesh.field.setNumber(g, "InField", f)
-    gmsh.model.mesh.field.setNumber(g, "SizeMin", size_min)
-    gmsh.model.mesh.field.setNumber(g, "SizeMax", size_max)
-    gmsh.model.mesh.field.setNumber(g, "DistMin", threshold / 2)
-    gmsh.model.mesh.field.setNumber(g, "DistMax", threshold)
+    t = np.dot(w, v) / (v_norm ** 2)
 
-    distance_fields.append(g)
+    return (0 <= t <= 1) and (cross_prod < tol)
 
-    # Fusionner tous les raffinements
-    min_field = gmsh.model.mesh.field.add("Min")
-    gmsh.model.mesh.field.setNumbers(min_field, "FieldsList", distance_fields)
+def is_point_on_boundary(surface_tag, point, tol=1e-5):
+    """
+    Vérifie si un point appartient au bord d'une surface quelconque.
 
-    # Appliquer le champ de maillage fusionné
-    gmsh.model.mesh.field.setAsBackgroundMesh(min_field)
+    Arguments :
+        - surface_tag : tag de la surface dans Gmsh.
+        - point : tuple (x, y, z) du point à tester.
+        - tol : tolérance numérique.
 
-    gmsh.model.geo.synchronize()
-    gmsh.model.mesh.generate(2)
+    Retourne :
+        - True si le point est sur la frontière de la surface, False sinon.
+    """
+    # Récupérer tous les nœuds du maillage
+    all_node_tags, all_node_coords, _ = gmsh.model.mesh.getNodes()
+    all_node_coords = np.array(all_node_coords).reshape(-1, 3)
+
+    # Dictionnaire associant chaque tag de nœud à ses coordonnées
+    node_dict = {tag: coord for tag, coord in zip(all_node_tags, all_node_coords)}
+
+    # Récupérer les entités de bord (les arêtes du contour de la surface)
+    boundary = gmsh.model.getBoundary([(2, surface_tag)], oriented=False)
+
+    segments = []
+    for edge in boundary:
+        edge_dim, edge_tag = edge
+
+        # Récupérer les connectivités des arêtes
+        elem_types, elem_tags, elem_node_tags = gmsh.model.mesh.getElements(edge_dim, edge_tag)
+
+        if elem_types:  # Vérifier qu'on a bien des éléments (arêtes)
+            for elem_nodes in elem_node_tags[0].reshape(-1, 2):  # Segments = paires de nœuds
+                id1, id2 = elem_nodes  # Indices globaux
+
+                if id1 in node_dict and id2 in node_dict:
+                    p1, p2 = node_dict[id1], node_dict[id2]
+                    segments.append((p1, p2))
+
+    # Vérifier si le point appartient à un segment du bord
+    for p1, p2 in segments:
+        if point_on_segment(*point, *p1, *p2, tol):
+            return True
+
+    return False
