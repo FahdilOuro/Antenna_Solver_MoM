@@ -2,7 +2,7 @@ import os
 import gmsh
 import numpy as np
 
-from utils.gmsh_function import feed_edge, is_point_on_boundary, save_gmsh_log
+from utils.gmsh_function import box_refinement, feed_edge, save_gmsh_log
 from utils.refinement_function import load_high_current_points_from_file, save_high_current_points_to_file
 
 
@@ -53,45 +53,11 @@ def plate_gmsh(longueur, hauteur, mesh_name, feed_point, length_feed_edge, angle
     else:
         # Sauver les nouveaux points de rafinage dans le fichier
         save_high_current_points_to_file(high_current_points_list, filename)
-        # Liste pour stocker tous les champs de distance
-        distance_fields = []
 
         # Charger les points actuels à chaque itération
         all_points = load_high_current_points_from_file(filename)
 
-        # Ajouter les nouveaux points à la géométrie (mais ne pas les garder)
-        point_tags = []
-        for x, y, z in all_points:
-            if not is_point_on_boundary(plate, (x, y, z)):
-                tag = gmsh.model.occ.addPoint(x, y, z)
-                point_tags.append(tag)  # Garder les tags pour les supprimer après
-
-        # Définir un champ de distance pour cette itération
-        f = gmsh.model.mesh.field.add("Distance")
-        gmsh.model.mesh.field.setNumbers(f, "PointsList", point_tags)
-
-        distance_fields.append(f)
-
-        # Créer un champ de seuil lié à ce champ de distance
-        g = gmsh.model.mesh.field.add("Threshold")
-        gmsh.model.mesh.field.setNumber(g, "InField", f)
-        gmsh.model.mesh.field.setNumber(g, "SizeMin", size_min)
-        gmsh.model.mesh.field.setNumber(g, "SizeMax", size_max)
-        gmsh.model.mesh.field.setNumber(g, "DistMin", threshold / 2)
-        gmsh.model.mesh.field.setNumber(g, "DistMax", threshold)
-
-        # Fusionner tous les champs de distance pour l'itération
-        min_field = gmsh.model.mesh.field.add("Min")
-        gmsh.model.mesh.field.setNumbers(min_field, "FieldsList", distance_fields)
-
-        # Appliquer le champ de maillage fusionné
-        gmsh.model.mesh.field.setAsBackgroundMesh(min_field)
-
-        gmsh.model.occ.synchronize()
-
-        # Supprimer les points ajoutés à la géométrie (les tags sont utilisés pour les supprimer)
-        for tag in point_tags:
-            gmsh.model.occ.remove([(0, tag)])  # Supprimer chaque point individuellement en passant une liste
+        box_refinement(high_current_points_list)
 
     # Génération du maillage 2D sur la surface
     gmsh.model.mesh.generate(2)

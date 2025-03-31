@@ -240,63 +240,28 @@ def save_gmsh_log(mesh_name, output_path):
 
     print(f"Log saved in: {log_file}")  # Confirmation en console
 
-def point_on_segment(px, py, pz, x1, y1, z1, x2, y2, z2, tol=1e-6):
-    """
-    Vérifie si le point (px, py, pz) appartient au segment [(x1, y1, z1), (x2, y2, z2)]
-    avec une tolérance 'tol' pour compenser les erreurs numériques.
-    """
-    v = np.array([x2 - x1, y2 - y1, z2 - z1])
-    w = np.array([px - x1, py - y1, pz - z1])
-    cross_prod = np.linalg.norm(np.cross(v, w))
+def box_field(box_tag, x, y, rayon = 1 / 10, density = 0.5, vin = 0.1/2, vout = 0.1*2):
+    gmsh.model.mesh.field.add("Box", box_tag)
+    gmsh.model.mesh.field.setNumber(box_tag, "VIn", vin)
+    gmsh.model.mesh.field.setNumber(box_tag, "VOut", vout)
+    gmsh.model.mesh.field.setNumber(box_tag, "XMin", x - rayon)
+    gmsh.model.mesh.field.setNumber(box_tag, "XMax", x + rayon)
+    gmsh.model.mesh.field.setNumber(box_tag, "YMin", y - rayon)
+    gmsh.model.mesh.field.setNumber(box_tag, "YMax", y + rayon)
+    gmsh.model.mesh.field.setNumber(box_tag, "Thickness", density)
 
-    v_norm = np.linalg.norm(v)
-    if v_norm < tol:
-        return False  # Segment dégénéré
+def box_refinement(Positions):
+    count_box_tag = []
+    for i in range(0, Positions.shape[0]):
+        box_tag = i+1
+        box_field(box_tag, Positions[i, 0], Positions[i, 1])
+        count_box_tag.append(box_tag)
 
-    t = np.dot(w, v) / (v_norm ** 2)
+    gmsh.model.mesh.field.add("Min", len(count_box_tag) + 1)
+    gmsh.model.mesh.field.setNumbers(len(count_box_tag) + 1, "FieldsList", count_box_tag)
 
-    return (0 <= t <= 1) and (cross_prod < tol)
+    gmsh.model.mesh.field.setAsBackgroundMesh(len(count_box_tag) + 1)
 
-def is_point_on_boundary(surface_tag, point, tol=1e-5):
-    """
-    Vérifie si un point appartient au bord d'une surface quelconque.
-
-    Arguments :
-        - surface_tag : tag de la surface dans Gmsh.
-        - point : tuple (x, y, z) du point à tester.
-        - tol : tolérance numérique.
-
-    Retourne :
-        - True si le point est sur la frontière de la surface, False sinon.
-    """
-    # Récupérer tous les nœuds du maillage
-    all_node_tags, all_node_coords, _ = gmsh.model.mesh.getNodes()
-    all_node_coords = np.array(all_node_coords).reshape(-1, 3)
-
-    # Dictionnaire associant chaque tag de nœud à ses coordonnées
-    node_dict = {tag: coord for tag, coord in zip(all_node_tags, all_node_coords)}
-
-    # Récupérer les entités de bord (les arêtes du contour de la surface)
-    boundary = gmsh.model.getBoundary([(2, surface_tag)], oriented=False)
-
-    segments = []
-    for edge in boundary:
-        edge_dim, edge_tag = edge
-
-        # Récupérer les connectivités des arêtes
-        elem_types, elem_tags, elem_node_tags = gmsh.model.mesh.getElements(edge_dim, edge_tag)
-
-        if elem_types:  # Vérifier qu'on a bien des éléments (arêtes)
-            for elem_nodes in elem_node_tags[0].reshape(-1, 2):  # Segments = paires de nœuds
-                id1, id2 = elem_nodes  # Indices globaux
-
-                if id1 in node_dict and id2 in node_dict:
-                    p1, p2 = node_dict[id1], node_dict[id2]
-                    segments.append((p1, p2))
-
-    # Vérifier si le point appartient à un segment du bord
-    for p1, p2 in segments:
-        if point_on_segment(*point, *p1, *p2, tol):
-            return True
-
-    return False
+    gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
