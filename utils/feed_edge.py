@@ -46,10 +46,6 @@ def create_edge_feed(indices_feed):
 
     return edge_feed
 
-import numpy as np
-
-import numpy as np
-
 def find_matching_edges(edge_obj, edge_feed):
     """
     Vérifie si les arêtes de `edge_feed` existent déjà dans `edge_obj` (dans les deux sens).

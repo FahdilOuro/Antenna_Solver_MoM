@@ -6,6 +6,8 @@ import scipy.io as sio
 import math
 import json
 
+from utils.refinement_function import load_high_current_points_from_file, save_high_current_points_to_file
+
 def open_mesh(file_msh_path):
     gmsh.initialize()
     gmsh.open(file_msh_path)
@@ -75,9 +77,7 @@ def extract_radiation_msh_to_mat(file_msh_path, mesh_name, save_mat_path):
 
     # Charger l'information sur l'arête insérée
     with open(json_path, "r") as f:
-        edge_data = json.load(f)
-
-    new_edge_tag = edge_data["edge_tag"]  # Tag de l'arête interne
+        data = json.load(f)
 
     # Récupérer tous les nœuds (points)
     node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
@@ -107,19 +107,11 @@ def extract_radiation_msh_to_mat(file_msh_path, mesh_name, save_mat_path):
     # Convertir en numpy array (4xT)
     t = np.hstack(triangles) if triangles else np.array([[], [], [], []])
 
-    # Identifier les nœuds de l'arête interne
-    p_feed = np.array([])
-
-    element_types, element_tags, edge_nodes = gmsh.model.mesh.getElements(1, new_edge_tag)  # Récupérer les nœuds de l'arête
-
-    if edge_nodes and len(edge_nodes) > 0:
-        edge_nodes_flat = edge_nodes[0].astype(int).tolist()  # Conversion en liste d'entiers
-        edge_nodes_set = set(edge_nodes_flat)  # Convertir en set propre
-
-        p_feed_indices = [i for i, tag in enumerate(node_tags.tolist()) if tag in edge_nodes_set]
-
-        if p_feed_indices:  # Vérifier qu'on a bien trouvé des indices
-            p_feed = p[:, p_feed_indices]  # Extraire les coordonnées des points appartenant à l'arête
+    # Extraire les coordonnées depuis le fichier JSON
+    coordinates = data["coordinates"]
+    
+    # Convertir les coordonnées en tableau Numpy
+    p_feed = np.array([[point["x"], point["y"], point["z"]] for point in coordinates]).T
     
     p_feed = sort_points(p_feed)
 
@@ -149,69 +141,147 @@ def extract_radiation_msh_to_mat(file_msh_path, mesh_name, save_mat_path):
 
     print(f"matlab file stored in {save_mat_path} successfully")
 
-def feed_edge(surface_tag, feed_point, length_feed_edge, mesh_name, angle=0, plane="xy"):
-    length_feed_edge -= 0.000001
-
-    # Point central de l'arête
-    if not (isinstance(feed_point, (list, tuple)) and len(feed_point) == 3):
-        raise ValueError("feed_point doit être une liste ou un tuple de trois éléments [x, y, z].")
-    
-    x0, y0, z0 = feed_point
-    half_length = length_feed_edge / 2
-
-    if plane == "xy":
-        dx = half_length * math.cos(angle)
-        dy = half_length * math.sin(angle)
-        x1 = x0 - dx
-        y1 = y0 - dy
-        x2 = x0 + dx
-        y2 = y0 + dy
-        p1 = gmsh.model.occ.addPoint(x1, y1, 0)
-        p2 = gmsh.model.occ.addPoint(x2, y2, 0)
-
-    elif plane == "yz":
-        dy = half_length * math.cos(angle)
-        dz = half_length * math.sin(angle)
-        y1 = y0 - dy
-        z1 = z0 - dz
-        y2 = y0 + dy
-        z2 = z0 + dz
-        p1 = gmsh.model.occ.addPoint(0, y1, z1)
-        p2 = gmsh.model.occ.addPoint(0, y2, z2)
-
-    elif plane == "xz":
-        dx = half_length * math.cos(angle)
-        dz = half_length * math.sin(angle)
-        x1 = x0 - dx
-        z1 = z0 - dz
-        x2 = x0 + dx
-        z2 = z0 + dz
-        p1 = gmsh.model.occ.addPoint(x1, 0, z1)
-        p2 = gmsh.model.occ.addPoint(x2, 0, z2)
-
-    else:
-        raise ValueError("Le paramètre 'plane' doit être 'xy', 'yz' ou 'xz'.")
-
-    # Création de l'arête interne
-    feed_edge_tag = gmsh.model.occ.addLine(p1, p2)
-
-    # Fragmentation de la surface avec l'arête
-    gmsh.model.occ.fragment([(2, surface_tag)], [(1, feed_edge_tag)])
+# -------------------------------Big_modifications--------------------
+def mesh_size(mesh_size):
+    # Synchronisation du modèle
     gmsh.model.occ.synchronize()
 
-    # Définir le chemin du fichier JSON
-    json_path = f'data/json/feed_edge_info_{os.path.splitext(mesh_name)[0]}.json'
+    gmsh.model.mesh.setSize(gmsh.model.getEntities(0), mesh_size)
 
-    # Vérifier si le dossier "json" existe, sinon le créer
-    os.makedirs(os.path.dirname(json_path), exist_ok=True)
+    # Génération du maillage
+    meshing_option = 2
+    gmsh.option.setNumber("Mesh.Algorithm", meshing_option)
 
-    # Sauvegarder l'ID de l'arête dans un fichier JSON pour éviter toute confusion
+def create_feed_edge(surface, feed_point, feed_lenght, angle, meshSize, json_path):
+    dx = feed_lenght / 2 * math.cos(angle)
+    dy = feed_lenght / 2 * math.sin(angle)
+
+    # Nouveaux points à ajouter (chaque point est un tableau de forme (3,) pour un point en 3D)
+    x1 = feed_point[0] - dx
+    y1 = feed_point[1] - dy
+    x2 = feed_point[0] + dx
+    y2 = feed_point[1] + dy
+
+    new_point1 = np.array([x1, y1, 0])  # Coordonnée du premier point
+    new_point2 = np.array([x2, y2, 0])  # Coordonnée du second point
+
+    # Ajouter la ligne d'alimentation qui coupe le carré en deux verticalement
+    feed_line_start = gmsh.model.occ.addPoint(new_point1[0], new_point1[1], new_point1[2])
+    feed_line_end = gmsh.model.occ.addPoint(new_point2[0], new_point2[1], new_point2[2])
+
+    # Créer la ligne d'alimentation
+    feed_line = gmsh.model.occ.addLine(feed_line_start, feed_line_end)
+
+    # Fragmenter le carré avec la ligne d'alimentation
+    gmsh.model.occ.fragment([(2, surface)], [(1, feed_line)])
+
+    # Synchronisation du modèle
+    gmsh.model.occ.synchronize()
+
+    mesh_size(meshSize)
+
+    gmsh.model.mesh.generate(2)
+
+    # Extraire les tags des nœuds associés à la ligne feed_line
+    nodeTags, coords, _ = gmsh.model.mesh.getNodes(dim=1, tag=feed_line)
+
+    # On filtre uniquement les nœuds de la ligne feed_line
+    points_feed_line = []
+    for i in range(len(nodeTags)):
+        # Les coordonnées de chaque point sont stockées dans le tableau "coords"
+        points_feed_line.append(coords[3 * i: 3 * i + 3])  # x, y, z pour chaque point
+
+    points_feed_line.append([new_point1[0], new_point1[1], new_point1[2]])
+    points_feed_line.append([new_point2[0], new_point2[1], new_point2[2]])
+
+    # Convertir la liste de points en tableau numpy
+    points_feed_line = np.array(points_feed_line).T  # Transpose pour avoir les coordonnées X, Y, Z dans les bonnes dimensions
+
+    coordinates = [{"x": point[0], "y": point[1], "z": point[2]} for point in points_feed_line.T]
+
+    # Sauvegarder les coordonnées dans un fichier JSON
     with open(json_path, "w") as f:
-        json.dump({"edge_tag": feed_edge_tag}, f, indent=4)
-    
+        json.dump({"coordinates": coordinates}, f, indent=4)
+
     print(f"Json File saved to the path : {json_path}")
 
-    print("Ajout de feed_edge reussie ...!")
+def apply_feed_edge(create_surface, json_path, meshSize):
+    surface = create_surface()
+
+    # Charger l'information sur l'arête insérée
+    with open(json_path, "r") as f:
+        data = json.load(f)
+
+    # Extraire les coordonnées depuis le fichier JSON
+    coordinates = data["coordinates"]
+
+    # Convertir les coordonnées en tableau Numpy
+    points_feed = np.array([[point["x"], point["y"], point["z"]] for point in coordinates]).T
+
+    # Ajouter des minuscules segments verticaux aux positions souhaitées
+    tiny_lines = []
+    dz = 1e-6  # hauteur très petite pour ne pas affecter la surface
+
+    for i in range(points_feed.shape[1]):
+        x, y, z = points_feed[:, i]
+        pt1 = gmsh.model.occ.addPoint(x, y, z)
+        pt2 = gmsh.model.occ.addPoint(x, y, z + dz)
+        line = gmsh.model.occ.addLine(pt1, pt2)
+        tiny_lines.append((1, line))
+
+    # Fragmenter la surface avec les petites lignes (ceci les intègre à la géométrie)
+    gmsh.model.occ.fragment([(2, surface)], tiny_lines)
+
+    # Synchronisation du modèle
+    gmsh.model.occ.synchronize()
+
+    mesh_size(meshSize)
+    gmsh.model.mesh.generate(2)
+
+def create_antenna_surface(creation_surface_func, feed_point, feed_lenght, angle, meshSize, mesh_name, save_mesh_folder, high_current_points_list=np.array([3, 0]), iteration=0):
+    
+    # Définir le chemin du fichier JSON
+    json_path = f'data/json/feed_edge_info_{os.path.splitext(mesh_name)[0]}.json'
+    # Créer les dossiers s'ils n'existent pas
+    
+    os.makedirs(os.path.dirname(json_path), exist_ok=True)
+    
+    # Créer le fichier JSON s'il n'existe pas
+    if not os.path.exists(json_path):
+    # Données initiales à mettre dans le fichier (peut être vide ou avec un contenu par défaut)
+        initial_data = {
+            "edge_tag": None,
+            "coordinates": []
+        }
+        with open(json_path, "w") as f:
+            json.dump(initial_data, f, indent=4)
+        print(f"Fichier créé : {json_path}")
+    else:
+        print(f"Fichier déjà existant : {json_path}")
+
+    create_feed_edge(creation_surface_func(), feed_point, feed_lenght, angle, meshSize, json_path)
+
+    apply_feed_edge(creation_surface_func, json_path, meshSize)
+
+    # Vérifier si le dossier existe, sinon le créer
+    if not os.path.exists(save_mesh_folder):
+        os.makedirs(save_mesh_folder)
+    
+    # Définir le chemin où enregistrer le fichier
+    output_path = os.path.join(save_mesh_folder, mesh_name)
+
+    gmsh.write(output_path)
+    print(f"{mesh_name} saved in {output_path} successfully")
+
+    # Sauvegarde des logs 
+    save_gmsh_log(mesh_name, output_path)
+
+    gmsh.fltk.run()
+    gmsh.finalize()
+
+    return output_path
+
+# -------------------------------Big_modifications--------------------
 
 def save_gmsh_log(mesh_name, output_path):
     """Enregistre les logs de GMSH dans un fichier texte avec un format clair et structuré."""
@@ -265,3 +335,53 @@ def box_refinement(Positions):
     gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
     gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
     gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
+
+def refinement_process(filename, high_current_points_list, iteration):
+    if iteration < 0:
+        raise ValueError("iteration value should start with '0'")
+    elif iteration == 0:
+        # Vérifier si le fichier existe et le réinitialiser
+        if os.path.exists(filename):
+            os.remove(filename)  # Supprimer le fichier existant s'il existe
+
+        # Créer un nouveau fichier vierge avec l'en-tête
+        with open(filename, 'w') as file:
+            file.write("x y z\n")
+        
+        # on incremente l'iteraton
+        iteration = 1
+    else:
+        # Sauver les nouveaux points de rafinage dans le fichier
+        save_high_current_points_to_file(high_current_points_list, filename)
+
+        # Charger les points actuels à chaque itération
+        all_points = load_high_current_points_from_file(filename)
+
+        box_refinement(high_current_points_list)
+
+def finalize_antenna_model_gmsh(filename, high_current_points_list, save_mesh_folder, mesh_name, iteration):
+    Automatic = 1
+    gmsh.option.setNumber("Mesh.Algorithm", Automatic)   # To set The "Automatic" algorithm / Change if necessary
+
+    refinement_process(filename, high_current_points_list, iteration)
+
+    # Génération du maillage
+    gmsh.model.mesh.generate(2)
+
+    # Vérifier si le dossier existe, sinon le créer
+    if not os.path.exists(save_mesh_folder):
+        os.makedirs(save_mesh_folder)
+    
+    # Définir le chemin où enregistrer le fichier
+    output_path = os.path.join(save_mesh_folder, mesh_name)
+
+    gmsh.write(output_path)
+    print(f"{mesh_name} saved in {output_path} successfully")
+
+    # Sauvegarde des logs 
+    save_gmsh_log(mesh_name, output_path)
+
+    # Fermeture de Gmsh
+    gmsh.finalize()
+
+    return output_path

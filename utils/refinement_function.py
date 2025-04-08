@@ -46,3 +46,15 @@ def save_high_current_points_to_file(points, filename):
     with open(filename, 'a') as file:
         for point in points:
             file.write(f"{point[0]} {point[1]} {point[2]}\n")
+
+def create_pos_file(mesh_name):
+    pos_folder = 'data/pos/'
+
+    # Vérifier si le dossier existe, sinon le créer
+    if not os.path.exists(pos_folder):
+        os.makedirs(pos_folder)
+
+    # Nom du fichier de points du maillage adaptatif
+    filename = f'data/pos/{os.path.splitext(os.path.basename(mesh_name))[0]}.pos'
+
+    return filename

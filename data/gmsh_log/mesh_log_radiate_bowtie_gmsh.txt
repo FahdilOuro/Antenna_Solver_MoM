@@ -1,6 +1,6 @@
 ========== MESHING SUMMARY ==========
 
 Model: radiate_bowtie_gmsh
-Mesh file location: D:\Doctorat LEAT\Projets_Github\Antenna_Solver_MoM\data\gmsh_files\radiate_bowtie_gmsh.msh
+Mesh file location: D:\Doctorat_LEAT\Projets_Github\Antenna_Solver_MoM\data\gmsh_files\radiate_bowtie_gmsh.msh
 -------------------------------------
 
