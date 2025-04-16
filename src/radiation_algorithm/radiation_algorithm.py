@@ -6,7 +6,7 @@ from rwg.rwg5 import *
 from utils.refinement_function import *
 
 
-def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_from_matlab=True, monopole=False):
+def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_from_matlab=True, monopole=False):
     # Chargement du fichier de maillage
     p, t = load_mesh_file(mesh1, load_from_matlab)
 
@@ -91,14 +91,17 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     # Calcul des courants de surface à partir du courant total
     surface_current_density = calculate_current_density(current, triangles, edges, vecteurs_rho)
 
-    selected_triangles = calculate_seuil_surface_current_density(surface_current_density)
+    """selected_triangles = calculate_seuil_surface_current_density(surface_current_density)
 
+    print(f"\nshape de selected_triangle = {selected_triangles.shape}\n")
+    print(f"\nselected_triangle = {selected_triangles}\n")
+    
     refinement_nodes = get_selected_edges(edges, selected_triangles)
 
     '''print(f"\nshape de refinement_nodes = {refinement_nodes.shape}\n")
     print(f"\nrefinement_nodes = {refinement_nodes}\n")'''
 
-    high_current_points_list = get_edge_midpoints(points, refinement_nodes)
+    high_current_points_list = get_edge_midpoints(points, refinement_nodes)"""
     
     """print(f"\nshape de high_current_points_list = {high_current_points_list.shape}\n")
     print(f"\ntype de high_current_points_list = {type(high_current_points_list)}\n")
@@ -110,4 +113,4 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude, load_fr
     fig = visualize_surface_current(points, triangles, surface_current_density, antennas_name)
     fig.show()
 
-    return impedance, high_current_points_list
+    return impedance, surface_current_density

@@ -140,18 +140,25 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
     voltage = np.zeros(edges.total_number_of_edges, dtype=complex)  # Vecteur de tension
     distance = np.zeros((3, edges.total_number_of_edges))           # Distance entre le point d'alimentation et chaque arête
 
-    """# Identification de l'arête la plus proche du point d'alimentation
+    # Identification de l'arête la plus proche du point d'alimentation
     for edge in range(edges.total_number_of_edges):
         # Calcul du point moyen de l'arête (milieu géométrique)
-        distance[:, edge] = 0.5 * (points.points[:, edges.first_points[edge]] + points.points[:, edges.second_points[edge]]) - feed_point"""
+        distance[:, edge] = 0.5 * (points.points[:, edges.first_points[edge]] + points.points[:, edges.second_points[edge]]) - feed_point
     
     if monopole:
         index_feeding_edges = np.argsort(np.sum(distance ** 2, axis=0))[:2]  # Indices des deux arêtes minimisant les distances
     else:
+        # new_code :
+        # Calcul de la norme au carré de chaque distance (colonne par colonne)
+        dist_squared = np.sum(distance * distance, axis=0)
+        # Tri et récupération de l’indice du centre d’arête le plus proche de FeedPoint
+        index_feeding_edges = np.argsort(dist_squared)[0]
+
         # Trouver les indices
-        indices_feed = find_feed_indices(points.points, points_feed)
+        '''indices_feed = find_feed_indices(points.points, points_feed)
         edge_feed = create_edge_feed(indices_feed)
-        index_feeding_edges = find_matching_edges(edges, edge_feed)
+        index_feeding_edges = find_matching_edges(edges, edge_feed)'''
+
 
     print("The index edge where the antenna is feed are : ", index_feeding_edges)
 
