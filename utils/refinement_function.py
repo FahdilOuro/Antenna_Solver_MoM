@@ -90,9 +90,9 @@ def compute_size_from_current(nodes, triangles, current_values, mesh_size, feed_
 
     size_field[outside_threshold] = new_mesh_field
 
-    '''print("Taille de size_field", size_field.shape)
+    '''print("Taille de size_field", size_field.shape)'''
 
-    print("size_field = ", size_field)'''
+    print("size_field = ", size_field)
     
     # Retourner le champ de taille
     return size_field

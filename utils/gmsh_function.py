@@ -91,8 +91,10 @@ def read_mesh_msh(fichier_msh):
     return vxyz, triangles, triangles_tags
 
 def save_mesh(mesh_file):
-    gmsh.open(mesh_file)
+    # gmsh.open(mesh_file)
     mesh = {}
+    if gmsh.initialize():
+        print("Gmsh est initialiser")
     for entite in gmsh.model.getEntities():
         dim, tag = entite
         frontieres = gmsh.model.getBoundary([entite])
@@ -112,7 +114,7 @@ def copy_mesh(mesh, copy_model_name):
         gmsh.model.mesh.addElements(dim, tag, elements[0], elements[1], elements[2])
 
 def remeshing_model(mesh_file, mesh, currents, mesh_size, feed_point, mesh_dividend):
-    gmsh.initialize()
+    # gmsh.initialize()
     save_bowtie = save_mesh(mesh_file)
     new_model = "bowtie_discrete"
     copy_mesh(save_bowtie, new_model)
@@ -127,11 +129,11 @@ def remeshing_model(mesh_file, mesh, currents, mesh_size, feed_point, mesh_divid
     gmsh.view.addModelData(sf_view, 0, new_model, "ElementData", mesh.triangles_tags, sf_ele[:, None])
     gmsh.plugin.setNumber("Smooth", "View", gmsh.view.getIndex(sf_view))
     gmsh.plugin.run("Smooth")
-    gmsh.finalize()
+    # gmsh.finalize()
     return sf_view
 
 def post_processing_meshing(mesh_file, sf_view):
-    gmsh.initialize()
+    # gmsh.initialize()
     model_name = gmsh.merge(mesh_file)
     # gmsh.model.setCurrent(model_name)
     field = gmsh.model.mesh.field.add("PostView")
@@ -142,6 +144,12 @@ def post_processing_meshing(mesh_file, sf_view):
     # 9: Packing of Parallelograms, 11: Quasi-structured Quad
     gmsh.model.mesh.clear()
     gmsh.model.mesh.generate(2)
+
+# merge everything here    ------------- new step ---------
+def adapt_meshing():
+    # code ici
+    print("")
+
 
 def sort_points(point):
     """

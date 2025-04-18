@@ -163,6 +163,9 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
     print("The index edge where the antenna is feed are : ", index_feeding_edges)
 
     # Définition du vecteur "voltage" au niveau de l'arête alimentée
+    print('type of voltage_amplitude=', type(voltage_amplitude))
+    print('type of voltage_amplitude=', voltage_amplitude)
+    print('type of edges.edges_length[index_feeding_edges]=', type(edges.edges_length[index_feeding_edges]))
     voltage[index_feeding_edges] = voltage_amplitude * edges.edges_length[index_feeding_edges]
 
     # Résolution du système linéaire (Z * I = V) pour obtenir les courants
