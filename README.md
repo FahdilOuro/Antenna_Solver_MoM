@@ -70,10 +70,19 @@ The antenna mesh data files should be placed in the data/antennas_mesh/ director
 
     Explore the example scripts in the `examples` folder to learn how to use the solver for different antenna designs.
 
-## 📓 Jupyter Notebooks
+## Jupyter Notebooks
 
 Some notebooks in this project include dynamic plots or interactive outputs that may not display correctly on GitHub.  
 To properly view them, please use [nbviewer](https://nbviewer.jupyter.org/).
+
+    For example, one can copy the link of the RWG_Bowtie notebook and add to viewer to open
+
+    https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/antenna_simulation/receiving_antenna/plate_antenna.ipynb
+    
+    <img src="https://github.com/Khainguyen1349/MoMPython_KN/blob/main/figures/Bowtie.png" width=40% height=40%>
+    
+    This is the earliest version of the simulator where one can still find the generation of the antenna mesh, calculation of the RWG basis functions, and the analysis of the antenna performances. Later on, those calculations are placed in libraries [meshlib.py](./meshlib.py) and [rwglib.py](./rwglib.py) for the sake of clarity.
+
 
 ### Contributing
 
