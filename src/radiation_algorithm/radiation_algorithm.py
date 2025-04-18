@@ -91,22 +91,6 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
     # Calcul des courants de surface à partir du courant total
     surface_current_density = calculate_current_density(current, triangles, edges, vecteurs_rho)
 
-    """selected_triangles = calculate_seuil_surface_current_density(surface_current_density)
-
-    print(f"\nshape de selected_triangle = {selected_triangles.shape}\n")
-    print(f"\nselected_triangle = {selected_triangles}\n")
-    
-    refinement_nodes = get_selected_edges(edges, selected_triangles)
-
-    '''print(f"\nshape de refinement_nodes = {refinement_nodes.shape}\n")
-    print(f"\nrefinement_nodes = {refinement_nodes}\n")'''
-
-    high_current_points_list = get_edge_midpoints(points, refinement_nodes)"""
-    
-    """print(f"\nshape de high_current_points_list = {high_current_points_list.shape}\n")
-    print(f"\ntype de high_current_points_list = {type(high_current_points_list)}\n")
-    print(f"\ntype de high_current_points_list = {high_current_points_list}\n")"""
-
     # Visualisation des courants de surface
     antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in receiving mode')
     print(f"{antennas_name} view is successfully created at frequency {frequency} Hz")

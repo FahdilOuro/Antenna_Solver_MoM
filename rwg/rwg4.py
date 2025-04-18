@@ -6,7 +6,6 @@ from scipy.io import savemat, loadmat
 
 from rwg.rwg2 import DataManager_rwg2
 from rwg.rwg3 import DataManager_rwg3
-from utils.feed_edge import *
 
 
 # Définition du champ incident
@@ -133,7 +132,7 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
             * La résolution du système linéaire repose sur une matrice d'impédance correctement formée.
     """
     # Chargement des données maillées et d'impédance
-    points, _, points_feed, _, edges, *_ = DataManager_rwg2.load_data(filename_mesh_2)
+    points, _, edges, *_ = DataManager_rwg2.load_data(filename_mesh_2)
     frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z = DataManager_rwg3.load_data(filename_impedance)
 
     # Initialisation des variables
@@ -154,18 +153,9 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
         # Tri et récupération de l’indice du centre d’arête le plus proche de FeedPoint
         index_feeding_edges = np.argsort(dist_squared)[0]
 
-        # Trouver les indices
-        '''indices_feed = find_feed_indices(points.points, points_feed)
-        edge_feed = create_edge_feed(indices_feed)
-        index_feeding_edges = find_matching_edges(edges, edge_feed)'''
-
-
     print("The index edge where the antenna is feed are : ", index_feeding_edges)
 
     # Définition du vecteur "voltage" au niveau de l'arête alimentée
-    print('type of voltage_amplitude=', type(voltage_amplitude))
-    print('type of voltage_amplitude=', voltage_amplitude)
-    print('type of edges.edges_length[index_feeding_edges]=', type(edges.edges_length[index_feeding_edges]))
     voltage[index_feeding_edges] = voltage_amplitude * edges.edges_length[index_feeding_edges]
 
     # Résolution du système linéaire (Z * I = V) pour obtenir les courants

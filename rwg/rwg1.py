@@ -354,21 +354,11 @@ class DataManager_rwg1:
             str : Le nom du fichier sauvegardé.
         """
         mesh = loadmat(filename)  # Charge le fichier MAT
-        # Validation des variables requises dans le fichier MAT
-        if 'p_feed' in mesh and 't_feed' in mesh:
-            points_feed = mesh['p_feed']
-            triangles_feed = mesh['t_feed']
-            triangles_feed[:3] = triangles_feed[:3] - 1
-        else:
-            points_feed = np.zeros((3, 0))  # Un tableau (3 lignes, 0 colonnes)
-            triangles_feed = np.zeros((4, 0))  # Un tableau (4 lignes, 0 colonnes)
 
         # Crée un dictionnaire contenant toutes les données à sauvegarder
         data = {
             'points' : points_data.points,
             'triangles' : triangles_data.triangles,
-            'points_feed' : points_feed,
-            'triangles_feed' : triangles_feed,
             'edge_first_points' : edges_data.first_points,
             'edge_second_points' : edges_data.second_points,
             'triangles_plus' : triangles_data.triangles_plus,
