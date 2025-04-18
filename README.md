@@ -70,6 +70,11 @@ The antenna mesh data files should be placed in the data/antennas_mesh/ director
 
     Explore the example scripts in the `examples` folder to learn how to use the solver for different antenna designs.
 
+## 📓 Jupyter Notebooks
+
+Some notebooks in this project include dynamic plots or interactive outputs that may not display correctly on GitHub.  
+To properly view them, please use [nbviewer](https://nbviewer.jupyter.org/).
+
 ### Contributing
 
 Contributions are welcome! If you find any issues or want to add new features, feel free to open an issue or submit a pull request.
