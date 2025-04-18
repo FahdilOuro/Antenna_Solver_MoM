@@ -87,15 +87,15 @@ This is the earliest version of the simulator where one can still find the gener
 
 **Comming Soon**
 
-### Contributing
+## Contributing
 
 Contributions are welcome! If you find any issues or want to add new features, feel free to open an issue or submit a pull request.
 
-### License
+## License
 
 This project is licensed under the MIT License. See the LICENSE file for more details.
 
-### Acknowledgments
+## Acknowledgments
 
 Special thanks to:
 
