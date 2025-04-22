@@ -255,7 +255,7 @@ def save_gmsh_log(mesh_name, output_path):
 
     print(f"Log saved in: {log_file}")  # Confirmation en console
 
-def refine_antenna(model_name, mesh_name, feed_point, mesh_size, file_name_msh, file_name_mat, save_mesh_folder, max_iterations=10):
+def refine_antenna(model_name, frequency, mesh_name, feed_point, mesh_size, file_name_msh, file_name_mat, save_mesh_folder, max_iterations=10):
     tolerance = 1e-3  # tolérance sur la variation d'impédance
     prev_impedance = None
 
@@ -263,7 +263,7 @@ def refine_antenna(model_name, mesh_name, feed_point, mesh_size, file_name_msh, 
         write(save_mesh_folder, mesh_name)
         extract_ModelMsh_to_mat(model_name, file_name_msh, file_name_mat)
 
-        impedance, current_bowtie_antenna = radiation_algorithm(file_name_mat, 1e9, feed_point)
+        impedance, current_bowtie_antenna = radiation_algorithm(file_name_mat, frequency, feed_point)
 
         mesh_bowtie = Mesh()
 

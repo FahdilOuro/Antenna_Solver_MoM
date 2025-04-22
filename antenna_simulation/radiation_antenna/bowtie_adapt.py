@@ -2,12 +2,15 @@ from utils.gmsh_function import *
 
 print("This code is write to simulate an antenna with adatative meshing code.")
 
+# -------------------------------------- Files names --------------------------------------
+
 mesh_name = 'radiate_bowtie_gmsh.msh'
 save_mesh_folder = 'data/gmsh_files/'
 radiate_bowtie_mat_gmsh = 'data/antennas_mesh/radiate_bowtie_gmsh.mat'
 radiate_bowtie_msh_gmsh = save_mesh_folder + mesh_name
 
-# Paramètres de l'antenne Bowtie
+# -------------------------------------- antenna creation code --------------------------------------
+
 width = 0.5   # Largeur totale
 hight = 1.0   # Hauteur totale
 width_finite = 0.1 # Largeur de la ligne d'alimentation
@@ -49,41 +52,9 @@ apply_mesh_size(width_finite)
 
 gmsh.model.mesh.generate(2)
 
+# -------------------------------------- Adapt antenna code --------------------------------------
+
 run()
 refine_antenna(model_name, mesh_name, feed_point, width_finite, radiate_bowtie_msh_gmsh, radiate_bowtie_mat_gmsh, save_mesh_folder)
-'''
-write(save_mesh_folder, mesh_name)
-extract_ModelMsh_to_mat(model_name, radiate_bowtie_msh_gmsh, radiate_bowtie_mat_gmsh)
-
-tolerance = 1e-3  # tolérance sur la variation d'impédance
-max_iterations = 10
-prev_impedance = None
-
-for iteration in range(max_iterations):
-    write(save_mesh_folder, mesh_name)
-    extract_ModelMsh_to_mat(model_name, radiate_bowtie_msh_gmsh, radiate_bowtie_mat_gmsh)
-
-    impedance, current_bowtie_antenna = radiation_algorithm(radiate_bowtie_mat_gmsh, 1e9, feed_point)
-
-    mesh_bowtie = Mesh()
-
-    mesh_dividend = 5
-
-    sf_view = remeshing_model(mesh_bowtie, current_bowtie_antenna, width_finite, feed_point, mesh_dividend)
-
-    post_processing_meshing(model_name, sf_view)
-
-    run()
-
-    if prev_impedance is not None:
-        # Calcul de la variation relative ou absolue
-        variation = np.abs(impedance - prev_impedance)
-        print(f"Iteration {iteration}: impedance = {impedance}, variation = {variation}")
-
-        if variation < tolerance:
-            print("Convergence atteinte")
-            break
-        
-    prev_impedance = impedance'''
 
 gmsh.finalize()
