@@ -20,6 +20,7 @@ test/test_adaptive.py
 test/test_efield1.py
 test/test_efield2.py
 test/test_efield3.py
+test/test_feed_edge.py
 test/test_rwg1.py
 test/test_rwg2.py
 test/test_rwg3.py
@@ -27,6 +28,9 @@ test/test_rwg4.py
 test/test_rwg5.py
 test/test_setup.py
 utils/__init__.py
+utils/create_antenna_for_scattering.py
 utils/dipole_parameters.py
+utils/gmsh_function.py
 utils/impmet.py
 utils/point_field.py
+utils/refinement_function.py

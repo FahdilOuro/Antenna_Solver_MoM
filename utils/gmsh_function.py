@@ -6,6 +6,7 @@ import scipy.io as sio
 import math
 import json
 
+from src.radiation_algorithm.radiation_algorithm import radiation_algorithm
 from utils.refinement_function import *
 
 class Mesh:
@@ -16,7 +17,6 @@ class Mesh:
         self.triangles_tags, evtags = gmsh.model.mesh.getElementsByType(2)
         evid = np.array([vmap[j] for j in evtags])
         self.triangles = evid.reshape((self.triangles_tags.shape[-1], -1))
-        gmsh.finalize()
 
 def open_mesh(file_msh_path):
     gmsh.initialize()
@@ -92,11 +92,8 @@ def read_mesh_msh(fichier_msh):
     gmsh.finalize()
     return vxyz, triangles, triangles_tags
 
-def save_mesh(mesh_file):
-    # gmsh.open(mesh_file)
+def save_mesh():
     mesh = {}
-    if gmsh.initialize():
-        print("Gmsh est initialiser")
     for entite in gmsh.model.getEntities():
         dim, tag = entite
         frontieres = gmsh.model.getBoundary([entite])
@@ -115,9 +112,8 @@ def copy_mesh(mesh, copy_model_name):
         gmsh.model.mesh.addNodes(dim, tag, noeuds[0], noeuds[1])
         gmsh.model.mesh.addElements(dim, tag, elements[0], elements[1], elements[2])
 
-def remeshing_model(mesh_file, mesh, currents, mesh_size, feed_point, mesh_dividend):
-    # gmsh.initialize()
-    save_bowtie = save_mesh(mesh_file)
+def remeshing_model(mesh, currents, mesh_size, feed_point, mesh_dividend):
+    save_bowtie = save_mesh()
     new_model = "bowtie_discrete"
     copy_mesh(save_bowtie, new_model)
     print(f"creation of new model {new_model}")
@@ -131,13 +127,10 @@ def remeshing_model(mesh_file, mesh, currents, mesh_size, feed_point, mesh_divid
     gmsh.view.addModelData(sf_view, 0, new_model, "ElementData", mesh.triangles_tags, sf_ele[:, None])
     gmsh.plugin.setNumber("Smooth", "View", gmsh.view.getIndex(sf_view))
     gmsh.plugin.run("Smooth")
-    # gmsh.finalize()
     return sf_view
 
-def post_processing_meshing(mesh_file, sf_view):
-    # gmsh.initialize()
-    model_name = gmsh.merge(mesh_file)
-    # gmsh.model.setCurrent(model_name)
+def post_processing_meshing(model_name, sf_view):
+    gmsh.model.setCurrent(model_name)
     field = gmsh.model.mesh.field.add("PostView")
     gmsh.model.mesh.field.setNumber(field, "ViewTag", sf_view)
     gmsh.model.mesh.field.setAsBackgroundMesh(field)
@@ -262,7 +255,38 @@ def save_gmsh_log(mesh_name, output_path):
 
     print(f"Log saved in: {log_file}")  # Confirmation en console
 
-def box_field(box_tag, x, y, rayon = 1 / 10, density = 0.5, vin = 0.1/2, vout = 0.1*2):
+def refine_antenna(model_name, mesh_name, feed_point, mesh_size, file_name_msh, file_name_mat, save_mesh_folder, max_iterations=10):
+    tolerance = 1e-3  # tolérance sur la variation d'impédance
+    prev_impedance = None
+
+    for iteration in range(max_iterations):
+        write(save_mesh_folder, mesh_name)
+        extract_ModelMsh_to_mat(model_name, file_name_msh, file_name_mat)
+
+        impedance, current_bowtie_antenna = radiation_algorithm(file_name_mat, 1e9, feed_point)
+
+        mesh_bowtie = Mesh()
+
+        mesh_dividend = 5
+
+        sf_view = remeshing_model(mesh_bowtie, current_bowtie_antenna, mesh_size, feed_point, mesh_dividend)
+
+        post_processing_meshing(model_name, sf_view)
+
+        run()
+
+        if prev_impedance is not None:
+            # Calcul de la variation relative ou absolue
+            variation = np.abs(impedance - prev_impedance)
+            print(f"Iteration {iteration}: impedance = {impedance}, variation = {variation}")
+
+            if variation < tolerance:
+                print("Convergence atteinte")
+                break
+            
+        prev_impedance = impedance
+
+'''def box_field(box_tag, x, y, rayon = 1 / 10, density = 0.5, vin = 0.1/2, vout = 0.1*2):
     gmsh.model.mesh.field.add("Box", box_tag)
     gmsh.model.mesh.field.setNumber(box_tag, "VIn", vin)
     gmsh.model.mesh.field.setNumber(box_tag, "VOut", vout)
@@ -286,4 +310,4 @@ def box_refinement(Positions):
 
     gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
     gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
-    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)'''
