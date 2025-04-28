@@ -79,7 +79,7 @@ def visualize_surface_current(points_data, triangles_data, radiation_intensity, 
         z=z_,                            # Coordonnées Z des sommets
         simplices=simplices,             # Indices des sommets de chaque triangle
         colormap="Rainbow",              # Colormap pour la coloration de la surface
-        plot_edges=True,                # Ne pas afficher les bords des triangles
+        plot_edges=False,                # Ne pas afficher les bords des triangles
         color_func=radiation_intensity,  # Utilisation de la densité de courant normalisée pour colorer
         show_colorbar=True,              # Affichage de la barre de couleurs
         title=title,                     # Titre de la visualisation
@@ -215,7 +215,7 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     # Chargement des fichiers contenant les données de maillage, courants et sphère
     data_sphere = loadmat(filename_sphere_to_load)
 
-    _, triangles, _, _, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
+    _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
 
     if scattering :
         frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)
@@ -287,7 +287,8 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     print(f"Total Power : {total_power : 4f}")
     print(f"Gain Linear : {gain_linear_max : 4f}")
     print(f"Gain Logarithmic : {gain_logarithmic_max : 4f} dB")
-    if gap_current:
+    if radiation:
+        print(f"\ngap_curent = {gap_current}")
         radiation_resistance = 2 * total_power / abs(gap_current)**2
         print(f"Radiation Resistance : {radiation_resistance : 4f} Ohms")
 

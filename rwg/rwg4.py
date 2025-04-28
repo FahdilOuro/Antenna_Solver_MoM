@@ -329,6 +329,7 @@ class DataManager_rwg4:
                 impedance = data['voltage'].squeeze()
                 feed_power = data['current'].squeeze()
                 gap_voltage = data['gap_voltage'].squeeze()
+                print("on est ici dans 2")
                 gap_current = data['gap_current'].squeeze()
                 return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_voltage, gap_current, impedance, feed_power
             if not scattering and not radiation:
