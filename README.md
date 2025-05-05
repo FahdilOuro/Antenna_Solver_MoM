@@ -85,7 +85,9 @@ This is the earliest version of the simulator where one can still find the gener
 
 Some result from the simulation of ifa antenna in scattering mode : https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/antenna_simulation/receiving_antenna/ifa_antenna.ipynb
 
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/data/plot_figures/plate_2_antenna_receiving_mode.png" width=50% height=50%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/data/plot_figures/ifaCurrent_receive.png" width=50% height=50%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/data/plot_figures/ifaEfield_receive.png" width=50% height=50%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/data/plot_figures/ifaGainDistribution_receive.png" width=50% height=50%>
 
 ## Tutorial
 
