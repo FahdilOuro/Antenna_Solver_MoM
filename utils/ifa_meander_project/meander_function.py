@@ -8,6 +8,18 @@ from rwg.rwg3 import *
 from rwg.rwg4 import *
 from rwg.rwg5 import *
 
+def calculate_nPoints(fLow, fHigh, fC, min_points=11):
+    step = (fHigh - fLow) / (min_points - 1)
+    if (fC - fLow) % step == 0:
+        return min_points
+    else:
+        # Trouve le plus petit nPoints qui inclut fC
+        nPoints = min_points
+        while True:
+            frequencies = np.linspace(fLow, fHigh, nPoints)
+            if fC in frequencies:
+                return nPoints
+            nPoints += 1
 
 '''def ifa_creation(a, b, wid, min_slot):
     gap = 0
@@ -151,6 +163,177 @@ def ifa_creation(a, b, first_min_slot, other_min_slot, m_max=100):
 
     return x, y, wid
 
+def ifa_creation_center(L, largeur, hauteur, width, min_slot):
+    """
+    Trace un dipôle méandré en 2D avec des points de contour bien délimités.
+    Le tracé commence au point (x0, y0) et se développe vers le bas.
+    """
+    # — Validation des entrées
+    for val, name in zip([L, largeur, hauteur, width, min_slot], ['L', 'largeur', 'hauteur', 'width', 'min_slot']):
+        if not isinstance(val, (int, float)) or np.isnan(val) or np.isinf(val):
+            raise ValueError(f"{name} doit etre un scalaire numérique réel.")
+    if L <= 0:
+        raise ValueError("L doit etre strictement positif.")
+    if width <= 0:
+        raise ValueError("width doit etre strictement positif.")
+    if hauteur < 0:
+        raise ValueError("hauteur doit etre positif ou nul.")
+    if min_slot <= 0:
+        raise ValueError("min_slot doit etre strictement positif.")
+    if largeur <= 0:
+        raise ValueError("largeur doit etre strictement positif.")
+    if min_slot <= width:
+        raise ValueError("min_slot doit etre strictement superieur à width.")
+
+    # — Initialisation
+    x0 = 0
+    y0 = hauteur / 2 - width / 2
+    hauteur = hauteur - width
+
+    # — Calcul du nombre de brins verticaux
+    N = int(np.floor((largeur / min_slot - 1)))
+    longueur_meandre = (N + 1) * min_slot + N * hauteur
+
+    print("longueur_meandre =", longueur_meandre, "\n")
+    print("longueur_desiree =", L)
+
+    x = np.zeros(2 * N + 2)
+    y = np.zeros(2 * N + 2)
+
+    x[0] = x0
+    y[0] = y0
+
+    direction = -1
+    idx = 0
+    calcul_actuel_longueur = 0
+    horizontal = False
+    vertical = False
+
+    for k in range(1, N + 1):
+        # Horizontal
+        idx += 1
+        x[idx] = x[idx - 1] + min_slot
+        y[idx] = y[idx - 1]
+        calcul_actuel_longueur += min_slot
+        if calcul_actuel_longueur + hauteur >= L:
+            rem = L - calcul_actuel_longueur
+            vertical = True
+            break
+
+        # Vertical
+        idx += 1
+        x[idx] = x[idx - 1]
+        y[idx] = y[idx - 1] + direction * hauteur
+        calcul_actuel_longueur += hauteur
+        direction = -direction
+        if calcul_actuel_longueur + min_slot >= L:
+            rem = L - calcul_actuel_longueur
+            horizontal = True
+            break
+
+    # Ajouter le dernier petit segment correctif
+    if not horizontal and not vertical:
+        idx += 1
+        x[idx] = x[idx - 1] + min_slot
+        y[idx] = y[idx - 1]
+        calcul_actuel_longueur += min_slot
+    elif horizontal:
+        idx += 1
+        x[idx] = x[idx - 1] + rem
+        y[idx] = y[idx - 1]
+        calcul_actuel_longueur += rem
+    elif vertical:
+        idx += 1
+        x[idx] = x[idx - 1]
+        y[idx] = y[idx - 1] + direction * rem
+        calcul_actuel_longueur += rem
+
+    return x[:idx+1], y[:idx+1], calcul_actuel_longueur
+
+def trace_meander(x, y, Width):
+    """
+    Génère le contour épais (meander) autour min_slot'une ligne polygonale donnée.
+    
+    Paramètres :
+        x : array-like, abscisses de la ligne centrale
+        y : array-like, ordonnées de la ligne centrale
+        Width : hauteur totale du contour (centré sur la ligne)
+        
+    Retourne :
+        x_meander, y_meander : coordonnées du contour
+    """
+    x = np.array(x)
+    y = np.array(y)
+    n = len(x)
+
+    x_meander = np.zeros(2 * n)
+    y_meander = np.zeros(2 * n)
+
+    # Premier point
+    if x[0] == x[1] and y[0] > y[1]:
+        x_meander[0]     = x[0] + Width / 2
+        x_meander[2*n-1] = x[0] - Width / 2
+        y_meander[0]     = y[0]
+        y_meander[2*n-1] = y[0]
+    elif x[0] == x[1] and y[0] < y[1]:
+        x_meander[0]     = x[0] - Width / 2
+        x_meander[2*n-1] = x[0] + Width / 2
+        y_meander[0]     = y[0]
+        y_meander[2*n-1] = y[0]
+    elif y[0] == y[1]:
+        x_meander[0]     = x[0]
+        x_meander[2*n-1] = x[0]
+        y_meander[0]     = y[0] + Width / 2
+        y_meander[2*n-1] = y[0] - Width / 2
+
+    # Dernier point
+    if y[n-2] == y[n-1]:
+        x_meander[n-1] = x[n-1]
+        x_meander[n]   = x[n-1]
+        y_meander[n-1] = y[n-1] + Width / 2
+        y_meander[n]   = y[n-1] - Width / 2
+    elif x[n-2] == x[n-1] and y[n-2] > y[n-1]:
+        x_meander[n-1] = x[n-1] + Width / 2
+        x_meander[n]   = x[n-1] - Width / 2
+        y_meander[n-1] = y[n-1]
+        y_meander[n]   = y[n-1]
+    elif x[n-2] == x[n-1] and y[n-2] < y[n-1]:
+        x_meander[n-1] = x[n-1] - Width / 2
+        x_meander[n]   = x[n-1] + Width / 2
+        y_meander[n-1] = y[n-1]
+        y_meander[n]   = y[n-1]
+
+    # Points intermédiaires
+    j = 2 * n - 2
+    for i in range(1, n - 1):
+        if y[i-1] == y[i] and x[i] == x[i+1] and y[i] > y[i+1]:
+            x_meander[i] = x[i] + Width / 2
+            y_meander[i] = y[i] + Width / 2
+            x_meander[j] = x[i] - Width / 2
+            y_meander[j] = y[i] - Width / 2
+
+        elif x[i-1] == x[i] and y[i] == y[i+1] and y[i-1] > y[i+1]:
+            x_meander[i] = x[i] + Width / 2
+            y_meander[i] = y[i] + Width / 2
+            x_meander[j] = x[i] - Width / 2
+            y_meander[j] = y[i] - Width / 2
+
+        elif y[i-1] == y[i] and x[i] == x[i+1] and y[i] < y[i+1]:
+            x_meander[i] = x[i] - Width / 2
+            y_meander[i] = y[i] + Width / 2
+            x_meander[j] = x[i] + Width / 2
+            y_meander[j] = y[i] - Width / 2
+
+        elif x[i-1] == x[i] and y[i] == y[i+1] and y[i-1] < y[i+1]:
+            x_meander[i] = x[i] - Width / 2
+            y_meander[i] = y[i] + Width / 2
+            x_meander[j] = x[i] + Width / 2
+            y_meander[j] = y[i] - Width / 2
+
+        j -= 1
+
+    return x_meander, y_meander
+
 def antenna_ifa_meander(meander_x, meander_y, terminal_x, terminal_y, feed_x, feed_y, save_mesh_folder, mesh_name, mesh_size):
     gmsh.initialize()
     model_name  = "IFA_meander"
@@ -177,7 +360,7 @@ def antenna_ifa_meander(meander_x, meander_y, terminal_x, terminal_y, feed_x, fe
     # Afficher le modèle dans l’interface Gmsh
     gmsh.model.mesh.generate(2)
 
-    run()
+    # run()
 
     write(save_mesh_folder, mesh_name)
 
@@ -271,8 +454,12 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
 
     for frequency in frequencies:
         print(f"Simulation Numéro {count + 1}")
-        if count == nPoints - 1: 
+        '''if count == nPoints - 1: 
+            show = True'''
+        if frequency == fC:
             show = True
+        else:
+            show = False
         impedance, _ = radiation_ifa(ifa_meander_mat, frequency, feed_point, voltage_amplitude, show)
         s11 = (impedance - Z0) / (impedance + Z0)
         s11_db.append(20 * np.log10(abs(s11)))
