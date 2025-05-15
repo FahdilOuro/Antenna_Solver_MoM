@@ -3,7 +3,6 @@ from rwg.rwg2 import *
 from rwg.rwg3 import *
 from rwg.rwg4 import *
 from rwg.rwg5 import *
-from utils.refinement_function import *
 
 
 def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_from_matlab=True, monopole=False):
@@ -86,13 +85,13 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
     save_file_name_current = DataManager_rwg4.save_data_for_radiation(filename_mesh2_to_load, save_folder_name_current, frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power)
     print(f"Sauvegarde du fichier : {save_file_name_current} effectué avec succès !")
 
-    print(f"Fréquence de rayonnement de l'antenne : {frequency} Hz")
+    print(f"Fréquence de rayonnement de l'antenne : {frequency} Hz\n")
 
     # Calcul des courants de surface à partir du courant total
     surface_current_density = calculate_current_density(current, triangles, edges, vecteurs_rho)
 
     # Visualisation des courants de surface
-    antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in receiving mode')
+    antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in radiation mode')
     print(f"{antennas_name} view is successfully created at frequency {frequency} Hz")
     fig = visualize_surface_current(points, triangles, surface_current_density, antennas_name)
     fig.show()

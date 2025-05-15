@@ -16,6 +16,7 @@ rwg/rwg3.py
 rwg/rwg4.py
 rwg/rwg5.py
 rwg/rwg6.py
+src/__init__.py
 test/test_adaptive.py
 test/test_efield1.py
 test/test_efield2.py

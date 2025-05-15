@@ -3,8 +3,6 @@ import sys
 import gmsh
 import numpy as np
 import scipy.io as sio
-import math
-import json
 
 from src.radiation_algorithm.radiation_algorithm import radiation_algorithm
 from utils.refinement_function import *
@@ -69,6 +67,23 @@ def write(save_folder_path, file_name="new_mesh.msh"):
     # Écriture du fichier
     gmsh.write(save_path)
     print(f"The .msh file was successfully saved to: '{save_path}'")
+
+def rectangle_surface(x_rect, y_rect):
+    point_tags = []
+    for x_ti, y_ti in zip(x_rect, y_rect):
+        tag = gmsh.model.occ.addPoint(x_ti, y_ti, 0)
+        point_tags.append(tag)
+
+    line_tags_terminal = []
+    for i in range(len(point_tags) - 1):
+        line = gmsh.model.occ.addLine(point_tags[i], point_tags[i + 1])
+        line_tags_terminal.append(line)
+
+    line_tags_terminal.append(gmsh.model.occ.addLine(point_tags[-1], point_tags[0]))
+    loop_terminal = gmsh.model.occ.addCurveLoop(line_tags_terminal)
+    rect_surface = gmsh.model.occ.addPlaneSurface([loop_terminal])
+
+    return rect_surface
 
 # -------------------------------A MODIFIER POUR LE REFIERMENT --------------------
 
@@ -285,29 +300,3 @@ def refine_antenna(model_name, frequency, mesh_name, feed_point, mesh_size, file
                 break
             
         prev_impedance = impedance
-
-'''def box_field(box_tag, x, y, rayon = 1 / 10, density = 0.5, vin = 0.1/2, vout = 0.1*2):
-    gmsh.model.mesh.field.add("Box", box_tag)
-    gmsh.model.mesh.field.setNumber(box_tag, "VIn", vin)
-    gmsh.model.mesh.field.setNumber(box_tag, "VOut", vout)
-    gmsh.model.mesh.field.setNumber(box_tag, "XMin", x - rayon)
-    gmsh.model.mesh.field.setNumber(box_tag, "XMax", x + rayon)
-    gmsh.model.mesh.field.setNumber(box_tag, "YMin", y - rayon)
-    gmsh.model.mesh.field.setNumber(box_tag, "YMax", y + rayon)
-    gmsh.model.mesh.field.setNumber(box_tag, "Thickness", density)
-
-def box_refinement(Positions):
-    count_box_tag = []
-    for i in range(0, Positions.shape[0]):
-        box_tag = i+1
-        box_field(box_tag, Positions[i, 0], Positions[i, 1])
-        count_box_tag.append(box_tag)
-
-    gmsh.model.mesh.field.add("Min", len(count_box_tag) + 1)
-    gmsh.model.mesh.field.setNumbers(len(count_box_tag) + 1, "FieldsList", count_box_tag)
-
-    gmsh.model.mesh.field.setAsBackgroundMesh(len(count_box_tag) + 1)
-
-    gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
-    gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
-    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)'''
