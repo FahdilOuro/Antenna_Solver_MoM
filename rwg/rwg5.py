@@ -1,6 +1,7 @@
 import numpy as np
 
 import plotly.figure_factory as ff
+import plotly.graph_objects as go
 
 
 def calculate_current_density(current, triangles, edges, vecteurs_rho):
@@ -119,7 +120,7 @@ def compute_aspect_ratios(points):
         "z": 0.3,
     }
 
-def visualize_surface_current(points_data, triangles_data, surface_current_density, title="Antennas Surface Current"):
+def visualize_surface_current(points_data, triangles_data, surface_current_density, feed_point, title="Antennas Surface Current"):
     """
         Visualise la densité de courant surfacique sur une surface triangulée en 3D à l'aide de Plotly.
 
@@ -172,6 +173,17 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
         title=title,
         aspectratio=aspect_ratios,
     )
+    # Ajout du feed-point en noir et en évidence
+    fig.add_trace(go.Scatter3d(
+        x=[feed_point[0]],
+        y=[feed_point[1]],
+        z=[feed_point[2]],
+        mode='markers+text',
+        marker=dict(size=6, color='red', symbol='circle'),
+        text=['Feed Point'],
+        textposition='top center',
+        name='Feed Point'
+    ))
     return fig
 
 def calculate_seuil_surface_current_density(surface_current_density):

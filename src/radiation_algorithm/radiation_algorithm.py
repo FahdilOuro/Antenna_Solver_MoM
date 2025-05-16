@@ -93,7 +93,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
     # Visualisation des courants de surface
     antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in radiation mode')
     print(f"{antennas_name} view is successfully created at frequency {frequency} Hz")
-    fig = visualize_surface_current(points, triangles, surface_current_density, antennas_name)
+    fig = visualize_surface_current(points, triangles, surface_current_density, feed_point, antennas_name)
     fig.show()
 
     return impedance, surface_current_density

@@ -8,7 +8,7 @@ from rwg.rwg3 import *
 from rwg.rwg4 import *
 from rwg.rwg5 import *
 
-def calculate_nPoints(fLow, fHigh, fC, min_points=11):
+def calculate_nPoints(fLow, fHigh, fC, min_points=28):
     step = (fHigh - fLow) / (min_points - 1)
     if (fC - fLow) % step == 0:
         return min_points
@@ -194,8 +194,8 @@ def ifa_creation_center(L, largeur, hauteur, width, min_slot):
     N = int(np.floor((largeur / min_slot - 1)))
     longueur_meandre = (N + 1) * min_slot + N * hauteur
 
-    print("longueur_meandre =", longueur_meandre, "\n")
-    print("longueur_desiree =", L)
+    '''print("longueur_meandre =", longueur_meandre)
+    print("longueur_desiree =", L, "\n")'''
 
     x = np.zeros(2 * N + 2)
     y = np.zeros(2 * N + 2)
@@ -360,7 +360,7 @@ def antenna_ifa_meander(meander_x, meander_y, terminal_x, terminal_y, feed_x, fe
     # Afficher le modèle dans l’interface Gmsh
     gmsh.model.mesh.generate(2)
 
-    # run()
+    run()
 
     write(save_mesh_folder, mesh_name)
 
@@ -438,7 +438,7 @@ def radiation_ifa(mesh1, frequency, feed_point, voltage_amplitude, show):
     # Visualisation des courants de surface
     if show:
         antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in radiation mode')
-        fig = visualize_surface_current(points, triangles, surface_current_density, antennas_name)
+        fig = visualize_surface_current(points, triangles, surface_current_density, feed_point, antennas_name)
         fig.show()
 
     return impedance, surface_current_density
@@ -472,7 +472,7 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
     print(f"\nFréquence de résonance : {f_resonance / 1e6:.2f} MHz")
 
     # Comparaison à la fréquence de coupure
-    error = abs(f_resonance - fC)
+    error = abs((fC - f_resonance) / fC)
     if error <= accuracy:
         has_converged = True
         print(f" Convergence atteinte : |f_res - fC| = {error:.2f} Hz ≤ {accuracy}")
