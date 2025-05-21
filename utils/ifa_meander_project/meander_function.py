@@ -9,7 +9,7 @@ from rwg.rwg3 import *
 from rwg.rwg4 import *
 from rwg.rwg5 import *
 
-def calculate_nPoints(fLow, fHigh, fC, min_points=5):
+def calculate_nPoints(fLow, fHigh, fC, min_points=4):
     step = (fHigh - fLow) / (min_points - 1)
     if (fC - fLow) % step == 0:
         return min_points
@@ -601,8 +601,6 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
 
     for frequency in frequencies:
         print(f"Simulation Numéro {count + 1}")
-        '''if count == nPoints - 1: 
-            show = True'''
         if frequency == fC:
             show = True
         else:
@@ -616,8 +614,12 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
 
     # Trouver la fréquence de résonance (minimum S11)
     min_index = np.argmin(s11_db)
+
+    # Trouver l'index de la valeur de fC ou la plus proche de fC
+    index_fC = np.argmin(np.abs(frequencies - fC))
+
     f_resonance = frequencies[min_index]
-    R_I_min_index = impedances[min_index].real
+    R_I_min_index = impedances[index_fC].real
     print(f"R_I_min_index = {R_I_min_index}")
     print(f"\nFréquence de résonance : {f_resonance / 1e6:.2f} MHz")
 
@@ -631,13 +633,13 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
             has_converged = True
             print(f" Convergence atteinte : |f_res - fC| = {error:.2f} Hz ≤ {accuracy}")
         else:
-            print(f"R_I_min_index = {R_I_min_index} $\Omega$")
+            print(f"R_I_min_index = {R_I_min_index} Ohm")
             # new_distance_short = distance_short * pow((Z0 / R_I_min_index), 2) 
             new_distance_short = distance_short * pow((Z0 / R_I_min_index), 2)
             # new_distance_short = 7.77 / 1000
             if new_distance_short < 0.5 / 1000:
                 new_distance_short = 0.5 / 1000
-            if new_distance_short > hauteur:
+            if new_distance_short > hauteur - wid:
                 new_distance_short = hauteur - wid
     else:
         distance_meandre = (largeur - L_short) / Nombre_meandre
@@ -645,19 +647,19 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
             distance_meandre = 0.5 / 1000
         # new_Nombre_meandre = np.floor((largeur - L_short) / (wid + distance_meandre))
         # new_Nombre_meandre = int(np.floor(Nombre_meandre * pow((fC / f_resonance), 2)))
-        new_Nombre_meandre = int(math.ceil((L / hauteur) * f_resonance / fC)) + 1 
+        new_Nombre_meandre = int(math.ceil((L / hauteur) * f_resonance / fC)) + 1
         new_wid = wid * pow((fC / f_resonance), 2)
-        # new_distance_short = distance_short * (Z0 / R_I_min_index)
         new_distance_short = distance_short * (Z0 / R_I_min_index)
+        # new_distance_short = 9 / 1000
         print(f"\n0...........short feed ...... dans la fonction = {new_distance_short * 1000}\n")
         if new_distance_short < 0.5 / 1000:
             new_distance_short = 0.5 / 1000
-        if new_distance_short > hauteur:
-            new_distance_short = hauteur
+        if new_distance_short > hauteur - wid:
+            new_distance_short = hauteur - wid
         print(f" Pas de convergence : |f_res - fC| = {error:.2f} Hz > {accuracy}")
         print(f"\n1...........short feed ...... dans la fonction = {new_distance_short * 1000}\n")
 
-    return s11_db, f_resonance, new_distance_short, new_wid, new_Nombre_meandre, has_converged
+    return s11_db, f_resonance, new_distance_short, new_wid, new_Nombre_meandre, has_converged, impedances
 
 
 def plot_s11_curve(fLow, fHigh, nPoints, s11_db, fC=None):
@@ -672,7 +674,9 @@ def plot_s11_curve(fLow, fHigh, nPoints, s11_db, fC=None):
     s11_min = s11_db[min_index]
 
     # Tracé
-    plt.figure(figsize=(8, 4))
+    fig_size = 8
+    Fibonacci = (1 + np.sqrt(5)) / 2
+    plt.figure(figsize=(fig_size, fig_size / Fibonacci))
     plt.plot(frequencies_mhz, s11_db, label="S11 (dB)", color='blue')
     plt.plot(f_resonance, s11_min, 'ro', label=f"Résonance: {f_resonance:.2f} MHz")
     
@@ -682,6 +686,41 @@ def plot_s11_curve(fLow, fHigh, nPoints, s11_db, fC=None):
     plt.xlabel("Fréquence (MHz)")
     plt.ylabel("S11 (dB)")
     plt.title("Courbe de S11 vs Fréquence")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+def plot_impedance(fLow, fHigh, nPoints, impedances, s11_db, fC=None):
+    frequencies = np.linspace(fLow, fHigh, nPoints)
+    frequencies_mhz = np.array(frequencies) / 1e6
+    impedances_real = np.zeros(nPoints)
+
+    for i in range(nPoints):
+        impedances_real[i] = impedances[i].real
+
+    # Trouver le minimum de S11
+    min_index = np.argmin(s11_db)
+    f_resonance = frequencies[min_index] / 1e6
+    # impedance_min = impedances_real[min_index]
+
+    # Trouver l'index de la valeur de fC ou la plus proche de fC
+    index_fC = np.argmin(np.abs(frequencies - fC))
+    impedance_fc = impedances_real[index_fC]
+
+    # Tracé
+    fig_size = 8
+    Fibonacci = (1 + np.sqrt(5)) / 2
+    plt.figure(figsize=(fig_size, fig_size / Fibonacci))
+    plt.plot(frequencies_mhz, impedances_real, label="R0", color='red')
+    plt.plot(f_resonance, impedance_fc, 'bo', label=f"Résonance: {f_resonance:.2f} MHz")
+    
+    if fC:
+        plt.axvline(fC / 1e6, color='green', linestyle='--', label=f"fC = {fC/1e6:.2f} MHz")
+
+    plt.xlabel("Fréquence (MHz)")
+    plt.ylabel("Impedance (Ohm)")
+    plt.title("Courbe de Impedance vs Fréquence")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
