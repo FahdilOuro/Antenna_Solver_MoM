@@ -599,10 +599,13 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
     new_wid = wid
     new_Nombre_meandre = Nombre_meandre
 
+    index_fC = 0
+
     for frequency in frequencies:
         print(f"Simulation Numéro {count + 1}")
         if frequency == fC:
             show = True
+            index_fC = count
         else:
             show = False
         impedance, _ = radiation_ifa(ifa_meander_mat, frequency, feed_point, voltage_amplitude, show)
@@ -616,7 +619,7 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
     min_index = np.argmin(s11_db)
 
     # Trouver l'index de la valeur de fC ou la plus proche de fC
-    index_fC = np.argmin(np.abs(frequencies - fC))
+    # index_fC = np.argmin(np.abs(frequencies - fC))
 
     f_resonance = frequencies[min_index]
     R_I_min_index = impedances[index_fC].real
@@ -635,7 +638,7 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
         else:
             print(f"R_I_min_index = {R_I_min_index} Ohm")
             # new_distance_short = distance_short * pow((Z0 / R_I_min_index), 2) 
-            new_distance_short = distance_short * pow((Z0 / R_I_min_index), 2)
+            new_distance_short = distance_short * pow((Z0 / R_I_min_index), 1)
             # new_distance_short = 7.77 / 1000
             if new_distance_short < 0.5 / 1000:
                 new_distance_short = 0.5 / 1000
@@ -691,7 +694,7 @@ def plot_s11_curve(fLow, fHigh, nPoints, s11_db, fC=None):
     plt.tight_layout()
     plt.show()
 
-def plot_impedance(fLow, fHigh, nPoints, impedances, s11_db, fC=None):
+""" def plot_impedance(fLow, fHigh, nPoints, impedances, s11_db, fC=None):
     frequencies = np.linspace(fLow, fHigh, nPoints)
     frequencies_mhz = np.array(frequencies) / 1e6
     impedances_real = np.zeros(nPoints)
@@ -706,14 +709,15 @@ def plot_impedance(fLow, fHigh, nPoints, impedances, s11_db, fC=None):
 
     # Trouver l'index de la valeur de fC ou la plus proche de fC
     index_fC = np.argmin(np.abs(frequencies - fC))
-    impedance_fc = impedances_real[index_fC]
+    impedance_fC = impedances_real[index_fC]
 
     # Tracé
     fig_size = 8
     Fibonacci = (1 + np.sqrt(5)) / 2
     plt.figure(figsize=(fig_size, fig_size / Fibonacci))
     plt.plot(frequencies_mhz, impedances_real, label="R0", color='red')
-    plt.plot(f_resonance, impedance_fc, 'bo', label=f"Résonance: {f_resonance:.2f} MHz")
+    # plt.plot(f_resonance, impedance_min, 'bo', label=f"Résonance: {f_resonance:.2f} MHz")
+    plt.plot(fC, impedance_fC, 'bo', label=f"Résonance: {f_resonance:.2f} MHz")
     
     if fC:
         plt.axvline(fC / 1e6, color='green', linestyle='--', label=f"fC = {fC/1e6:.2f} MHz")
@@ -721,6 +725,47 @@ def plot_impedance(fLow, fHigh, nPoints, impedances, s11_db, fC=None):
     plt.xlabel("Fréquence (MHz)")
     plt.ylabel("Impedance (Ohm)")
     plt.title("Courbe de Impedance vs Fréquence")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show() """
+
+def plot_impedance(fLow, fHigh, nPoints, impedances, s11_db, fC=None):
+    # Vecteur de fréquences
+    frequencies = np.linspace(fLow, fHigh, nPoints)
+    frequencies_mhz = frequencies / 1e6
+
+    # Partie réelle de l’impédance
+    impedances_real = np.real(impedances)
+
+    # Trouver la fréquence de résonance (minimum de S11)
+    min_index = np.argmin(s11_db)
+    f_resonance = frequencies[min_index] / 1e6
+    impedance_resonance = impedances_real[min_index]
+
+    # Préparer le tracé
+    fig_size = 8
+    golden_ratio = (1 + np.sqrt(5)) / 2
+    plt.figure(figsize=(fig_size, fig_size / golden_ratio))
+
+    # Courbe d'impédance réelle
+    plt.plot(frequencies_mhz, impedances_real, label="Re(Z)", color='red')
+
+    # Marqueur de résonance
+    plt.plot(f_resonance, impedance_resonance, 'bo', label=f"Résonance: {f_resonance:.2f} MHz")
+
+    # Si une fréquence cible est donnée
+    if fC is not None:
+        fC_mhz = fC / 1e6
+        index_fC = np.argmin(np.abs(frequencies - fC))
+        impedance_fC = impedances_real[index_fC]
+        plt.plot(fC_mhz, impedance_fC, 'go', label=f"fC: {fC_mhz:.2f} MHz")
+        plt.axvline(fC_mhz, color='green', linestyle='--')
+
+    # Mise en forme
+    plt.xlabel("Fréquence (MHz)")
+    plt.ylabel("Impédance réelle (Ohm)")
+    plt.title("Impédance réelle vs Fréquence")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
