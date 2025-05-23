@@ -602,7 +602,7 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
     index_fC = 0
 
     for frequency in frequencies:
-        print(f"Simulation Numéro {count + 1}")
+        print(f"Simulation Numéro {count + 1}\n")
         if frequency == fC:
             show = True
             index_fC = count
@@ -612,55 +612,83 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
         impedances.append(impedance)
         s11 = (impedance - Z0) / (impedance + Z0)
         s11_db.append(20 * np.log10(abs(s11)))
-        print(f"paramètre S11 = {s11_db[count]} db")
+        print(f"paramètre S11 = {s11_db[count]} db\n")
         count += 1
 
     # Trouver la fréquence de résonance (minimum S11)
     min_index = np.argmin(s11_db)
 
+    max_freq = max(frequencies)
+    print(f"max_freq = {max_freq / 1e6:.2f} MHz\n")
+    min_freq = min(frequencies)
+    print(f"min_freq = {min_freq / 1e6:.2f} MHz\n")
+
     # Trouver l'index de la valeur de fC ou la plus proche de fC
     # index_fC = np.argmin(np.abs(frequencies - fC))
 
     f_resonance = frequencies[min_index]
-    R_I_min_index = impedances[index_fC].real
+    R_I_min_index = impedances[min_index].real
     print(f"R_I_min_index = {R_I_min_index}")
-    print(f"\nFréquence de résonance : {f_resonance / 1e6:.2f} MHz")
+    print(f"\nFréquence de résonance : {f_resonance / 1e6:.2f} MHz\n")
 
     sf_list.append(new_distance_short)
 
     # Comparaison à la fréquence de coupure
     error = abs((fC - f_resonance) / fC)
     s11_db_min_index = s11_db[min_index]
+
+    new_distance_short = distance_short * (Z0 / R_I_min_index)
+
     if error < accuracy:
         if s11_db_min_index < -10:
             has_converged = True
             print(f" Convergence atteinte : |f_res - fC| = {error:.2f} Hz ≤ {accuracy}")
         else:
-            print(f"R_I_min_index = {R_I_min_index} Ohm")
+            print(" ")
+            print("Opti Freq found but no matching yet ! \n")
+            print(f"R_I_min_index = {R_I_min_index} Ohm\n")
             # new_distance_short = distance_short * pow((Z0 / R_I_min_index), 2) 
             new_distance_short = distance_short * pow((Z0 / R_I_min_index), 1)
             # new_distance_short = 7.77 / 1000
-            if new_distance_short < 0.5 / 1000:
+            """ if new_distance_short < 0.5 / 1000:
                 new_distance_short = 0.5 / 1000
             if new_distance_short > hauteur - wid:
-                new_distance_short = hauteur - wid
-    else:
-        distance_meandre = (largeur - L_short) / Nombre_meandre
-        if distance_meandre < 0.5 / 1000:
-            distance_meandre = 0.5 / 1000
-        # new_Nombre_meandre = np.floor((largeur - L_short) / (wid + distance_meandre))
-        # new_Nombre_meandre = int(np.floor(Nombre_meandre * pow((fC / f_resonance), 2)))
+                new_distance_short = hauteur - wid """
+    #else:
+    distance_meandre = (largeur - L_short) / Nombre_meandre
+    if distance_meandre < 0.5 / 1000:
+        distance_meandre = 0.5 / 1000
+    new_Nombre_meandre = int(np.floor((largeur - L_short) / (wid + distance_meandre)))
+    # new_Nombre_meandre = int(np.floor(Nombre_meandre * pow((fC / f_resonance), 2)))
+
+    new_wid = wid * pow((fC / f_resonance), 2)
+
+    if (abs((f_resonance -  max_freq)/f_resonance) < accuracy):
+        print("f_resonance = max_freq\n")
         new_Nombre_meandre = int(math.ceil((L / hauteur) * f_resonance / fC)) + 1
-        new_wid = wid * pow((fC / f_resonance), 2)
-        new_distance_short = distance_short * (Z0 / R_I_min_index)
-        # new_distance_short = 9 / 1000
-        print(f"\n0...........short feed ...... dans la fonction = {new_distance_short * 1000}\n")
-        if new_distance_short < 0.5 / 1000:
-            new_distance_short = 0.5 / 1000
-        if new_distance_short > hauteur - wid:
-            new_distance_short = hauteur - wid
-        print(f" Pas de convergence : |f_res - fC| = {error:.2f} Hz > {accuracy}")
-        print(f"\n1...........short feed ...... dans la fonction = {new_distance_short * 1000}\n")
+        new_wid = np.sqrt(2)/2 * wid * pow((fC / f_resonance), 2)
+        print(f"new_Nombre_meandre = {new_Nombre_meandre}\n")
+        print(f"new_wid = {new_wid}\n")
+    
+    #new_distance_short = distance_short * (Z0 / R_I_min_index)
+    # new_distance_short = 9 / 1000
+    print(f"\n0...........short feed ...... dans la fonction = {new_distance_short * 1000}\n")
+
+    DSF_max = hauteur - new_wid
+    
+    if new_distance_short > DSF_max:
+        print("new_distance_short > DSF_max\n")
+        #new_distance_short = hauteur - wid
+        new_distance_short = DSF_max - distance_short * np.sqrt(Z0 / R_I_min_index)
+        print(f"new_distance_short = {new_distance_short * 1000}\n")
+
+    if new_distance_short < 0.5 / 1000:
+        print("new_distance_short < 0.5 / 1000\n")
+        new_distance_short = (0.5 + new_wid/2) / 1000
+        print(f"new_distance_short = {new_distance_short * 1000}\n")
+
+    print(f" Pas de convergence : |f_res - fC| = {error:.2f} Hz > {accuracy}")
+    print(f"\n1...........short feed ...... dans la fonction = {new_distance_short * 1000}\n")
 
     return s11_db, f_resonance, new_distance_short, new_wid, new_Nombre_meandre, has_converged, impedances
 
