@@ -246,11 +246,11 @@ class DataManager_rwg2:
         # Création du dossier si nécessaire
         if not os.path.exists(save_folder_name): # Vérification et création du dossier si nécessaire
             os.makedirs(save_folder_name)
-            print(f"Directory '{save_folder_name}' created.")
+            # print(f"Directory '{save_folder_name}' created.")
 
         # Sauvegarde des données dans un fichier MAT
         savemat(full_save_path, data)
-        print(f"Data saved successfully to {full_save_path}")
+        # print(f"Data saved successfully to {full_save_path}")
         return save_file_name
 
     @staticmethod
@@ -292,7 +292,7 @@ class DataManager_rwg2:
                                           vecteur_rho_minus=data['vecteur_rho_minus'].squeeze(),
                                           vecteur_rho_barycentric_plus=data['vecteur_rho_barycentric_plus'].squeeze(),
                                           vecteur_rho_barycentric_minus=data['vecteur_rho_barycentric_minus'].squeeze())
-            print(f"Data loaded from {filename}")
+            # print(f"Data loaded from {filename}")
             return points, triangles, edges, barycentric_triangle, vecteurs_rho
         except FileNotFoundError as e:
             print(f"Error: {e}")

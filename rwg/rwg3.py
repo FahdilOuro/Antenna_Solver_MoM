@@ -51,7 +51,7 @@ def calculate_z_matrice(triangles, edges, barycentric_triangles, vecteurs_rho, f
 
     # Fin du chronométrage
     elapsed_time = time.time() - start_time
-    print(f"Temps écoulé pour le calcul de la matrice Z : {elapsed_time:.6f} secondes")
+    # print(f"Temps écoulé pour le calcul de la matrice Z : {elapsed_time:.6f} secondes")
 
     return omega, mu, epsilon, light_speed_c, eta, matrice_z
 
@@ -107,11 +107,11 @@ class DataManager_rwg3:
         # Vérification et création du dossier si nécessaire
         if not os.path.exists(save_folder_name):           # Vérification et création du dossier si nécessaire
             os.makedirs(save_folder_name)
-            print(f"Directory '{save_folder_name}' created.")
+            # print(f"Directory '{save_folder_name}' created.")
 
         # Sauvegarde des données dans un fichier .mat
         savemat(full_save_path, data)
-        print(f"Data saved successfully to {full_save_path}")
+        # print(f"Data saved successfully to {full_save_path}")
         return save_file_name
 
     @staticmethod
@@ -146,7 +146,7 @@ class DataManager_rwg3:
             light_speed_c = data['light_speed_c'].squeeze()
             eta = data['eta'].squeeze()
             matrice_z = data['matrice_z'].squeeze()
-            print(f"Data loaded from {filename}")
+            # print(f"Data loaded from {filename}")
             return frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z
         except FileNotFoundError as e:
             print(f"Error: {e}")

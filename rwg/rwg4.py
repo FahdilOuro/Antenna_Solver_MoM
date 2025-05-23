@@ -86,7 +86,7 @@ def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incid
 
     # Mesure du temps écoulé pour la résolution
     elapsed_time = time.time() - start_time
-    print(f"Temps écoulé pour le calcul du courant : {elapsed_time:.6f} secondes")
+    # print(f"Temps écoulé pour le calcul du courant : {elapsed_time:.6f} secondes")
 
     # Retourner les résultats principaux
     return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current
@@ -153,7 +153,7 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
         # Tri et récupération de l’indice du centre d’arête le plus proche de FeedPoint
         index_feeding_edges = np.argsort(dist_squared)[0]
 
-    print("The index edge where the antenna is feed are : ", index_feeding_edges)
+    # print("The index edge where the antenna is feed are : ", index_feeding_edges)
 
     # Définition du vecteur "voltage" au niveau de l'arête alimentée
     voltage[index_feeding_edges] = voltage_amplitude * edges.edges_length[index_feeding_edges]
@@ -214,7 +214,7 @@ class DataManager_rwg4:
         # Vérification et création du répertoire si nécessaire
         if not os.path.exists(save_folder_name):
             os.makedirs(save_folder_name)
-            print(f"Directory '{save_folder_name}' created.")
+            # print(f"Directory '{save_folder_name}' created.")
 
         # Sauvegarde des données avec la direction et la polarisation de l'incident de l'onde
         data = {
@@ -233,7 +233,7 @@ class DataManager_rwg4:
         # Sauvegarde des données
         savemat(full_save_path, data)
 
-        print(f"Data saved successfully to {full_save_path}")
+        # print(f"Data saved successfully to {full_save_path}")
 
         return save_file_name
 
@@ -262,7 +262,7 @@ class DataManager_rwg4:
         # Vérification et création du répertoire si nécessaire
         if not os.path.exists(save_folder_name):  # Vérification et création du dossier si nécessaire
             os.makedirs(save_folder_name)
-            print(f"Directory '{save_folder_name}' created.")
+            # print(f"Directory '{save_folder_name}' created.")
 
         # Sauvegarde des données avec le courant, l'impédance et la puissance d'alimentation
         data = {
@@ -283,7 +283,7 @@ class DataManager_rwg4:
         # Sauvegarde des données
         savemat(full_save_path, data)
 
-        print(f"Data saved successfully to {full_save_path}")
+        # print(f"Data saved successfully to {full_save_path}")
 
         return save_file_name
 
@@ -329,7 +329,7 @@ class DataManager_rwg4:
                 impedance = data['voltage'].squeeze()
                 feed_power = data['current'].squeeze()
                 gap_voltage = data['gap_voltage'].squeeze()
-                print("on est ici dans 2")
+                # print("on est ici dans 2")
                 gap_current = data['gap_current'].squeeze()
                 return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_voltage, gap_current, impedance, feed_power
             if not scattering and not radiation:

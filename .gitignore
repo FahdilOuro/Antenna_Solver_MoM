@@ -3,3 +3,6 @@ data/antennas_gain_power
 data/antennas_impedance
 data/antennas_mesh1
 data/antennas_mesh2
+
+# ifa_meander project
+antennas_simulation/ifa_meander_project/data

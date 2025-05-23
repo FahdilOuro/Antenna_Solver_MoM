@@ -331,7 +331,7 @@ def filter_complexes_jonctions(point_data, triangle_data, edge_data):
         edge_data.set_edges(edges[0], edges[1])
         triangle_data.set_triangles_plus_minus(triangles_plus, triangles_minus)
         edge_data.compute_edges_length(point_data)
-    else: print("Aucune jonction complexe trouvée....")  # Si aucune jonction complexe n'est trouvée, affiche un message
+    # else: print("Aucune jonction complexe trouvée....")  # Si aucune jonction complexe n'est trouvée, affiche un message
 
 
 class DataManager_rwg1:
@@ -376,11 +376,11 @@ class DataManager_rwg1:
         # Vérifie si le dossier existe, sinon crée le dossier
         if not os.path.exists(save_folder_name): # Vérification et création du dossier si nécessaire
             os.makedirs(save_folder_name)
-            print(f"Directory '{save_folder_name}' created.")
+            # print(f"Directory '{save_folder_name}' created.")
 
         # Sauvegarde les données dans le fichier MAT
         savemat(full_save_path, data)
-        print(f"Data saved successfully to {full_save_path}")
+        # print(f"Data saved successfully to {full_save_path}")
 
         # Retourne le nom du fichier sauvegardé
         return save_file_name
@@ -417,7 +417,7 @@ class DataManager_rwg1:
             edges.set_edge_length(edge_length=data['edges_length'].squeeze())
 
             # Affiche un message confirmant le succès du chargement des données
-            print(f"Data loaded from {filename}")
+            # print(f"Data loaded from {filename}")
 
             # Retourne les objets créés
             return points, triangles, edges

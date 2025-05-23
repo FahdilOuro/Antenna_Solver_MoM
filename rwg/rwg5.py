@@ -70,7 +70,7 @@ def calculate_current_density(current, triangles, edges, vecteurs_rho):
 
     # Densité de courant maximale
     j_max_surface_current_abs_norm = max(surface_current_density_abs_norm)
-    print(f"Max Current value = {j_max_surface_current_abs_norm} [A/m]")
+    # print(f"Max Current value = {j_max_surface_current_abs_norm} [A/m]")
 
     # Trouver la valeur maximale et son indice
     j_max_index = np.argmax(surface_current_density_norm)  # Renvoie l'indice du max
@@ -188,7 +188,7 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
 
 def calculate_seuil_surface_current_density(surface_current_density):
 
-    print(f"\nNombre de triangles = {surface_current_density.shape}\n")
+    # print(f"\nNombre de triangles = {surface_current_density.shape}\n")
 
     # Calculer la valeur maximale
     max_value = np.max(surface_current_density)
@@ -200,7 +200,7 @@ def calculate_seuil_surface_current_density(surface_current_density):
     # Afficher les résultats
     '''print("Seuil choisi basé sur la médiane et l'écart-type:", seuil)
     print("Valeur maximale de la densité de courant de surface:", max_value)'''
-    print(f"\nNombre d'éléments inférieurs au seuil: {len(indices_below_seuil)}")
+    # print(f"\nNombre d'éléments inférieurs au seuil: {len(indices_below_seuil)}")
     '''print("Indices des éléments inférieurs au seuil:", indices_below_seuil)'''
 
     return indices_below_seuil

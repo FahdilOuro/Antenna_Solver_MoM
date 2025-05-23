@@ -198,6 +198,11 @@ def extract_msh_to_mat(file_msh_path, save_mat_path):
     # Convertir la liste en un tableau numpy (4xT)
     t = np.hstack(triangles) if triangles else np.array([])
 
+    # verifier si save_mat_path existe sinon le creer
+    if not os.path.exists(os.path.dirname(save_mat_path)):
+        os.makedirs(os.path.dirname(save_mat_path))
+        print(f"Folder '{os.path.dirname(save_mat_path)}' was created successfully.")
+
     # Sauvegarder les données dans un fichier .mat
     sio.savemat(save_mat_path, {"p": p, "t": t})
 
