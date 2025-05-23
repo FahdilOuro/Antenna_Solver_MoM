@@ -772,7 +772,7 @@ def simulate_freq_loop_test(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat,
     error = abs((fC - f_resonance) / fC)
     s11_db_min_index = s11_db[min_index]
 
-    #new_distance_short = distance_short * (Z0 / R_I_min_index)
+    # new_distance_short = distance_short * (Z0 / R_I_min_index)
 
     if error < accuracy:
         if s11_db_min_index < -10:
