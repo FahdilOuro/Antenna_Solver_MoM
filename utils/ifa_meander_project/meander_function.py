@@ -150,248 +150,6 @@ def ifa_creation_optimisation(L, largeur, hauteur, width, Nombre_meandre, L_shor
 
     return x[:idx+1], y[:idx+1]
 
-def ifa_creation(a, b, first_min_slot, other_min_slot, m_max=100):
-    gap = 0
-    # Essayer différentes valeurs de m pour trouver un wid acceptable
-    for m in reversed(range(1, m_max + 1)):
-        numerator = a - first_min_slot - (m - 1) * other_min_slot
-        if numerator > 0:
-            wid = numerator / m
-            break
-    else:
-        raise ValueError("Impossible de placer au moins un brin avec ces paramètres.")
-
-    x_dip = []
-    y_dip = []
-
-    # Point de départ (en haut à gauche)
-    x_dip.append(gap)
-    y_dip.append(b / 2)
-
-    # Premier slot horizontal (first_min_slot)
-    x_dip.append(gap + first_min_slot)
-    y_dip.append(b / 2)
-
-    # Zigzag horizontal (de gauche à droite)
-    for i in range(m):
-        base_x = gap + first_min_slot + i * (wid + other_min_slot)
-        if i % 2 == 0:
-            # Descente
-            x_dip.append(base_x + wid)
-            y_dip.append(b / 2)
-            x_dip.append(base_x + wid)
-            y_dip.append(-b / 2 + wid)
-        else:
-            # Montée
-            x_dip.append(base_x)
-            y_dip.append(-b / 2 + wid)
-            x_dip.append(base_x)
-            y_dip.append(b / 2)
-
-    # Dernier point à droite
-    if m % 2 == 0:
-        x_dip.append(a)
-        y_dip.append(b / 2)
-    else:
-        x_dip.append(a)
-        y_dip.append(-b / 2)
-
-    # Deuxième moitié (retour vers la gauche)
-    for i in range(m):
-        base_x = a - i * (wid + other_min_slot)
-        if (m - i) % 2 == 1:
-            # Montée
-            x_dip.append(base_x - wid)
-            y_dip.append(-b / 2)
-            x_dip.append(base_x - wid)
-            y_dip.append(b / 2 - wid)
-        else:
-            # Descente
-            x_dip.append(base_x)
-            y_dip.append(b / 2 - wid)
-            x_dip.append(base_x)
-            y_dip.append(-b / 2)
-
-    # Retour final à gauche
-    x_dip.append(gap)
-    y_dip.append(b / 2 - wid)
-
-    x = np.array(x_dip)
-    y = np.array(y_dip)
-
-    return x, y, wid
-
-def ifa_creation_center(L, largeur, hauteur, width, min_slot):
-    """
-    Trace un dipôle méandré en 2D avec des points de contour bien délimités.
-    Le tracé commence au point (x0, y0) et se développe vers le bas.
-    """
-    # — Validation des entrées
-    for val, name in zip([L, largeur, hauteur, width, min_slot], ['L', 'largeur', 'hauteur', 'width', 'min_slot']):
-        if not isinstance(val, (int, float)) or np.isnan(val) or np.isinf(val):
-            raise ValueError(f"{name} doit etre un scalaire numérique réel.")
-    if L <= 0:
-        raise ValueError("L doit etre strictement positif.")
-    if width <= 0:
-        raise ValueError("width doit etre strictement positif.")
-    if hauteur < 0:
-        raise ValueError("hauteur doit etre positif ou nul.")
-    if min_slot <= 0:
-        raise ValueError("min_slot doit etre strictement positif.")
-    if largeur <= 0:
-        raise ValueError("largeur doit etre strictement positif.")
-    if min_slot <= width:
-        raise ValueError("min_slot doit etre strictement superieur à width.")
-
-    # — Initialisation
-    x0 = 0
-    y0 = hauteur / 2 - width / 2
-    hauteur = hauteur - width
-
-    # — Calcul du nombre de brins verticaux
-    N = int(np.floor((largeur / min_slot - 1)))
-    longueur_meandre = (N + 1) * min_slot + N * hauteur
-
-    print("longueur_meandre =", longueur_meandre)
-    print("longueur_desiree =", L, "\n")
-
-    x = np.zeros(2 * N + 2)
-    y = np.zeros(2 * N + 2)
-
-    x[0] = x0
-    y[0] = y0
-
-    direction = -1
-    idx = 0
-    calcul_actuel_longueur = 0
-    horizontal = False
-    vertical = False
-
-    for k in range(1, N + 1):
-        # Horizontal
-        idx += 1
-        x[idx] = x[idx - 1] + min_slot
-        y[idx] = y[idx - 1]
-        calcul_actuel_longueur += min_slot
-        if calcul_actuel_longueur + hauteur >= L:
-            rem = L - calcul_actuel_longueur
-            vertical = True
-            break
-
-        # Vertical
-        idx += 1
-        x[idx] = x[idx - 1]
-        y[idx] = y[idx - 1] + direction * hauteur
-        calcul_actuel_longueur += hauteur
-        direction = -direction
-        if calcul_actuel_longueur + min_slot >= L:
-            rem = L - calcul_actuel_longueur
-            horizontal = True
-            break
-
-    # Ajouter le dernier petit segment correctif
-    if not horizontal and not vertical:
-        idx += 1
-        x[idx] = x[idx - 1] + min_slot
-        y[idx] = y[idx - 1]
-        calcul_actuel_longueur += min_slot
-    elif horizontal:
-        idx += 1
-        x[idx] = x[idx - 1] + rem
-        y[idx] = y[idx - 1]
-        calcul_actuel_longueur += rem
-    elif vertical:
-        idx += 1
-        x[idx] = x[idx - 1]
-        y[idx] = y[idx - 1] + direction * rem
-        calcul_actuel_longueur += rem
-
-    return x[:idx+1], y[:idx+1], calcul_actuel_longueur
-
-def trace_meander(x, y, Width):
-    """
-    Génère le contour épais (meander) autour min_slot'une ligne polygonale donnée.
-    
-    Paramètres :
-        x : array-like, abscisses de la ligne centrale
-        y : array-like, ordonnées de la ligne centrale
-        Width : hauteur totale du contour (centré sur la ligne)
-        
-    Retourne :
-        x_meander, y_meander : coordonnées du contour
-    """
-    x = np.array(x)
-    y = np.array(y)
-    n = len(x)
-
-    x_meander = np.zeros(2 * n)
-    y_meander = np.zeros(2 * n)
-
-    # Premier point
-    if x[0] == x[1] and y[0] > y[1]:
-        x_meander[0]     = x[0] + Width / 2
-        x_meander[2*n-1] = x[0] - Width / 2
-        y_meander[0]     = y[0]
-        y_meander[2*n-1] = y[0]
-    elif x[0] == x[1] and y[0] < y[1]:
-        x_meander[0]     = x[0] - Width / 2
-        x_meander[2*n-1] = x[0] + Width / 2
-        y_meander[0]     = y[0]
-        y_meander[2*n-1] = y[0]
-    elif y[0] == y[1]:
-        x_meander[0]     = x[0]
-        x_meander[2*n-1] = x[0]
-        y_meander[0]     = y[0] + Width / 2
-        y_meander[2*n-1] = y[0] - Width / 2
-
-    # Dernier point
-    if y[n-2] == y[n-1]:
-        x_meander[n-1] = x[n-1]
-        x_meander[n]   = x[n-1]
-        y_meander[n-1] = y[n-1] + Width / 2
-        y_meander[n]   = y[n-1] - Width / 2
-    elif x[n-2] == x[n-1] and y[n-2] > y[n-1]:
-        x_meander[n-1] = x[n-1] + Width / 2
-        x_meander[n]   = x[n-1] - Width / 2
-        y_meander[n-1] = y[n-1]
-        y_meander[n]   = y[n-1]
-    elif x[n-2] == x[n-1] and y[n-2] < y[n-1]:
-        x_meander[n-1] = x[n-1] - Width / 2
-        x_meander[n]   = x[n-1] + Width / 2
-        y_meander[n-1] = y[n-1]
-        y_meander[n]   = y[n-1]
-
-    # Points intermédiaires
-    j = 2 * n - 2
-    for i in range(1, n - 1):
-        if y[i-1] == y[i] and x[i] == x[i+1] and y[i] > y[i+1]:
-            x_meander[i] = x[i] + Width / 2
-            y_meander[i] = y[i] + Width / 2
-            x_meander[j] = x[i] - Width / 2
-            y_meander[j] = y[i] - Width / 2
-
-        elif x[i-1] == x[i] and y[i] == y[i+1] and y[i-1] > y[i+1]:
-            x_meander[i] = x[i] + Width / 2
-            y_meander[i] = y[i] + Width / 2
-            x_meander[j] = x[i] - Width / 2
-            y_meander[j] = y[i] - Width / 2
-
-        elif y[i-1] == y[i] and x[i] == x[i+1] and y[i] < y[i+1]:
-            x_meander[i] = x[i] - Width / 2
-            y_meander[i] = y[i] + Width / 2
-            x_meander[j] = x[i] + Width / 2
-            y_meander[j] = y[i] - Width / 2
-
-        elif x[i-1] == x[i] and y[i] == y[i+1] and y[i-1] < y[i+1]:
-            x_meander[i] = x[i] - Width / 2
-            y_meander[i] = y[i] + Width / 2
-            x_meander[j] = x[i] + Width / 2
-            y_meander[j] = y[i] - Width / 2
-
-        j -= 1
-
-    return x_meander, y_meander
-
 def trace_meander_new(x, y, Width):
     """
     Génère le contour épais (meander) autour min_slot'une ligne polygonale donnée.
@@ -594,7 +352,6 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
     count = 0
     show = False
     impedances = []
-    sf_list = []
     new_distance_short = distance_short
     new_wid = wid
     new_Nombre_meandre = Nombre_meandre
@@ -630,8 +387,6 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
     R_I_min_index = impedances[min_index].real
     print(f"R_I_min_index = {R_I_min_index}")
     print(f"\nFréquence de résonance : {f_resonance / 1e6:.2f} MHz\n")
-
-    sf_list.append(new_distance_short)
 
     # Comparaison à la fréquence de coupure
     error = abs((fC - f_resonance) / fC)
@@ -697,16 +452,6 @@ def simulate_freq_loop(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed
     if new_wid < 0.5 / 1000:
         new_wid = 0.5 / 1000
 
-
-
-
-
-
-
-
-
-
-
     DSF_max = hauteur - new_wid
     
     if new_distance_short > DSF_max:
@@ -734,7 +479,6 @@ def simulate_freq_loop_test(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat,
     count = 0
     show = False
     impedances = []
-    sf_list = []
     new_distance_short = distance_short
     new_wid = wid
     new_Nombre_meandre = Nombre_meandre
@@ -765,8 +509,6 @@ def simulate_freq_loop_test(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat,
     R_I_min_index = impedances[min_index].real
     print(f"R_I_min_index = {R_I_min_index}")
     print(f"\nFréquence de résonance : {f_resonance / 1e6:.2f} MHz\n")
-
-    sf_list.append(new_distance_short)
 
     # Comparaison à la fréquence de coupure
     error = abs((fC - f_resonance) / fC)
@@ -778,65 +520,59 @@ def simulate_freq_loop_test(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat,
         if s11_db_min_index < -10:
             has_converged = True
             print(f" Convergence atteinte : |f_res - fC| = {error:.2f} Hz ≤ {accuracy}")
-        else:
+            return s11_db, f_resonance, new_distance_short, new_wid, new_Nombre_meandre, has_converged, impedances
+        """ else:
             print(" ")
             print("Opti Freq found but no matching yet ! \n")
             print(f"R_I_min_index = {R_I_min_index} Ohm\n")
-            new_distance_short = distance_short * pow((Z0 / R_I_min_index), 2)
+            new_distance_short = distance_short * pow((Z0 / R_I_min_index), 2) """
+    else:
+        distance_meandre = (largeur - L_short) / Nombre_meandre
+        if distance_meandre < 0.5 / 1000:
+            distance_meandre = 0.5 / 1000
 
+        #new_wid = np.sqrt(2) * wid * pow((fC / f_resonance), 2)
 
-    distance_meandre = (largeur - L_short) / Nombre_meandre
-    if distance_meandre < 0.5 / 1000:
-        distance_meandre = 0.5 / 1000
-    
+        if f_resonance == fHigh:
+            print("f_resonance > fC\n")
+            new_Nombre_meandre = int(math.ceil((L / hauteur) * f_resonance / fC)) + 1
+            new_wid = np.sqrt(2)/2 * wid * pow((fC / f_resonance), 2)
+            print(f"new_Nombre_meandre = {new_Nombre_meandre}\n")
+            print(f"new_wid = {new_wid * 1000}\n")
+        if f_resonance == fLow:
+            print("f_resonance < fC\n")
+            new_Nombre_meandre = new_Nombre_meandre - 1
+            new_wid = wid * pow((fC / f_resonance), 2)
+            
+            print(f"new_Nombre_meandre = {new_Nombre_meandre}\n")
+            print(f"new_wid = {new_wid * 1000}\n")
 
-    
+        if new_wid < 0.5 / 1000:
+            new_wid = 0.5 / 1000
 
-    #new_wid = np.sqrt(2) * wid * pow((fC / f_resonance), 2)
+        if f_resonance > fLow and f_resonance < fHigh:
+            has_converged = True
+            return s11_db, f_resonance, new_distance_short, new_wid, new_Nombre_meandre, has_converged, impedances
 
-
-    if f_resonance == fHigh:
-        print("f_resonance > fC\n")
-        new_Nombre_meandre = int(math.ceil((L / hauteur) * f_resonance / fC)) + 1
-        new_wid = np.sqrt(2)/2 * wid * pow((fC / f_resonance), 2)
-        print(f"new_Nombre_meandre = {new_Nombre_meandre}\n")
-        print(f"new_wid = {new_wid * 1000}\n")
-    if f_resonance == fLow:
-        print("f_resonance < fC\n")
-        new_Nombre_meandre = new_Nombre_meandre - 1
-        new_wid = wid * pow((fC / f_resonance), 2)
+        """ DSF_max = hauteur - new_wid
         
-        print(f"new_Nombre_meandre = {new_Nombre_meandre}\n")
-        print(f"new_wid = {new_wid * 1000}\n")
+        if new_distance_short > DSF_max:
+            print("new_distance_short > DSF_max\n")
+            #new_distance_short = hauteur - wid
+            new_distance_short = DSF_max - distance_short * np.sqrt(Z0 / R_I_min_index)
+            print(f"new_distance_short = {new_distance_short * 1000}\n")
 
-    if f_resonance > fLow and f_resonance < fHigh:
-        has_converged = True
-        return s11_db, f_resonance, new_distance_short, new_wid, new_Nombre_meandre, has_converged, impedances
+        if new_distance_short < 0.5 / 1000:
+            print("new_distance_short < 0.5 / 1000\n")
+            new_distance_short = 0.5 / 1000 + new_wid
+            print(f"new_distance_short = {new_distance_short * 1000}\n") """
 
-
-
-    if new_wid < 0.5 / 1000:
-        new_wid = 0.5 / 1000
-
-    DSF_max = hauteur - new_wid
-    
-    if new_distance_short > DSF_max:
-        print("new_distance_short > DSF_max\n")
-        #new_distance_short = hauteur - wid
-        new_distance_short = DSF_max - distance_short * np.sqrt(Z0 / R_I_min_index)
-        print(f"new_distance_short = {new_distance_short * 1000}\n")
-
-    if new_distance_short < 0.5 / 1000:
-        print("new_distance_short < 0.5 / 1000\n")
-        new_distance_short = 0.5 / 1000 + new_wid
-        print(f"new_distance_short = {new_distance_short * 1000}\n")
-
-    print(f" Pas de convergence : |f_res - fC| = {error:.2f} Hz > {accuracy}")
-    print(f"\n1...........short feed ...... dans la fonction = {new_distance_short * 1000}\n")
+        print(f" Pas de convergence : |f_res - fC| = {error:.2f} Hz > {accuracy}")
+        print(f"\n1...........short feed ...... dans la fonction = {new_distance_short * 1000}\n")
 
     return s11_db, f_resonance, new_distance_short, new_wid, new_Nombre_meandre, has_converged, impedances
 
-def loop_in_interval(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed_point, distance_short, wid, hauteur, Nombre_meandre):
+def loop_in_interval(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed_point, distance_short, wid, hauteur):
     print("\n############### loop_in_interval ###############################\n")
     Z0 = 50  # Impédance caractéristique en ohms
     frequencies = np.linspace(fLow, fHigh, nPoints)
@@ -846,10 +582,8 @@ def loop_in_interval(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed_p
     count = 0
     show = False
     impedances = []
-    sf_list = []
     new_distance_short = distance_short
     new_wid = wid
-    new_Nombre_meandre = Nombre_meandre
 
     index_fC = 0
 
@@ -878,47 +612,45 @@ def loop_in_interval(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed_p
     print(f"R_I_min_index = {R_I_min_index}")
     print(f"\nFréquence de résonance : {f_resonance / 1e6:.2f} MHz\n")
 
-    sf_list.append(new_distance_short)
-
     # Comparaison à la fréquence de coupure
     error = abs((fC - f_resonance) / fC)
     s11_db_min_index = s11_db[min_index]
-
-    new_distance_short = distance_short * (Z0 / R_I_min_index)
 
     if error < accuracy:
         if s11_db_min_index < -10:
             has_converged = True
             print(f" Convergence atteinte : |f_res - fC| = {error:.2f} Hz ≤ {accuracy}")
+            return s11_db, f_resonance, new_distance_short, new_wid, has_converged, impedances
         else:
             print(" ")
             print("Opti Freq found but no matching yet ! \n")
             print(f"R_I_min_index = {R_I_min_index} Ohm\n")
             new_distance_short = distance_short * pow((Z0 / R_I_min_index), 2)
+    else:
 
-    print("f_resonance > fLow and f_resonance < fHigh\n")
-    new_wid = wid * pow((fC / f_resonance), 2)
+        new_distance_short = distance_short * (Z0 / R_I_min_index)
+        print("f_resonance > fLow and f_resonance < fHigh\n")
+        new_wid = wid * pow((fC / f_resonance), 2)
+        
+        if new_wid < 0.5 / 1000:
+            new_wid = 0.5 / 1000
+
+        DSF_max = hauteur - new_wid
+        
+        if new_distance_short > DSF_max:
+            print("new_distance_short > DSF_max\n")
+            new_distance_short = DSF_max
+            # new_distance_short = DSF_max - distance_short * np.sqrt(Z0 / R_I_min_index)
+            print(f"new_distance_short = {new_distance_short * 1000}\n")
+
+        if new_distance_short < 0.5 / 1000 or new_distance_short < new_wid:
+            print("new_distance_short < 0.5 / 1000\n")
+            new_distance_short = 0.5 / 1000 + new_wid
+            print(f"new_distance_short = {new_distance_short * 1000}\n")
+
+        print(f" Pas de convergence : |f_res - fC| = {error:.2f} Hz > {accuracy}")
+        print(f"\n1...........short feed ...... dans la fonction = {new_distance_short * 1000}\n")
     
-
-    if new_wid < 0.5 / 1000:
-        new_wid = 0.5 / 1000
-
-    DSF_max = hauteur - new_wid
-    
-    if new_distance_short > DSF_max:
-        print("new_distance_short > DSF_max\n")
-        #new_distance_short = hauteur - wid
-        new_distance_short = DSF_max - distance_short * np.sqrt(Z0 / R_I_min_index)
-        print(f"new_distance_short = {new_distance_short * 1000}\n")
-
-    if new_distance_short < 0.5 / 1000:
-        print("new_distance_short < 0.5 / 1000\n")
-        new_distance_short = 0.5 / 1000 + new_wid
-        print(f"new_distance_short = {new_distance_short * 1000}\n")
-
-    print(f" Pas de convergence : |f_res - fC| = {error:.2f} Hz > {accuracy}")
-    print(f"\n1...........short feed ...... dans la fonction = {new_distance_short * 1000}\n")
-
     return s11_db, f_resonance, new_distance_short, new_wid, has_converged, impedances
 
 
@@ -951,42 +683,6 @@ def plot_s11_curve(fLow, fHigh, nPoints, s11_db, fC=None):
     plt.legend()
     plt.tight_layout()
     plt.show()
-
-""" def plot_impedance(fLow, fHigh, nPoints, impedances, s11_db, fC=None):
-    frequencies = np.linspace(fLow, fHigh, nPoints)
-    frequencies_mhz = np.array(frequencies) / 1e6
-    impedances_real = np.zeros(nPoints)
-
-    for i in range(nPoints):
-        impedances_real[i] = impedances[i].real
-
-    # Trouver le minimum de S11
-    min_index = np.argmin(s11_db)
-    f_resonance = frequencies[min_index] / 1e6
-    # impedance_min = impedances_real[min_index]
-
-    # Trouver l'index de la valeur de fC ou la plus proche de fC
-    index_fC = np.argmin(np.abs(frequencies - fC))
-    impedance_fC = impedances_real[index_fC]
-
-    # Tracé
-    fig_size = 8
-    Fibonacci = (1 + np.sqrt(5)) / 2
-    plt.figure(figsize=(fig_size, fig_size / Fibonacci))
-    plt.plot(frequencies_mhz, impedances_real, label="R0", color='red')
-    # plt.plot(f_resonance, impedance_min, 'bo', label=f"Résonance: {f_resonance:.2f} MHz")
-    plt.plot(fC, impedance_fC, 'bo', label=f"Résonance: {f_resonance:.2f} MHz")
-    
-    if fC:
-        plt.axvline(fC / 1e6, color='green', linestyle='--', label=f"fC = {fC/1e6:.2f} MHz")
-
-    plt.xlabel("Fréquence (MHz)")
-    plt.ylabel("Impedance (Ohm)")
-    plt.title("Courbe de Impedance vs Fréquence")
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-    plt.show() """
 
 def plot_impedance(fLow, fHigh, nPoints, impedances, s11_db, fC=None):
     # Vecteur de fréquences

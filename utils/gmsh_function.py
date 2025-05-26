@@ -66,7 +66,7 @@ def write(save_folder_path, file_name="new_mesh.msh"):
 
     # Écriture du fichier
     gmsh.write(save_path)
-    print(f"The .msh file was successfully saved to: '{save_path}'")
+    # print(f"The .msh file was successfully saved to: '{save_path}'")
 
 def rectangle_surface(x_rect, y_rect):
     point_tags = []
@@ -209,7 +209,7 @@ def extract_msh_to_mat(file_msh_path, save_mat_path):
     # Fermer Gmsh
     gmsh.finalize()
 
-    print(f"matlab file stored in {save_mat_path} successfully")
+    # print(f"matlab file stored in {save_mat_path} successfully")
 
 def extract_ModelMsh_to_mat(model_name, file_msh_path, save_mat_path):
     gmsh.model.setCurrent(model_name)
