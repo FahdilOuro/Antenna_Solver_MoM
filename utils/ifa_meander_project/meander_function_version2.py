@@ -387,7 +387,7 @@ def simulate_freq_loop_test(
     X_error = abs(X_res) / Z0
     s11_min = s11_db[min_index]
 
-    alpha = 0.3  # Empirique — à ajuster selon résultats
+    alpha = 0.1  # Empirique — à ajuster selon résultats
 
     # --- Critères de convergence ---
     if freq_error < accuracy and X_error < 0.1 and s11_min < -10:
@@ -524,6 +524,100 @@ def simulate_freq_loop_test_version_2(
         print(f"\n📐 Paramètres ajustés intelligemment :")
         print(f"• Distance short-feed : {new_distance_short * 1e3:.2f} mm")
         print(f"• Largeur de trace    : {new_wid * 1e3:.2f} mm")
+        print(f"• Nombre de méandres  : {new_Nombre_meandre}\n")
+
+    # --- Retour ---
+    return s11_db, f_resonance, new_distance_short, new_wid, new_Nombre_meandre, has_converged, impedances
+
+# Troisieme version de la fonction simulate_freq_loop_test
+
+def simulate_freq_loop_test_version_3(
+    fLow, fHigh, nPoints, fC, accuracy,
+    ifa_meander_mat, feed_point, distance_short,
+    wid, L, hauteur, largeur, L_short, Nombre_meandre
+):
+    Z0 = 50  # Impédance caractéristique
+    frequencies = np.linspace(fLow, fHigh, nPoints)
+    s11_db = []
+    impedances = []
+    voltage_amplitude = 0.5
+    has_converged = False
+
+    # Variables ajustables
+    new_distance_short = distance_short
+    new_wid = wid
+    new_Nombre_meandre = Nombre_meandre
+
+    for idx, frequency in enumerate(frequencies):
+        show = (frequency == fC)
+        impedance, _ = radiation_ifa(ifa_meander_mat, frequency, feed_point, voltage_amplitude, show)
+        impedances.append(impedance)
+
+        s11 = (impedance - Z0) / (impedance + Z0)
+        s11_db.append(20 * np.log10(abs(s11)))
+
+        print(f"Simulation {idx+1}/{nPoints} | f = {frequency/1e6:.2f} MHz | S11 = {s11_db[-1]:.2f} dB")
+
+    # Résultats
+    min_index = np.argmin(s11_db)
+    f_resonance = frequencies[min_index]
+    Z_at_res = impedances[min_index]
+    R_res = Z_at_res.real
+    X_res = Z_at_res.imag
+
+    print(f"\n📡 Résultats de simulation :")
+    print(f"→ Fréquence de résonance = {f_resonance / 1e6:.2f} MHz")
+    print(f"→ Impédance à f_res      = {Z_at_res:.2f} Ω")
+
+    # Erreurs
+    freq_error = abs((fC - f_resonance) / fC)
+    R_error = abs(R_res - Z0) / Z0
+    X_error = abs(X_res) / Z0
+    s11_min = s11_db[min_index]
+
+    # --- Critères de convergence ---
+    if freq_error < accuracy and R_error < 0.1 and X_error < 0.1 and s11_min < -10:
+        has_converged = True
+        print(f"\n✅ Convergence atteinte !")
+    else:
+        print("\n❌ Pas de convergence —> Ajustement basé sur les erreurs...\n")
+
+        # Ajustement du nombre de méandres selon la fréquence trouvée
+        if f_resonance > fC * (1 + accuracy):
+            print("📉 Fréquence trop haute —> + méandres")
+            new_Nombre_meandre = min(new_Nombre_meandre + 1, int((L / hauteur) * 2))
+        elif f_resonance < fC * (1 - accuracy):
+            print("📈 Fréquence trop basse —> - méandres")
+            new_Nombre_meandre = max(new_Nombre_meandre - 1, 1)
+
+        # Ajustement fin de la distance short-feed selon l'erreur de fréquence
+        freq_corr_factor = (fC / f_resonance)
+        new_distance_short *= freq_corr_factor
+
+        # Ajustement de la largeur de piste selon l'erreur sur la résistance
+        if abs(R_res - Z0) > 1:
+            if R_res < Z0:
+                print("↪ R trop basse —> augmenter wid")
+                new_wid *= 1 + 0.1 * R_error
+            else:
+                print("↪ R trop haute —> diminuer wid")
+                new_wid *= 1 - 0.1 * R_error
+
+        # Ajustement de la distance short-feed selon l'erreur sur la réactance
+        if abs(X_res) > 1:
+            print("↪ X non nulle —> ajustement fin de distance_short")
+            new_distance_short *= 1 - 0.1 * np.sign(X_res) * min(X_error, 0.5)
+
+        # --- Sécurité : limites physiques ---
+        new_wid = np.clip(new_wid, 0.5e-3, largeur / 2)
+        # La distance short-feed doit être supérieure à la largeur + marge de sécurité
+        min_distance_short = new_wid + 2e-3
+        max_distance_short = hauteur - new_wid
+        new_distance_short = np.clip(new_distance_short, min_distance_short, max_distance_short)
+
+        print(f"🔧 Nouveaux paramètres :")
+        print(f"• Distance short-feed : {new_distance_short * 1e3:.2f} mm")
+        print(f"• Largeur de piste    : {new_wid * 1e3:.2f} mm")
         print(f"• Nombre de méandres  : {new_Nombre_meandre}\n")
 
     # --- Retour ---
