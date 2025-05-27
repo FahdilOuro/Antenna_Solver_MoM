@@ -5,7 +5,7 @@ from rwg.rwg4 import *
 from rwg.rwg5 import *
 
 
-def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_from_matlab=True, monopole=False):
+def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_from_matlab=True, monopole=False, show = True):
     # Chargement du fichier de maillage
     p, t = load_mesh_file(mesh1, load_from_matlab)
 
@@ -24,17 +24,17 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
     edges = triangles.get_edges()
     filter_complexes_jonctions(points, triangles, edges)          # Filtrage des jonctions complexes pour simplifier la structure du maillage
 
-    print(f"\nNombre d'elements de maillage (edges) = {edges.total_number_of_edges}\n")
-    print(f"\nNombre de triangles = {triangles.total_of_triangles}\n")
+    """ print(f"\nNombre d'elements de maillage (edges) = {edges.total_number_of_edges}\n")
+    print(f"\nNombre de triangles = {triangles.total_of_triangles}\n") """
 
     edges.compute_edges_length(points)
     
-    index = 0
+    """ index = 0
     for area in triangles.triangles_area:
         if area == 0:
             print(area)
             print("Aire du triangle nulle a la colonne :", index)
-        index += 1
+        index += 1 """
 
     # Sauvegarde des données du maillage traité
     save_folder_name_mesh1 = 'data/antennas_mesh1/'
@@ -75,25 +75,26 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
     # Calcul du courant induit sur l'antenne par l'onde incidente
     frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power = calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude, monopole)
 
-    print(f"\nLa valeur de l'impédance d'entrée de l'antenne {base_name} = {impedance.real : .7f} {"+" if impedance.imag >= 0 else "-"}{abs(impedance.imag) : .7f}i Ohm")
+    """ print(f"\nLa valeur de l'impédance d'entrée de l'antenne {base_name} = {impedance.real : .7f} {"+" if impedance.imag >= 0 else "-"}{abs(impedance.imag) : .7f}i Ohm")
     print(f"Gap current of {base_name} = {gap_current}")
     print(f"Gap voltage of {base_name} = {gap_voltage}")
-    print(f"La valeur de feed_power  = {feed_power}\n")
+    print(f"La valeur de feed_power  = {feed_power}\n") """
 
     # Sauvegarde des données de courant
     save_folder_name_current = 'data/antennas_current/'
     save_file_name_current = DataManager_rwg4.save_data_for_radiation(filename_mesh2_to_load, save_folder_name_current, frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power)
-    print(f"Sauvegarde du fichier : {save_file_name_current} effectué avec succès !")
+    """ print(f"Sauvegarde du fichier : {save_file_name_current} effectué avec succès !")
 
-    print(f"Fréquence de rayonnement de l'antenne : {frequency} Hz\n")
+    print(f"Fréquence de rayonnement de l'antenne : {frequency} Hz\n") """
 
     # Calcul des courants de surface à partir du courant total
     surface_current_density = calculate_current_density(current, triangles, edges, vecteurs_rho)
 
     # Visualisation des courants de surface
-    antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in radiation mode')
-    print(f"{antennas_name} view is successfully created at frequency {frequency} Hz")
-    fig = visualize_surface_current(points, triangles, surface_current_density, feed_point, antennas_name)
-    fig.show()
+    if show:
+        antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in radiation mode')
+        """ print(f"{antennas_name} view is successfully created at frequency {frequency} Hz") """
+        fig = visualize_surface_current(points, triangles, surface_current_density, feed_point, antennas_name)
+        fig.show()
 
     return impedance, surface_current_density
