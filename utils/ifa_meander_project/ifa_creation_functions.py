@@ -65,6 +65,70 @@ def ifa_creation_new(L, largeur, hauteur, width, L_short = 1 / 1000):
 
     return x[:idx+1], y[:idx+1], N
 
+def ifa_creation_new_v4(L, largeur, hauteur, width, L_short = 1 / 1000):
+    # — Initialisation
+    x0 = 0
+    y0 = hauteur - width / 2
+    hauteur = hauteur - width
+
+    # — Calcul du nombre de brins verticaux
+    # N = int(np.floor((largeur / min_slot - 1)))
+    N = int(np.floor((L - largeur) / hauteur))
+    print(f"Number of meanders {N}")
+    distance_meandre = (largeur - L_short) / N
+    print(f"distance meandres {distance_meandre * 1000} mm")
+
+    # longueur_meandre = (N + 1) * min_slot + N * hauteur
+
+    x = np.zeros(2 * N + 3)
+    y = np.zeros(2 * N + 3)
+
+    x[0] = x0
+    y[0] = y0
+
+    direction = -1
+    idx = 0
+    calcul_actuel_longueur = 0
+    horizontal = False
+    vertical = False
+
+    idx += 1
+    x[idx] = x[idx - 1] + L_short
+    y[idx] = y[idx - 1]
+
+    for k in range(1, N + 1):
+        # Vertical
+        idx += 1
+        x[idx] = x[idx - 1]
+        y[idx] = y[idx - 1] + direction * hauteur
+        calcul_actuel_longueur += hauteur
+        direction = -direction
+
+        # Horizontal
+        idx += 1
+        x[idx] = x[idx - 1] + distance_meandre - width / 4
+        y[idx] = y[idx - 1]
+        # calcul_actuel_longueur += distance_meandre - width / 2
+    
+    # print(f"last index = {idx}")
+
+    # Horizontal
+    idx += 1
+    x[idx] = x[idx - 1] + distance_meandre - width / 4
+    y[idx] = y[idx - 1]
+    # calcul_actuel_longueur += distance_meandre - width / 2
+
+    # Ajouter le dernier petit segment correctif
+    # idx += 1
+    x[idx] = x[idx - 1]
+    y[idx] = y[idx - 1] + direction * hauteur
+    calcul_actuel_longueur += distance_meandre
+    
+    """ print("\nlongueur_obtenue =", calcul_actuel_longueur)
+    print("longueur_desiree =", L, "\n") """
+
+    return x[:idx+1], y[:idx+1], N, distance_meandre
+
 def ifa_creation_optimisation(L, largeur, hauteur, width, Nombre_meandre, L_short = 2):
     # — Initialisation
     x0 = 0
@@ -128,6 +192,71 @@ def ifa_creation_optimisation(L, largeur, hauteur, width, Nombre_meandre, L_shor
     print("longueur_desiree =", L, "\n") """
 
     return x[:idx+1], y[:idx+1]
+
+def ifa_creation_optimisation_v4(L, largeur, hauteur, width, Nombre_meandre, L_short = 2):
+    # — Initialisation
+    x0 = 0
+    y0 = hauteur - width / 2
+    hauteur = hauteur - width
+
+    # — Calcul du nombre de brins verticaux
+    # N = int(np.floor((largeur / min_slot - 1)))
+    N = Nombre_meandre
+    print(f"Number of meanders {N}")
+    distance_meandre = (largeur - L_short) / N
+    print(f"distance meandres {distance_meandre * 1000} mm")
+
+
+    # longueur_meandre = (N + 1) * min_slot + N * hauteur
+
+    x = np.zeros(2 * N + 3)
+    y = np.zeros(2 * N + 3)
+
+    x[0] = x0
+    y[0] = y0
+
+    direction = -1
+    idx = 0
+    calcul_actuel_longueur = 0
+    horizontal = False
+    vertical = False
+
+    idx += 1
+    x[idx] = x[idx - 1] + L_short
+    y[idx] = y[idx - 1]
+
+    for k in range(1, N + 1):
+        # Vertical
+        idx += 1
+        x[idx] = x[idx - 1]
+        y[idx] = y[idx - 1] + direction * hauteur
+        calcul_actuel_longueur += hauteur
+        direction = -direction
+
+        # Horizontal
+        idx += 1
+        x[idx] = x[idx - 1] + distance_meandre - width / 4
+        y[idx] = y[idx - 1]
+        # calcul_actuel_longueur += distance_meandre - width / 2
+    
+    # print(f"last index = {idx}")
+
+    # Horizontal
+    idx += 1
+    x[idx] = x[idx - 1] + distance_meandre - width / 4
+    y[idx] = y[idx - 1]
+    # calcul_actuel_longueur += distance_meandre - width / 2
+
+    # Ajouter le dernier petit segment correctif
+    # idx += 1
+    x[idx] = x[idx - 1]
+    y[idx] = y[idx - 1] + direction * hauteur
+    calcul_actuel_longueur += distance_meandre
+    
+    """ print("\nlongueur_obtenue =", calcul_actuel_longueur)
+    print("longueur_desiree =", L, "\n") """
+
+    return x[:idx+1], y[:idx+1], distance_meandre
 
 def trace_meander_new(x, y, Width):
     """
