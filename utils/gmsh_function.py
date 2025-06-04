@@ -90,7 +90,7 @@ def rectangle_surface(x_rect, y_rect):
 def read_mesh_msh(fichier_msh):
     gmsh.initialize()
     # gmsh.option.setNumber("General.Terminal", 0)
-    gmsh.open(fichier_msh)
+    gmsh.open(str(fichier_msh))
 
     # Récupérer les nœuds
     vtags, vxyz, _ = gmsh.model.mesh.getNodes()
@@ -168,7 +168,7 @@ def extract_msh_to_mat(file_msh_path, save_mat_path):
     gmsh.initialize()
 
     # Charger le fichier maillé
-    gmsh.open(file_msh_path)
+    gmsh.open(str(file_msh_path))
 
     # Récupérer tous les nœuds (points)
     node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
@@ -211,7 +211,7 @@ def extract_msh_to_mat(file_msh_path, save_mat_path):
 
     # print(f"matlab file stored in {save_mat_path} successfully")
 
-def extract_ModelMsh_to_mat(model_name, file_msh_path, save_mat_path):
+def extract_ModelMsh_to_mat(model_name, save_mat_path):
     gmsh.model.setCurrent(model_name)
     # Récupérer tous les nœuds (points)
     node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
