@@ -1,5 +1,5 @@
 import os
-import  numpy as np
+import numpy as np
 from scipy.io import savemat, loadmat
 
 
@@ -131,10 +131,11 @@ class Triangles:
         self.triangles_area = triangles_area
         self.triangles_center = triangles_center
 
+    # Ce code est une version optimisée de la méthode get_edges    - version 2
     def get_edges(self):
         """
             Détecte les arêtes communes entre les triangles et détermine les relations de triangle "plus" et "minus".
-
+            
             Cette méthode analyse les triangles pour trouver les arêtes communes et les classer en paires
             de triangles ayant une arête partagée. Les indices des triangles ayant des arêtes communes sont
             enregistrés dans les tableaux triangles_plus et triangles_minus.
@@ -142,23 +143,36 @@ class Triangles:
             Retour :
             Edges : Un objet de la classe Edges représentant les arêtes communes entre triangles.
         """
+        triangles = self.triangles[:3].T  # (n_triangles, 3)
+        edge_dict = {}  # Dictionnaire classique
+
+        for idx, tri in enumerate(triangles):
+            # Liste des 3 arêtes du triangle (en triant les sommets)
+            edges = [tuple(sorted((tri[i], tri[j]))) for i, j in [(0, 1), (1, 2), (2, 0)]]
+
+            for edge in edges:
+                if edge in edge_dict:
+                    edge_dict[edge].append(idx)
+                else:
+                    edge_dict[edge] = [idx]
+
         triangles_plus = []
         triangles_minus = []
         edge_points = []
-        for index_triangle_M in range(self.total_of_triangles):
-            triangle_m = self.triangles[:3, index_triangle_M]
-            for index_triangle_K in range(index_triangle_M + 1, self.total_of_triangles):
-                triangle_k = self.triangles[:3, index_triangle_K]
-                a = np.isin(triangle_m, triangle_k)  # Trouve les éléments communs entre les triangles
-                if np.sum(a) == 2:  # Si deux sommets sont communs, ils partagent une arête
-                    edge_points.append(triangle_m[np.where(a)])  # Enregistre les points de l'arête partagée
-                    triangles_plus.append(index_triangle_M)
-                    triangles_minus.append(index_triangle_K)
+
+        for edge in edge_dict:
+            tris = edge_dict[edge]
+            if len(tris) == 2:
+                t_plus, t_minus = tris
+                edge_points.append(edge)
+                triangles_plus.append(t_plus)
+                triangles_minus.append(t_minus)
+
         self.triangles_plus = np.array(triangles_plus)
         self.triangles_minus = np.array(triangles_minus)
-        edge = np.array(edge_points).T
+        edge = np.array(edge_points).T  # (2, n_edges)
         return Edges(edge[0], edge[1])
-
+    
     def set_triangles_plus_minus(self, triangles_plus, triangles_minus):
         """
             Définit manuellement les triangles qui partagent des arêtes communes.

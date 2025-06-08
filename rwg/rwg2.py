@@ -18,68 +18,50 @@ class Barycentric_triangle:
             Initialise l'objet avec un attribut pour stocker les centres barycentriques.
         """
         self.barycentric_triangle_center = None
-
+    
+    # version 2 :
     def calculate_barycentric_center(self, point_data, triangles_data):
-        """
-            Calcule les centres barycentriques pour chaque triangle du maillage.
+        points = point_data.points                             # (3, M)
+        triangles = triangles_data.triangles                   # (3, N)
+        triangles_center = triangles_data.triangles_center     # (3, N)
+        total_of_triangles = triangles_data.total_of_triangles # N
 
-            Cette méthode divise chaque triangle en neuf sous-triangles, calcule les centres de chacun,
-            et stocke ces centres dans une matrice 3 x 9 x N (où N est le nombre total de triangles).
+        # Récupération des points des sommets pour tous les triangles
+        pt1 = points[:, triangles[0]]  # (3, N)
+        pt2 = points[:, triangles[1]]  # (3, N)
+        pt3 = points[:, triangles[2]]  # (3, N)
 
-            Paramètres :
-                * point_data (Points) : Objet contenant les coordonnées des points du maillage (3 x M).
-                * triangles_data (Triangles) : Objet contenant les indices des sommets des triangles et leurs centres (3 x N).
-        """
-        points = point_data.points  # Coordonnées des points du maillage
-        triangles = triangles_data.triangles  # Indices des sommets des triangles
-        triangles_center = triangles_data.triangles_center  # Centres géométriques des triangles
-        total_of_triangles = triangles_data.total_of_triangles  # Nombre total de triangles
+        # Calcul des vecteurs côtés
+        v12 = pt2 - pt1  # (3, N)
+        v23 = pt3 - pt2  # (3, N)
+        v13 = pt3 - pt1  # (3, N)
 
-        # Initialisation de la matrice pour stocker les centres barycentriques
-        self.barycentric_triangle_center = np.zeros((3, 9, total_of_triangles))  # Initialisation
+        # Points aux fractions 1/3 et 2/3
+        pt12_1 = pt1 + (1/3) * v12
+        pt12_2 = pt1 + (2/3) * v12
+        pt23_1 = pt2 + (1/3) * v23
+        pt23_2 = pt2 + (2/3) * v23
+        pt13_1 = pt1 + (1/3) * v13
+        pt13_2 = pt1 + (2/3) * v13
 
-        for triangle in range(total_of_triangles):
-            # Extraction des indices des sommets du triangle courant
-            sommet_triangle_1 = triangles[0, triangle]
-            sommet_triangle_2 = triangles[1, triangle]
-            sommet_triangle_3 = triangles[2, triangle]
-            centre_triangle = triangles_center[:, triangle]
+        c = triangles_center  # alias plus court
 
-            # Coordonnées des sommets
-            point_triangle_1 = points[:, sommet_triangle_1]
-            point_triangle_2 = points[:, sommet_triangle_2]
-            point_triangle_3 = points[:, sommet_triangle_3]
+        # Calcul des 9 centres barycentriques
+        bary_1 = (pt12_1 + pt13_1 + pt1) / 3
+        bary_2 = (pt12_1 + pt12_2 + c) / 3
+        bary_3 = (pt12_2 + pt23_1 + pt2) / 3
+        bary_4 = (pt12_2 + pt23_1 + c) / 3
+        bary_5 = (pt23_1 + pt23_2 + c) / 3
+        bary_6 = (pt12_1 + pt13_1 + c) / 3
+        bary_7 = (pt13_1 + pt13_2 + c) / 3
+        bary_8 = (pt23_2 + pt13_2 + c) / 3
+        bary_9 = (pt23_2 + pt13_2 + pt3) / 3
 
-            # Calcul des côtés du triangle
-            cote_1_2 = point_triangle_2 - point_triangle_1
-            cote_2_3 = point_triangle_3 - point_triangle_2
-            cote_1_3 = point_triangle_3 - point_triangle_1
-
-            # Points intermédiaires sur les côtés du triangle (1/3 et 2/3 des longueurs)
-            cote12_point_1 = point_triangle_1 + (1 / 3) * cote_1_2
-            cote12_point_2 = point_triangle_1 + (2 / 3) * cote_1_2
-            cote23_point_1 = point_triangle_2 + (1 / 3) * cote_2_3
-            cote23_point_2 = point_triangle_2 + (2 / 3) * cote_2_3
-            cote13_point_1 = point_triangle_1 + (1 / 3) * cote_1_3
-            cote13_point_2 = point_triangle_1 + (2 / 3) * cote_1_3
-
-            # Calcul des centres barycentriques pour les neuf sous-triangles
-            barycentric_triangle_center_1 = (cote12_point_1 + cote13_point_1 + point_triangle_1) / 3
-            barycentric_triangle_center_2 = (cote12_point_1 + cote12_point_2 + centre_triangle) / 3
-            barycentric_triangle_center_3 = (cote12_point_2 + cote23_point_1 + point_triangle_2) / 3
-            barycentric_triangle_center_4 = (cote12_point_2 + cote23_point_1 + centre_triangle) / 3
-            barycentric_triangle_center_5 = (cote23_point_1 + cote23_point_2 + centre_triangle) / 3
-            barycentric_triangle_center_6 = (cote12_point_1 + cote13_point_1 + centre_triangle) / 3
-            barycentric_triangle_center_7 = (cote13_point_1 + cote13_point_2 + centre_triangle) / 3
-            barycentric_triangle_center_8 = (cote23_point_2 + cote13_point_2 + centre_triangle) / 3
-            barycentric_triangle_center_9 = (cote23_point_2 + cote13_point_2 + point_triangle_3) / 3
-
-            # Stockage des centres barycentriques dans la matrice
-            self.barycentric_triangle_center[:, :, triangle] = np.array([
-                barycentric_triangle_center_1, barycentric_triangle_center_2, barycentric_triangle_center_3,
-                barycentric_triangle_center_4, barycentric_triangle_center_5, barycentric_triangle_center_6,
-                barycentric_triangle_center_7, barycentric_triangle_center_8, barycentric_triangle_center_9
-            ]).T
+        # Empilement dans un tableau final (3, 9, N)
+        self.barycentric_triangle_center = np.stack([
+            bary_1, bary_2, bary_3, bary_4, bary_5,
+            bary_6, bary_7, bary_8, bary_9
+        ], axis=1)  # shape (3, 9, N)
 
     def set_barycentric_center(self, barycentric_triangle_center):
         """
@@ -107,82 +89,52 @@ class Vecteurs_Rho:
         self.vecteur_rho_minus = None
         self.vecteur_rho_barycentric_plus = None
         self.vecteur_rho_barycentric_minus = None
-
+    
+    # version 4
     def calculate_vecteurs_rho(self, points_data, triangles_data, edges_data, barycentric_triangle_data):
-        """
-            Calcule les vecteurs Rho pour chaque arête du maillage.
+        points = points_data.points  # (3, N_points)
+        triangles = triangles_data.triangles  # (3, N_triangles)
+        triangles_center = triangles_data.triangles_center  # (3, N_triangles)
+        triangles_plus = triangles_data.triangles_plus  # (N_edges,)
+        triangles_minus = triangles_data.triangles_minus  # (N_edges,)
+        barycentric_triangle_center = barycentric_triangle_data.barycentric_triangle_center  # (3, 9, N_triangles)
 
-            Les vecteurs Rho sont définis pour les triangles "plus" et "moins" associés à chaque arête :
-            - `vecteur_rho_plus` : vecteur du point opposé à l'arête dans le triangle "plus" au centre du triangle.
-            - `vecteur_rho_minus` : vecteur du point opposé à l'arête dans le triangle "moins" au centre du triangle.
-            - `vecteur_rho_barycentric_plus` : vecteurs pour les sous-triangles barycentriques dans le triangle "plus".
-            - `vecteur_rho_barycentric_minus` : vecteurs pour les sous-triangles barycentriques dans le triangle "moins".
+        edges_first_points = edges_data.first_points  # (N_edges,)
+        edges_second_points = edges_data.second_points  # (N_edges,)
+        total_number_of_edges = edges_data.total_number_of_edges  # int
 
-            Paramètres :
-                * points_data (Points) : Objet contenant les coordonnées des points du maillage (3 x M).
-                * triangles_data (Triangles) : Objet contenant les triangles et leurs propriétés.
-                * edges_data (Edges) : Objet contenant les informations des arêtes du maillage.
-                * barycentric_triangle_data (Barycentric_triangle) : Objet contenant les centres barycentriques.
-        """
-        points = points_data.points  # Coordonnées des points
-        triangles = triangles_data.triangles  # Indices des sommets des triangles
-        edges_first_points = edges_data.first_points  # Indices des premiers points des arêtes
-        edges_second_points = edges_data.second_points  # Indices des seconds points des arêtes
-        total_number_of_edges = edges_data.total_number_of_edges  # Nombre total d'arêtes
-        triangles_center = triangles_data.triangles_center  # Centres géométriques des triangles
-        triangles_plus = triangles_data.triangles_plus  # Triangles "plus" associés aux arêtes
-        triangles_minus = triangles_data.triangles_minus  # Triangles "moins" associés aux arêtes
-        barycentric_triangle_center = barycentric_triangle_data.barycentric_triangle_center  # Centres barycentriques
-
-        # Initialisation des matrices pour stocker les vecteurs Rho
         self.vecteur_rho_plus = np.zeros((3, total_number_of_edges))
         self.vecteur_rho_minus = np.zeros((3, total_number_of_edges))
         self.vecteur_rho_barycentric_plus = np.zeros((3, 9, total_number_of_edges))
         self.vecteur_rho_barycentric_minus = np.zeros((3, 9, total_number_of_edges))
 
-        # Calcul des vecteurs Rho pour les triangles "plus"
-        for edge in range(total_number_of_edges):
-            index_point_vecteur = 0
-            index_triangle_plus = triangles_plus[edge]
+        # --- Traitement vectorisé pour les triangles "plus" ---
+        triangles_plus_sommets = triangles[:, triangles_plus]  # (3, N_edges)
+        edges_fp = edges_first_points
+        edges_sp = edges_second_points
 
-            # Identification du point opposé à l'arête dans le triangle "plus"
-            sommet_triangle_plus_1 = triangles[0, index_triangle_plus]
-            sommet_triangle_plus_2 = triangles[1, index_triangle_plus]
-            sommet_triangle_plus_3 = triangles[2, index_triangle_plus]
-            if np.all(sommet_triangle_plus_1 != edges_first_points[edge]) and np.all(sommet_triangle_plus_1 != edges_second_points[edge]):
-                index_point_vecteur = sommet_triangle_plus_1
-            elif np.all(sommet_triangle_plus_2 != edges_first_points[edge]) and np.all(sommet_triangle_plus_2 != edges_second_points[edge]):
-                index_point_vecteur = sommet_triangle_plus_2
-            elif np.all(sommet_triangle_plus_3 != edges_first_points[edge]) and np.all(sommet_triangle_plus_3 != edges_second_points[edge]):
-                index_point_vecteur = sommet_triangle_plus_3
+        # Détection du sommet opposé
+        mask_plus = (triangles_plus_sommets != edges_fp) & (triangles_plus_sommets != edges_sp)  # (3, N_edges)
+        # Pour chaque arête, trouver l'indice du sommet opposé
+        indices_opposes_plus = np.argmax(mask_plus, axis=0)  # (N_edges,)
+        index_point_vecteur_plus = triangles_plus_sommets[indices_opposes_plus, np.arange(total_number_of_edges)]  # (N_edges,)
+        point_vecteurs_plus = points[:, index_point_vecteur_plus]  # (3, N_edges)
 
-            point_vecteur = points[:, index_point_vecteur]
+        # Calcul des vecteurs Rho "plus"
+        self.vecteur_rho_plus = triangles_center[:, triangles_plus] - point_vecteurs_plus
+        self.vecteur_rho_barycentric_plus = barycentric_triangle_center[:, :, triangles_plus] - point_vecteurs_plus[:, None, :]
 
-            # Calcul du vecteur Rho pour le triangle "plus"
-            self.vecteur_rho_plus[:, edge] = + triangles_center[:, index_triangle_plus] - point_vecteur
-            self.vecteur_rho_barycentric_plus[:, :, edge] = + barycentric_triangle_center[:, :, index_triangle_plus] - np.tile(point_vecteur, (9, 1)).T
+        # --- Traitement vectorisé pour les triangles "moins" ---
+        triangles_minus_sommets = triangles[:, triangles_minus]  # (3, N_edges)
 
-        # Calcul des vecteurs Rho pour les triangles "moins"
-        for edge in range(total_number_of_edges):
-            index_point_vecteur = 0
-            index_triangle_minus = triangles_minus[edge]
+        mask_minus = (triangles_minus_sommets != edges_fp) & (triangles_minus_sommets != edges_sp)
+        indices_opposes_minus = np.argmax(mask_minus, axis=0)
+        index_point_vecteur_minus = triangles_minus_sommets[indices_opposes_minus, np.arange(total_number_of_edges)]
+        point_vecteurs_minus = points[:, index_point_vecteur_minus]
 
-            # Identification du point opposé à l'arête dans le triangle "moins"
-            sommet_triangle_minus_1 = triangles[0, index_triangle_minus]
-            sommet_triangle_minus_2 = triangles[1, index_triangle_minus]
-            sommet_triangle_minus_3 = triangles[2, index_triangle_minus]
-            if np.all(sommet_triangle_minus_1 != edges_first_points[edge]) and np.all(sommet_triangle_minus_1 != edges_second_points[edge]):
-                index_point_vecteur = sommet_triangle_minus_1
-            elif np.all(sommet_triangle_minus_2 != edges_first_points[edge]) and np.all(sommet_triangle_minus_2 != edges_second_points[edge]):
-                index_point_vecteur = sommet_triangle_minus_2
-            elif np.all(sommet_triangle_minus_3 != edges_first_points[edge]) and np.all(sommet_triangle_minus_3 != edges_second_points[edge]):
-                index_point_vecteur = sommet_triangle_minus_3
-
-            point_vecteur = points[:, index_point_vecteur]
-
-            # Calcul du vecteur Rho pour le triangle "moins"
-            self.vecteur_rho_minus[:, edge] = - triangles_center[:, index_triangle_minus] + point_vecteur
-            self.vecteur_rho_barycentric_minus[:, :, edge] = - barycentric_triangle_center[:, :, index_triangle_minus] + np.tile(point_vecteur, (9, 1)).T
+        # Calcul des vecteurs Rho "moins"
+        self.vecteur_rho_minus = point_vecteurs_minus - triangles_center[:, triangles_minus]
+        self.vecteur_rho_barycentric_minus = point_vecteurs_minus[:, None, :] - barycentric_triangle_center[:, :, triangles_minus]
 
     def set_vecteurs_rho(self, vecteur_rho_plus, vecteur_rho_minus, vecteur_rho_barycentric_plus, vecteur_rho_barycentric_minus):
         """

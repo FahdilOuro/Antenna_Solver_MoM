@@ -85,7 +85,7 @@ def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incid
     current = np.linalg.solve(matrice_z, voltage)
 
     # Mesure du temps écoulé pour la résolution
-    elapsed_time = time.time() - start_time
+    # elapsed_time = time.time() - start_time
     # print(f"Temps écoulé pour le calcul du courant : {elapsed_time:.6f} secondes")
 
     # Retourner les résultats principaux
@@ -236,7 +236,6 @@ class DataManager_rwg4:
         # print(f"Data saved successfully to {full_save_path}")
 
         return save_file_name
-
 
     @staticmethod
     def save_data_for_radiation(filename_mesh2, save_folder_name, frequency, omega,

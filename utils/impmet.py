@@ -21,6 +21,7 @@
 """
 import numpy as np
 
+# version 1 que j'ai ecrit
 def impedance_matrice_z(edges_data, triangles_data, barycentric_triangles_data, vecteurs_rho_data, parameter_k, factor_a, factor_fi):
     """
     Calcule la matrice d'impédance Z pour les interactions entre les arêtes du maillage.
