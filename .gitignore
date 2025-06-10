@@ -6,6 +6,7 @@ data/antennas_mesh2
 
 # ifa_meander project
 antennas_simulation/ifa_meander_project/data
+antennas_simulation/ifa_meander_project_v2/data
 
 # Les ameliorations .txt
 Zameloration.md
