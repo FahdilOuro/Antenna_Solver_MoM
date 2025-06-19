@@ -8,6 +8,8 @@ data/antennas_mesh2
 antennas_simulation/ifa_meander_project/data
 antennas_simulation/ifa_meander_project_v2/data
 
+antenna_simulation/receiving_antenna/data
+
 # Les ameliorations .txt
 Zameloration.md
 

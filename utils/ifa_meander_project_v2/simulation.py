@@ -7,7 +7,6 @@ def analysis(frequencies, ifa_meander_mat, feed_point):
     impedances = []
     nPoints = len(frequencies)
     for idx, frequency in enumerate(frequencies):
-        # visualiser = (frequency == fC)
         visualiser = False
         impedance, _ = radiation_algorithm(ifa_meander_mat, frequency, feed_point, 0.5, show=visualiser)
         impedances.append(impedance)
@@ -25,7 +24,7 @@ def analysis(frequencies, ifa_meander_mat, feed_point):
     print(f"→ Fréquence de résonance = {f_resonance / 1e6:.2f} MHz")
     print(f"→ Impédance à f_res      = {Z_at_res:.2f} Ω")
 
-    return f_resonance
+    return f_resonance, s11_db, R_res
 
 def simulate(frequencies, ifa_meander_mat, fC, feed_point):
     Z0=50

@@ -192,7 +192,7 @@ def bowtie_gmsh(width, hight, width_finite, mesh_name, save_mesh_folder, mesh_si
 
     return output_path
 
-def ifa_gmsh(Lenght, Hight, Small_Lenght, Small_Hight, gap_F, Tight_F, mesh_name, save_mesh_folder, mesh_size):
+def ifa_gmsh(Lenght, Hight, Small_Lenght, Small_Hight, gap_F, mesh_name, save_mesh_folder, mesh_size):
     # Initialisation de Gmsh
     gmsh.initialize()
     gmsh.model.add("IFA_antenna")
@@ -211,6 +211,7 @@ def ifa_gmsh(Lenght, Hight, Small_Lenght, Small_Hight, gap_F, Tight_F, mesh_name
 
     # Fusion des formes
     antenna, _ = gmsh.model.occ.fuse([(2, base)], [(2, f_vertical_1), (2, f_vertical_2), (2, f_top)])
+    # antenna, _ = gmsh.model.occ.fuse([(2, f_vertical_1)], [(2, f_vertical_2), (2, f_top)])
     gmsh.model.occ.synchronize()
 
     Automatic = 2
