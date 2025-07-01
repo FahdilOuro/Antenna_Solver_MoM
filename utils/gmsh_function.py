@@ -54,6 +54,11 @@ def apply_mesh_size(mesh_size):
     # 5: Delaunay, 6: Frontal-Delaunay (Default value: 6), 7: BAMG, 8: Frontal-Delaunay for Quads, 
     # 9: Packing of Parallelograms, 11: Quasi-structured Quad
 
+def generate_surface_mesh():
+    NumberofTreads = 5
+    gmsh.option.setNumber('General.NumThreads', NumberofTreads)
+    gmsh.model.mesh.generate(2)  # Générer le maillage en 2D
+    
 def write(save_folder_path, file_name="new_mesh.msh"):
     # Assure que save_folder_path est un dossier, pas un fichier
     if not os.path.isdir(save_folder_path):
@@ -136,7 +141,7 @@ def remeshing_model(mesh, currents, mesh_size, feed_point, mesh_dividend):
     # Calculer la taille de maillage basée sur le champ de courant
     # sf_ele = compute_size_field_based_on_current(mesh_bowtie.vxyz, mesh_bowtie.triangles, currents_bowtie, lenght_feed_high, feed_point, r_threshold=lenght_feed_high, N=100)
     # mesh[0], mesh[1], mesh[2], mesh.vxyz, mesh.triangles, mesh.triangles_tags
-    sf_ele = compute_size_from_current(mesh.vxyz, mesh.triangles, currents, mesh_size, feed_point, mesh_dividend, r_threshold=mesh_size/2)
+    sf_ele = compute_size_from_current(mesh.vxyz, mesh.triangles, currents, mesh_size, feed_point, mesh_dividend, r_threshold=mesh_size*2)
     # Afficher le champ de taille
     sf_view = gmsh.view.add("mesh size field")
     gmsh.view.addModelData(sf_view, 0, new_model, "ElementData", mesh.triangles_tags, sf_ele[:, None])
@@ -153,7 +158,8 @@ def post_processing_meshing(model_name, sf_view):
     # 5: Delaunay, 6: Frontal-Delaunay (Default value: 6), 7: BAMG, 8: Frontal-Delaunay for Quads, 
     # 9: Packing of Parallelograms, 11: Quasi-structured Quad
     gmsh.model.mesh.clear()
-    gmsh.model.mesh.generate(2)
+    generate_surface_mesh()
+    
 
 # merge everything here    ------------- new step ---------
 
@@ -281,7 +287,7 @@ def refine_antenna(model_name, frequency, mesh_name, feed_point, mesh_size, file
 
     for iteration in range(max_iterations):
         write(save_mesh_folder, mesh_name)
-        extract_ModelMsh_to_mat(model_name, file_name_msh, file_name_mat)
+        extract_ModelMsh_to_mat(model_name, file_name_mat)
 
         impedance, current_bowtie_antenna = radiation_algorithm(file_name_mat, frequency, feed_point)
 

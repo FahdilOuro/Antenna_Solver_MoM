@@ -217,14 +217,8 @@ def ifa_gmsh(Lenght, Hight, Small_Lenght, Small_Hight, gap_F, mesh_name, save_me
     Automatic = 2
     gmsh.option.setNumber("Mesh.Algorithm", Automatic)   # To set The "Automatic" algorithm / Change if necessary
 
-    if mesh_size == 0:
-        raise ValueError("mesh_size should not be null")
-    elif mesh_size > 1:
-        raise ValueError("mesh_size should not be greater than 1")
-    elif Lenght >= Hight:
-        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), mesh_size * Lenght)
-    else:
-        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), mesh_size * Hight)
+    
+    gmsh.model.mesh.setSize(gmsh.model.getEntities(0), mesh_size)
 
     # Génération du maillage
     gmsh.model.mesh.generate(2)

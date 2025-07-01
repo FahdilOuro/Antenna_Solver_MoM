@@ -42,9 +42,9 @@ lines = [gmsh.model.occ.addLine(points[i], points[(i + 1) % len(points)]) for i 
 cl = gmsh.model.occ.addCurveLoop(lines)
 ifa_1 = gmsh.model.occ.addPlaneSurface([cl])
 
-apply_mesh_size(feed_lenght)
+apply_mesh_size(feed_lenght*10)
 
-gmsh.model.mesh.generate(2)
+generate_surface_mesh()
 
 # -------------------------------------- Adapt antenna code --------------------------------------
 

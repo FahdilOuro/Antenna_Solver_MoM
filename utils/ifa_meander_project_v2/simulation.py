@@ -1,4 +1,5 @@
 from src.radiation_algorithm.radiation_algorithm import radiation_algorithm
+from efield.efield4 import *
 import numpy as np
 
 def analysis(frequencies, ifa_meander_mat, feed_point):
@@ -44,6 +45,7 @@ def simulate(frequencies, ifa_meander_mat, fC, feed_point):
     Z_at_res = impedances[min_index]
     R_res = Z_at_res.real
     X_res = Z_at_res.imag
+    plot_smith_chart(impedances, frequencies, fC)
 
     print(f"\n📡 Résultats de simulation :")
     print(f"→ Fréquence de résonance = {f_resonance / 1e6:.2f} MHz")

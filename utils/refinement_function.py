@@ -19,7 +19,7 @@ def compute_size_from_current(nodes, triangles, current_values, mesh_size, feed_
     outside_threshold = distances > r_threshold
 
     # 3. Masque combiné : à la fois en dehors du seuil ET courant fort
-    high_current_mask = (current_values > 0.7 * np.max(current_values)) & outside_threshold
+    high_current_mask = (current_values > 0.5 * np.max(current_values)) & outside_threshold
 
     # 4. Réduire la taille de maillage là où le courant est fort ET loin
     size_field[high_current_mask] /= mesh_dividend
