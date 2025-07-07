@@ -2,6 +2,8 @@ from src.radiation_algorithm.radiation_algorithm import radiation_algorithm
 from efield.efield4 import *
 import numpy as np
 
+from utils.frequency_sweep import load_cst_data, plot_smith_chart_CST_MoM
+
 def analysis(frequencies, ifa_meander_mat, feed_point):
     Z0=50
     s11_db = []
@@ -46,6 +48,13 @@ def simulate(frequencies, ifa_meander_mat, fC, feed_point):
     R_res = Z_at_res.real
     X_res = Z_at_res.imag
     plot_smith_chart(impedances, frequencies, fC)
+
+    """ # filepath = 'data/plot_file/plot_smith_chart_cst_Antenne_Ta_92_Tb_55_a_27.txt'
+    filepath = 'data/plot_file/plot_smith_chart_cst_Antenne_Ta_89_Tb_44_a_29.txt'
+    frequencies_cst, mag_cst, phase_cst = load_cst_data(filepath)
+    
+    plot_smith_chart_CST_MoM(frequencies, impedances, frequencies_cst, mag_cst, phase_cst, fC) """
+    
 
     print(f"\n📡 Résultats de simulation :")
     print(f"→ Fréquence de résonance = {f_resonance / 1e6:.2f} MHz")

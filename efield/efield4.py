@@ -1,7 +1,11 @@
+from matplotlib import pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 
 def plot_smith_chart(impedances, frequencies, fC=None):
+    fig_size = 12
+    Fibonacci = (1 + np.sqrt(5)) / 2
+    plt.figure(figsize=(fig_size, fig_size / Fibonacci))
     fig = go.Figure()
 
     Normalized_Z0 = 50  # Normalized impedance reference (Z0)
@@ -26,7 +30,7 @@ def plot_smith_chart(impedances, frequencies, fC=None):
             real=[pt['real'] for i, pt in enumerate(smith_points) if i != idx_fC],
             imag=[pt['imag'] for i, pt in enumerate(smith_points) if i != idx_fC],
             mode='markers+lines',
-            marker=dict(size=10, color='blue'),
+            marker=dict(size=4, color='blue'),
             name='Impedance Points',
             text=[pt['label'] for i, pt in enumerate(smith_points) if i != idx_fC],
             hoverinfo='text'
@@ -37,7 +41,7 @@ def plot_smith_chart(impedances, frequencies, fC=None):
             real=[pt['real']],
             imag=[pt['imag']],
             mode='markers',
-            marker=dict(size=14, color='red', symbol='circle'),
+            marker=dict(size=10, color='red', symbol='circle'),
             name=f'Impedance at fC={fC*1e-6} MHz',
             text=[pt['label']],
             hoverinfo='text'
@@ -48,7 +52,7 @@ def plot_smith_chart(impedances, frequencies, fC=None):
             real=[pt['real'] for pt in smith_points],
             imag=[pt['imag'] for pt in smith_points],
             mode='markers+lines',
-            marker=dict(size=10, color='blue'),
+            marker=dict(size=4, color='blue'),
             name='Impedance Points',
             text=[pt['label'] for pt in smith_points],
             hoverinfo='text'
