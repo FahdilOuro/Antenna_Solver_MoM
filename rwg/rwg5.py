@@ -180,10 +180,26 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
         z=[feed_point[2]],
         mode='markers+text',
         marker=dict(size=6, color='red', symbol='circle'),
-        text=['Feed Point'],
-        textposition='top center',
         name='Feed Point'
     ))
+    # Configuration de la légende
+    fig.update_layout(
+        scene=dict(
+            camera=dict(
+                eye=dict(x=0.8, y=0.8, z=0.7)  # Valeurs plus grandes = zoom arrière
+            )
+        ),
+        legend=dict(
+            x=0.2,  # Position horizontale (0=left, 1=right)
+            y=0.9,  # Position verticale (0=bottom, 1=top)
+            xanchor='left',  # Ancrage horizontal ('auto', 'left', 'center', 'right')
+            yanchor='top',   # Ancrage vertical ('auto', 'top', 'middle', 'bottom')
+            bgcolor='rgba(255,255,255,0.7)',  # Fond semi-transparent
+            bordercolor='lightgray',
+            borderwidth=1
+        )
+    )
+
     return fig
 
 def calculate_seuil_surface_current_density(surface_current_density):

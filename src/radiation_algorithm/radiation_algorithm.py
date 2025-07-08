@@ -4,8 +4,7 @@ from rwg.rwg3 import *
 from rwg.rwg4 import *
 from rwg.rwg5 import *
 
-
-def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_from_matlab=True, monopole=False, show = True):
+def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_from_matlab=True, monopole=False, show=True, save_image=False):
     # Chargement du fichier de maillage
     p, t = load_mesh_file(mesh1, load_from_matlab)
 
@@ -96,5 +95,25 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
         """ print(f"{antennas_name} view is successfully created at frequency {frequency} Hz") """
         fig = visualize_surface_current(points, triangles, surface_current_density, feed_point, antennas_name)
         fig.show()
+        """ fig_main = visualize_surface_current(points, triangles, surface_current_density, feed_point, antennas_name)
+        fig = configure_display(fig_main, margin_scale=0.8)
+        # Display
+        display_figure(fig) """
+
+        if save_image:
+            # Chemin du dossier de sortie
+            output_dir_fig_image = "data/fig_image/"
+            
+            # Crée le dossier s'il n'existe pas
+            if not os.path.exists(output_dir_fig_image):
+                os.makedirs(output_dir_fig_image)
+                print(f"Dossier créé : {output_dir_fig_image}")
+            
+            # Nom du fichier PDF à enregistrer
+            pdf_path = os.path.join(output_dir_fig_image, antennas_name.replace(" ", "_") + ".pdf")
+            
+            # Sauvegarde de la figure
+            fig.write_image(pdf_path, format="pdf")
+            print(f"\nImage sauvegardée au format PDF : {pdf_path}\n")
 
     return impedance, surface_current_density

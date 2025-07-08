@@ -3,9 +3,11 @@ import numpy as np
 import plotly.graph_objects as go
 
 def plot_smith_chart(impedances, frequencies, fC=None):
-    fig_size = 12
+    # fig_size and plt.figure are not used by plotly, only by matplotlib
+    # To set figure size in plotly, use width and height in update_layout
+    fig_size = 15
     Fibonacci = (1 + np.sqrt(5)) / 2
-    plt.figure(figsize=(fig_size, fig_size / Fibonacci))
+
     fig = go.Figure()
 
     Normalized_Z0 = 50  # Normalized impedance reference (Z0)
@@ -60,7 +62,9 @@ def plot_smith_chart(impedances, frequencies, fC=None):
 
     fig.update_layout(
         title='Abaque de Smith',
-        showlegend=True
+        showlegend=True,
+        width=1000,  # Set your desired width here
+        height=int(1000 / Fibonacci)  # Set your desired height here
     )
 
     fig.show()
