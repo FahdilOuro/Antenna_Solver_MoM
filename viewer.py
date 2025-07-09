@@ -7,6 +7,7 @@ Usage:  python viewer.py data/antennas_mesh/bowtie      or
 Copyright 2002 AEMM. Revision 2002/03/05 Chapter 2
 """
 import argparse
+import os
 import re
 
 import numpy as np
@@ -80,7 +81,6 @@ def create_figure(points, triangles, title="Antennas Mesh"):
 
 
 def viewer(filename):
-
     """Charge, filtre et visualise un fichier de maillage."""
     print(f"Chargement du fichier : {filename}")
     points, triangles = load_mesh_file(filename)
@@ -98,7 +98,7 @@ def viewer(filename):
     print(f"Longueur suivant l'axe x = {longueur} metre \nHauteur suivant l'axe y = {hauteur} metre")
 
     # Créer et afficher la figure
-    antennas_file_name = re.split('[./]', filename)[2]  + ' antenna mesh'
+    antennas_file_name = os.path.splitext(os.path.basename(filename))[0] + ' antenna mesh'
     fig = create_figure(points, triangles, antennas_file_name)
     fig.show()
 
