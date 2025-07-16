@@ -290,8 +290,17 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     print(f"Gain Linear : {gain_linear_max : 4f}")
     print(f"Gain Logarithmic : {gain_logarithmic_max : 4f} dB")
     if radiation:
-        print(f"\ngap_curent = {gap_current}")
-        radiation_resistance = 2 * total_power / abs(gap_current)**2
+        print(f"\ngap_current = {gap_current}")
+        # Si gap_current est un array, prendre la norme ou la valeur absolue du premier élément
+        if isinstance(gap_current, np.ndarray):
+            gap_current_abs = np.abs(gap_current)
+            if gap_current_abs.size == 1:
+                gap_current_val = gap_current_abs.item()
+            else:
+                gap_current_val = np.linalg.norm(gap_current_abs)
+        else:
+            gap_current_val = abs(gap_current)
+        radiation_resistance = 2 * total_power / gap_current_val**2
         print(f"Radiation Resistance : {radiation_resistance : 4f} Ohms")
 
     # Sauvegarde des résultats calculés

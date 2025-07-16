@@ -174,14 +174,15 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
         title='',
         aspectratio=aspect_ratios,
     )
-    # Ajout du feed-point en noir et en évidence
+    # Ajout du/des feed-point(s) en rouge et en évidence
+    feed_point = np.atleast_2d(feed_point)  # S'assure que feed_point est de forme (n, 3)
     fig.add_trace(go.Scatter3d(
-        x=[feed_point[0]],
-        y=[feed_point[1]],
-        z=[feed_point[2]],
+        x=feed_point[:, 0],
+        y=feed_point[:, 1],
+        z=feed_point[:, 2],
         mode='markers+text',
         marker=dict(size=6, color='red', symbol='circle'),
-        name='Feed Point'
+        name='Feed Point(s)'
     ))
     # Configuration de la légende
     fig.update_layout(

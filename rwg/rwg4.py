@@ -91,7 +91,7 @@ def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incid
     # Retourner les résultats principaux
     return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current
 
-def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point, voltage_amplitude, monopole=False):
+def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point, voltage_amplitude, monopole=False, simulate_array_antenna=False):
     """
         Calcule les courants, l'impédance d'entrée et la puissance rayonnée d'une antenne.
 
@@ -135,37 +135,59 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
     points, _, edges, *_ = DataManager_rwg2.load_data(filename_mesh_2)
     frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z = DataManager_rwg3.load_data(filename_impedance)
 
-    # Initialisation des variables
-    voltage = np.zeros(edges.total_number_of_edges, dtype=complex)  # Vecteur de tension
-    distance = np.zeros((3, edges.total_number_of_edges))           # Distance entre le point d'alimentation et chaque arête
+    # Initialisation du vecteur de tension
+    voltage = np.zeros(edges.total_number_of_edges, dtype=complex)
 
-    # Identification de l'arête la plus proche du point d'alimentation
-    for edge in range(edges.total_number_of_edges):
-        # Calcul du point moyen de l'arête (milieu géométrique)
-        distance[:, edge] = 0.5 * (points.points[:, edges.first_points[edge]] + points.points[:, edges.second_points[edge]]) - feed_point
-    
-    if monopole:
-        index_feeding_edges = np.argsort(np.sum(distance ** 2, axis=0))[:2]  # Indices des deux arêtes minimisant les distances
+    # --- Normalisation de feed_point / Feed ---
+    Feed = np.asarray(feed_point.T)
+    if Feed.ndim == 1:
+        Feed = Feed.reshape(3, 1)
+    elif Feed.ndim == 2 and Feed.shape[0] == 3:
+        pass
     else:
-        # new_code :
-        # Calcul de la norme au carré de chaque distance (colonne par colonne)
-        dist_squared = np.sum(distance * distance, axis=0)
-        # Tri et récupération de l’indice du centre d’arête le plus proche de FeedPoint
-        index_feeding_edges = np.argsort(dist_squared)[0]
+        raise ValueError("feed_point doit être de forme (3,) ou (3, N)")
 
-    # print("The index edge where the antenna is feed are : ", index_feeding_edges)
+    # --- Calcul vectorisé des centres géométriques des arêtes ---
+    centers = 0.5 * (points.points[:, edges.first_points] + points.points[:, edges.second_points])  # (3, E)
 
-    # Définition du vecteur "voltage" au niveau de l'arête alimentée
-    voltage[index_feeding_edges] = voltage_amplitude * edges.edges_length[index_feeding_edges]
+    # --- Calcul des distances entre chaque feed point et chaque arête ---
+    diff = centers[:, :, np.newaxis] - Feed[:, np.newaxis, :]  # (3, E, N)
+    dist_squared = np.sum(diff ** 2, axis=0)                   # (E, N)
 
-    # Résolution du système linéaire (Z * I = V) pour obtenir les courants
+    # --- Sélection des arêtes à alimenter ---
+    if monopole:
+        index_feeding_edges = np.argsort(dist_squared, axis=0)[:2, :]  # (2, N)
+        index_feeding_edges = index_feeding_edges.flatten(order='F')   # (2*N,)
+    else:
+        index_feeding_edges = np.argmin(dist_squared, axis=0)          # (N,)
+
+    # --- Application de la tension avec phase progressive si simulate_array ---
+    if simulate_array_antenna:
+        N = len(index_feeding_edges)
+        phase = 0  # ex: 0 (broadside), -2 * np.pi / 3 (end-fire), etc.
+        phase_shift = np.exp(1j * phase * np.arange(N))
+        voltage[index_feeding_edges] = voltage_amplitude * edges.edges_length[index_feeding_edges] * phase_shift
+    else:
+        voltage[index_feeding_edges] = voltage_amplitude * edges.edges_length[index_feeding_edges]
+
+    # --- Résolution du système linéaire (Z * I = V) ---
     current = np.linalg.solve(matrice_z, voltage)
 
-    # Calcul de l'impédance d'entrée et de la puissance fournie
-    gap_current = np.sum(current[index_feeding_edges] * edges.edges_length[index_feeding_edges])    # Courant effectif
-    gap_voltage = np.mean(voltage[index_feeding_edges] / edges.edges_length[index_feeding_edges])   # Tension effective
-    impedance = gap_voltage / gap_current   # Impédance d'entrée
-    feed_power = 0.5 * np.real(gap_current * np.conj(gap_voltage))  # Puissance active fournie
+    # --- Impédance / puissance ---
+    if simulate_array_antenna:
+        edge_lengths = edges.edges_length[index_feeding_edges]
+        current_vals = current[index_feeding_edges]
+        voltage_vals = voltage[index_feeding_edges]
+
+        gap_current = current_vals * edge_lengths
+        gap_voltage = voltage_vals / edge_lengths
+        impedance = gap_voltage / gap_current
+        feed_power = 0.5 * np.real(gap_current * np.conj(gap_voltage))
+    else:
+        gap_current = np.sum(current[index_feeding_edges] * edges.edges_length[index_feeding_edges])
+        gap_voltage = np.mean(voltage[index_feeding_edges] / edges.edges_length[index_feeding_edges])
+        impedance = gap_voltage / gap_current
+        feed_power = 0.5 * np.real(gap_current * np.conj(gap_voltage))
 
     # Retourner les résultats
     return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power

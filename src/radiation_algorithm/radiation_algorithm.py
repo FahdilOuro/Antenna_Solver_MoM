@@ -4,7 +4,19 @@ from rwg.rwg3 import *
 from rwg.rwg4 import *
 from rwg.rwg5 import *
 
-def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_from_matlab=True, monopole=False, show=True, save_image=False):
+def format_impedance(imp):
+    if np.isscalar(imp):
+        return f"{imp.real:.7f} {'+ ' if imp.imag >= 0 else '- '}{abs(imp.imag):.7f}i"
+    else:
+        return "[" + ", ".join(f"{z.real:.7f} {'+ ' if z.imag >= 0 else '- '}{abs(z.imag):.7f}i" for z in np.ravel(imp)) + "]"
+
+def format_array(arr):
+    if np.isscalar(arr):
+        return str(arr)
+    else:
+        return "[" + ", ".join(str(a) for a in np.ravel(arr)) + "]"
+
+def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_from_matlab=True, monopole=False, simulate_array_antenna=False, show=True, save_image=False):
     # Chargement du fichier de maillage
     p, t = load_mesh_file(mesh1, load_from_matlab)
 
@@ -72,12 +84,13 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
     filename_impedance = save_folder_name_impedance + save_file_name_impedance
 
     # Calcul du courant induit sur l'antenne par l'onde incidente
-    frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power = calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude, monopole)
+    frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power = calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude, monopole, simulate_array_antenna)
 
-    print(f"\nLa valeur de l'impédance d'entrée de l'antenne {base_name} = {impedance.real : .7f} {"+" if impedance.imag >= 0 else "-"}{abs(impedance.imag) : .7f}i Ohm")
-    print(f"Gap current of {base_name} = {gap_current}")
-    print(f"Gap voltage of {base_name} = {gap_voltage}")
-    print(f"La valeur de feed_power  = {feed_power}\n")
+    # Affichage des résultats, gestion des scalaires et des tableaux
+    print(f"\nLa valeur de l'impédance d'entrée de l'antenne {base_name} = {format_impedance(impedance)} Ohm")
+    print(f"Gap current of {base_name} = {format_array(gap_current)}")
+    print(f"Gap voltage of {base_name} = {format_array(gap_voltage)}")
+    print(f"La valeur de feed_power  = {format_array(feed_power)}\n")
 
     # Sauvegarde des données de courant
     save_folder_name_current = 'data/antennas_current/'
@@ -88,6 +101,8 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
 
     # Calcul des courants de surface à partir du courant total
     surface_current_density = calculate_current_density(current, triangles, edges, vecteurs_rho)
+
+    print(f"\nSurface current density of {base_name}: min = {np.min(surface_current_density):.7f} [A/m], max = {np.max(surface_current_density):.7f} [A/m]\n")
 
     # Visualisation des courants de surface
     if show:
