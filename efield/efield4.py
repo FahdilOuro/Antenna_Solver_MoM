@@ -1,8 +1,9 @@
+import os
 from matplotlib import pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 
-def plot_smith_chart(impedances, frequencies, fC=None):
+def plot_smith_chart(impedances, frequencies, fC=None, save_image=False):
     # fig_size and plt.figure are not used by plotly, only by matplotlib
     # To set figure size in plotly, use width and height in update_layout
     fig_size = 15
@@ -61,13 +62,36 @@ def plot_smith_chart(impedances, frequencies, fC=None):
         ))
 
     fig.update_layout(
-        title='Abaque de Smith',
+        title='',
         showlegend=True,
         width=1000,  # Set your desired width here
         height=int(1000 / Fibonacci)  # Set your desired height here
     )
 
     fig.show()
+
+    if save_image:
+        # Chemin du dossier de sortie
+        output_dir_fig_image = "data/fig_image/"
+        
+        # Crée le dossier s'il n'existe pas
+        if not os.path.exists(output_dir_fig_image):
+            os.makedirs(output_dir_fig_image)
+            print(f"Dossier créé : {output_dir_fig_image}")
+        
+        # Nom du fichier PDF à enregistrer
+        pdf_path = os.path.join(output_dir_fig_image, "ifa_M_opti3_Smith_chart.pdf")
+        
+        # Mettre le fond transparent et supprimer les marges blanches
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(l=0, r=0, t=10, b=10)
+        )
+        
+        # Sauvegarde de la figure
+        fig.write_image(pdf_path, format="pdf")
+        print(f"\nImage sauvegardée au format PDF (fond transparent, marges minimales) : {pdf_path}\n")
 
 def plot_single_impedance(Z):
     Normalized_Z0 = 50  # Normalized impedance reference (Z0)

@@ -82,7 +82,8 @@ def visualize_surface_current(points_data, triangles_data, radiation_intensity, 
         plot_edges=False,                # Ne pas afficher les bords des triangles
         color_func=radiation_intensity,  # Utilisation de la densité de courant normalisée pour colorer
         show_colorbar=True,              # Affichage de la barre de couleurs
-        title=title,                     # Titre de la visualisation
+        # title=title,                     # Titre de la visualisation
+        title='',                     # Titre de la visualisation
         aspectratio=dict(aspect_ratios), # Ajustement des rapports d'échelle pour l'affichage 3D
     )
 
@@ -181,7 +182,8 @@ def load_gain_power_data(filename_to_load):
         # Gestion des erreurs inattendues
         print(f"An unexpected error occurred: {e}")
 
-def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load, filename_current_to_load, filename_sphere_to_load, scattering = False, radiation = False):
+def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load, filename_current_to_load, filename_sphere_to_load, 
+                                                         scattering = False, radiation = False, save_image=False):
     """
         Calcule et visualise la distribution d'intensité de radiation et de gain sur la surface d'une sphère entourant une antenne.
 
@@ -333,3 +335,26 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     # Visualisation du gain logarithmique
     fig2 = visualize_surface_current(sphere_points_update, sphere_triangles, gain_logarithmic, plot_name_gain)
     fig2.show()
+
+    if save_image:
+        # Chemin du dossier de sortie
+        output_dir_fig_image = "data/fig_image/"
+        
+        # Crée le dossier s'il n'existe pas
+        if not os.path.exists(output_dir_fig_image):
+            os.makedirs(output_dir_fig_image)
+            print(f"Dossier créé : {output_dir_fig_image}")
+        
+        # Nom du fichier PDF à enregistrer
+        pdf_path = os.path.join(output_dir_fig_image, 'radiation_intensity_distribution' + ".pdf")
+        
+        # Définir le fond transparent et supprimer les marges blanches
+        fig2.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=0, r=0, t=0, b=0)
+        )
+
+        # Sauvegarde de la figure
+        fig2.write_image(pdf_path, format="pdf")
+        print(f"\nImage sauvegardée au format PDF : {pdf_path}\n")

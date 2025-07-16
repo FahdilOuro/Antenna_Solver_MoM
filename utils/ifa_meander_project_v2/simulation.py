@@ -36,7 +36,7 @@ def simulate(frequencies, ifa_meander_mat, fC, feed_point):
     nPoints = len(frequencies)
     for idx, frequency in enumerate(frequencies):
         visualiser = (frequency == fC)
-        impedance, _ = radiation_algorithm(ifa_meander_mat, frequency, feed_point, 0.5, show=visualiser)
+        impedance, _ = radiation_algorithm(ifa_meander_mat, frequency, feed_point, 0.5, show=visualiser, save_image=True)
         impedances.append(impedance)
         s11 = (impedance - Z0) / (impedance + Z0)
         s11_db.append(20 * np.log10(abs(s11)))
@@ -47,7 +47,7 @@ def simulate(frequencies, ifa_meander_mat, fC, feed_point):
     Z_at_res = impedances[min_index]
     R_res = Z_at_res.real
     X_res = Z_at_res.imag
-    plot_smith_chart(impedances, frequencies, fC)
+    plot_smith_chart(impedances, frequencies, fC, save_image=True)
 
     """ # filepath = 'data/plot_file/plot_smith_chart_cst_Antenne_Ta_92_Tb_55_a_27.txt'
     filepath = 'data/plot_file/plot_smith_chart_cst_Antenne_Ta_89_Tb_44_a_29.txt'

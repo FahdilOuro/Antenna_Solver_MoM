@@ -170,7 +170,8 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
         colormap="Rainbow",
         color_func=surface_current_density,  # Utilisation de la densité de courant pour colorer
         show_colorbar=True,
-        title=title,
+        # title=title,
+        title='',
         aspectratio=aspect_ratios,
     )
     # Ajout du feed-point en noir et en évidence
@@ -186,7 +187,7 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
     fig.update_layout(
         scene=dict(
             camera=dict(
-                eye=dict(x=0.8, y=0.8, z=0.7)  # Valeurs plus grandes = zoom arrière
+                eye=dict(x=0.65, y=0.65, z=0.65)  # Valeurs plus grandes = zoom arrière
             )
         ),
         legend=dict(

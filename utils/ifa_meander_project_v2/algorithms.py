@@ -6,6 +6,7 @@ from utils.ifa_meander_project_v2.meshing import *
 
 import time
 from matplotlib import pyplot as plt
+import os
 
 def adapt_with_ratio_square(distance_meandre, largeur_piste, ratio):
     return distance_meandre / (ratio**2), largeur_piste / (ratio**2)

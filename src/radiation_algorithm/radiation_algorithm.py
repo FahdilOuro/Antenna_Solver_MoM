@@ -92,13 +92,8 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
     # Visualisation des courants de surface
     if show:
         antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in radiation mode')
-        """ print(f"{antennas_name} view is successfully created at frequency {frequency} Hz") """
         fig = visualize_surface_current(points, triangles, surface_current_density, feed_point, antennas_name)
         fig.show()
-        """ fig_main = visualize_surface_current(points, triangles, surface_current_density, feed_point, antennas_name)
-        fig = configure_display(fig_main, margin_scale=0.8)
-        # Display
-        display_figure(fig) """
 
         if save_image:
             # Chemin du dossier de sortie
@@ -112,6 +107,13 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
             # Nom du fichier PDF à enregistrer
             pdf_path = os.path.join(output_dir_fig_image, antennas_name.replace(" ", "_") + ".pdf")
             
+            # Définir le fond transparent et supprimer les marges blanches
+            fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(l=0, r=0, t=0, b=0)
+            )
+
             # Sauvegarde de la figure
             fig.write_image(pdf_path, format="pdf")
             print(f"\nImage sauvegardée au format PDF : {pdf_path}\n")
