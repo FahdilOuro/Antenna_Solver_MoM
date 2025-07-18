@@ -25,7 +25,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
     triangles = Triangles(t)
 
     # Filtrage des triangles invalides et calcul des propriétés géométriques (aires, centres)
-    triangles.filter_triangles()
+    # triangles.filter_triangles()
     triangles.calculate_triangles_area_and_center(points)
 
     # Affiche les dimensions principales de l'antenne
@@ -33,10 +33,13 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
 
     # Définition des arêtes et calcul de leurs longueurs
     edges = triangles.get_edges()
+
+    print(f"\nNombre de triangles = {triangles.total_of_triangles}")
+    print(f"\nNombre d'elements de maillage (edges) = {edges.total_number_of_edges}\n")
+
     filter_complexes_jonctions(points, triangles, edges)          # Filtrage des jonctions complexes pour simplifier la structure du maillage
 
-    """ print(f"\nNombre d'elements de maillage (edges) = {edges.total_number_of_edges}\n")
-    print(f"\nNombre de triangles = {triangles.total_of_triangles}\n") """
+    print(f"\nNombre d'elements de maillage (edges) = {edges.total_number_of_edges}\n")
 
     edges.compute_edges_length(points)
     

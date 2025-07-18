@@ -1,5 +1,7 @@
 import os
 import numpy as np
+from itertools import combinations
+from collections import defaultdict
 from scipy.io import savemat, loadmat
 
 
@@ -77,6 +79,7 @@ class Triangles:
                                         un triangle et contient trois indices pour les sommets du triangle.
         """
         self.triangles = triangles_data
+        self.triangles = self.triangles.astype(int)  # Conversion explicite pour éviter les erreurs
         self.total_of_triangles = triangles_data.shape[1]
         self.triangles_area = None
         self.triangles_center = None
@@ -91,7 +94,7 @@ class Triangles:
             raise ValueError("Les données de triangles doivent avoir au moins 4 lignes.")
         # Filtrage des triangles valides en fonction de la quatrième ligne
         valid_indices = np.where(self.triangles[3, :] <= 1)[0]
-        self.triangles = self.triangles[:, valid_indices].astype(int)  # Conversion explicite pour éviter les erreurs
+        self.triangles = self.triangles[:, valid_indices].astype(int)
         self.total_of_triangles = self.triangles.shape[1]
 
     def calculate_triangles_area_and_center(self, points_data):
@@ -131,47 +134,53 @@ class Triangles:
         self.triangles_area = triangles_area
         self.triangles_center = triangles_center
 
-    # Ce code est une version optimisée de la méthode get_edges    - version 2
     def get_edges(self):
         """
             Détecte les arêtes communes entre les triangles et détermine les relations de triangle "plus" et "minus".
             
             Cette méthode analyse les triangles pour trouver les arêtes communes et les classer en paires
             de triangles ayant une arête partagée. Les indices des triangles ayant des arêtes communes sont
-            enregistrés dans les tableaux triangles_plus et triangles_minus.
+            enregistrés dans les tableaux triangles_plus et triangles_minus. 
+
+            Note : enregistre les arrêtes partagées entre plus de deux triangles.
 
             Retour :
             Edges : Un objet de la classe Edges représentant les arêtes communes entre triangles.
         """
         triangles = self.triangles[:3].T  # (n_triangles, 3)
-        edge_dict = {}  # Dictionnaire classique
+        edge_dict = defaultdict(list)
 
-        for idx, tri in enumerate(triangles):
-            # Liste des 3 arêtes du triangle (en triant les sommets)
-            edges = [tuple(sorted((tri[i], tri[j]))) for i, j in [(0, 1), (1, 2), (2, 0)]]
+        # Générer les arêtes pour chaque triangle
+        tri_indices = np.arange(triangles.shape[0])
+        edges = np.stack([
+            np.sort(triangles[:, [0, 1]], axis=1),
+            np.sort(triangles[:, [1, 2]], axis=1),
+            np.sort(triangles[:, [2, 0]], axis=1)
+        ], axis=1)  # shape (n_triangles, 3, 2)
 
-            for edge in edges:
-                if edge in edge_dict:
-                    edge_dict[edge].append(idx)
-                else:
-                    edge_dict[edge] = [idx]
+        # Ajouter chaque arête dans un dictionnaire de la forme (n1, n2) -> [tri1, tri2, ...]
+        for tri_idx, tri_edges in zip(tri_indices, edges):
+            for edge in tri_edges:
+                edge_key = tuple(edge)
+                edge_dict[edge_key].append(tri_idx)
 
+        edge_points = []
         triangles_plus = []
         triangles_minus = []
-        edge_points = []
 
-        for edge in edge_dict:
-            tris = edge_dict[edge]
-            if len(tris) == 2:
-                t_plus, t_minus = tris
+        for edge, tris in edge_dict.items():
+            # Pour chaque paire unique de triangles partageant l’arête
+            for t1, t2 in combinations(tris, 2):
                 edge_points.append(edge)
-                triangles_plus.append(t_plus)
-                triangles_minus.append(t_minus)
+                triangles_plus.append(t1)
+                triangles_minus.append(t2)
 
         self.triangles_plus = np.array(triangles_plus)
         self.triangles_minus = np.array(triangles_minus)
-        edge = np.array(edge_points).T  # (2, n_edges)
-        return Edges(edge[0], edge[1])
+        edge_array = np.array(edge_points).T  # shape (2, n_edges)
+
+        return Edges(edge_array[0], edge_array[1])
+
     
     def set_triangles_plus_minus(self, triangles_plus, triangles_minus):
         """
@@ -228,7 +237,7 @@ class Edges:
             # Calcul de la longueur de l'arête en utilisant la norme euclidienne entre les deux points
             edge_length = np.linalg.norm(points[:, self.first_points[edge]] - points[:, self.second_points[edge]])
             edges_length.append(edge_length)
-        self.edges_length = np.array(edges_length)
+        self.edges_length = np.array(edges_length)       
 
     def set_edges(self, first_points, second_points):
         """
@@ -296,56 +305,60 @@ def load_mesh_file(filename, load_from_matlab = True):
 
 def filter_complexes_jonctions(point_data, triangle_data, edge_data):
     """
-        Filtre les jonctions complexes (spécifiquement les jonctions en T) dans un maillage.
+    Supprime les arêtes issues de jonctions en T : lorsque trois triangles partagent la même arête.
+    Cela correspond à des incohérences dans un maillage (non-manifold ou artefacts topologiques).
 
-        Cette fonction examine les arêtes du maillage et vérifie si certaines jonctions sont complexes.
-        Une jonction complexe, dans ce contexte, est définie comme une jonction en T où une arête est partagée par trois triangles.
-        Si une telle jonction est trouvée, elle est filtrée en supprimant les arêtes et les triangles associés.
+    Paramètres :
+        point_data : données des points (utilisé ici pour recalculer les longueurs d’arêtes après suppression)
+        triangle_data : contient les triangles et les liens triangle_plus / triangle_minus
+        edge_data : contient les arêtes (first_points, second_points)
 
-        Paramètres :
-            * triangle_data (Triangles) : Un objet de la classe Triangles contenant les données des triangles, les arêtes adjacentes (triangles_plus et triangles_minus).
-            * edge_data (Edges) : Un objet de la classe Edges contenant les arêtes et leurs informations associées.
-
-        Levée des exceptions :
-        Aucune exception n'est levée par cette fonction.
+    Comportement :
+        Supprime les arêtes identiques (dans un sens ou dans l’autre) lorsqu’elles apparaissent trois fois.
     """
-    triangles = triangle_data.triangles  # Récupère les triangles du maillage
-    triangles_plus = triangle_data.triangles_plus  # Récupère les triangles adjacents (plus) pour chaque arête
-    triangles_minus = triangle_data.triangles_minus  # Récupère les triangles adjacents (minus) pour chaque arête
-    edges = np.array([edge_data.first_points, edge_data.second_points])  # Récupère les arêtes du maillage sous forme de tableau numpy
-    # Crée une version inversée des arêtes pour permettre la comparaison dans les deux directions (sens direct et inversé)
-    triangles_edge_inverse = np.vstack((edge_data.second_points, edge_data.first_points))
+    triangles = triangle_data.triangles
+    triangles_plus = triangle_data.triangles_plus
+    triangles_minus = triangle_data.triangles_minus
 
-    remove = []  # Liste des indices des arêtes à supprimer
+    # Représentation des arêtes
+    edges = np.vstack((edge_data.first_points, edge_data.second_points))  # shape (2, n_edges)
+    edges_inv = edges[::-1, :]  # arêtes inversées
 
-    # Parcourt toutes les arêtes
-    for edge in range(edge_data.total_number_of_edges):
-        # Crée une matrice dans laquelle l'arête courante est répétée pour chaque colonne
-        triangles_edge_selected = np.tile(np.array([edge_data.first_points[edge], edge_data.second_points[edge]]).reshape(-1, 1), (1, edge_data.total_number_of_edges))  # triangles_edge_selected est une matrice dans laquelle l’arête courante "edge" est répétée pour chaque colonne
-        # Trouve les arêtes qui ne sont pas identiques à l'arête courante dans les deux directions
-        ind1 = np.any(edges != triangles_edge_selected, axis=0)  # Indique les arêtes de self.edge qui ne sont pas identiques à l’arête "edge" courante
-        ind2 = np.any(triangles_edge_inverse != triangles_edge_selected, axis=0)  # Fait la même chose, mais avec triangles_edge_inverse (arêtes inversées).
-        # Trouve les indices des arêtes qui sont identiques à l'arête courante (directement ou inversée)
-        a = np.where((ind1 & ind2) == 0)[0]
+    remove = []
 
+    for i in range(edge_data.total_number_of_edges):
+        current_edge = edges[:, i].reshape(2, 1)
+        # On répète l’arête courante autant de fois qu’il y a d’arêtes
+        repeated_edge = np.tile(current_edge, (1, edges.shape[1]))
 
-        if len(a) == 3:  # Si trois éléments sont associés à une jonction en 'T'
-            # Compare les triangles adjacents aux arêtes trouvées pour voir s'ils partagent une jonction complexe
-            out = np.where(triangles[3, triangles_plus[a]] == triangles[3, triangles_minus[a]])[0]
-            # Si la condition est satisfaite, ajoute les indices des triangles à supprimer
-            remove.extend(a[out])  # les indices sont ajoutés à remove
+        # Cherche les arêtes identiques à current_edge (dans le même sens ou inverse)
+        is_same_forward = np.all(edges == repeated_edge, axis=0)
+        is_same_backward = np.all(edges_inv == repeated_edge, axis=0)
+        same_edges_indices = np.where(is_same_forward | is_same_backward)[0]
 
-    # Si des jonctions complexes ont été trouvées, supprime les arêtes et triangles associés
-    if len(remove) > 0:
-        # Supprime les arêtes et les triangles marqués
+        # Si cette arête est identifiée trois fois : jonction en T
+        if len(same_edges_indices) == 3:
+            # Vérifie que les labels des triangles associés sont identiques
+            t_plus_labels = triangles[3, triangles_plus[same_edges_indices]]
+            t_minus_labels = triangles[3, triangles_minus[same_edges_indices]]
+            same_label = t_plus_labels == t_minus_labels
+
+            # On retire uniquement les arêtes dont les deux triangles ont le même label
+            to_remove = same_edges_indices[np.where(same_label)[0]]
+            remove.extend(to_remove)
+
+    if remove:
         edges = np.delete(edges, remove, axis=1)
         triangles_plus = np.delete(triangles_plus, remove)
         triangles_minus = np.delete(triangles_minus, remove)
-        # Mets à jour les données des arêtes et triangles après suppression
+
         edge_data.set_edges(edges[0], edges[1])
         triangle_data.set_triangles_plus_minus(triangles_plus, triangles_minus)
         edge_data.compute_edges_length(point_data)
-    # else: print("Aucune jonction complexe trouvée....")  # Si aucune jonction complexe n'est trouvée, affiche un message
+
+        print(f"Suppression de {len(remove)} jonctions en T.")
+    else:
+        print("Aucune jonction complexe trouvée.")
 
 
 class DataManager_rwg1:

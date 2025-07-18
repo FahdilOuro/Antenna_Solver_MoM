@@ -170,52 +170,46 @@ def adapt_meshing():
 # -------------------------------REFIERMENT CODE --------------------
 
 def extract_msh_to_mat(file_msh_path, save_mat_path):
-    # Initialiser Gmsh
-    gmsh.initialize()
+    import gmsh
+    import numpy as np
+    import os
+    import scipy.io as sio
 
-    # Charger le fichier maillé
+    gmsh.initialize()
     gmsh.open(str(file_msh_path))
 
-    # Récupérer tous les nœuds (points)
     node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-    N = len(node_tags)  # Nombre de points
+    p = np.array(node_coords).reshape(-1, 3).T  # (3 x N)
 
-    # Restructurer les coordonnées en un tableau 3xN
-    p = np.array(node_coords).reshape(-1, 3).T  # (3xN)
-
-    # Extraire les éléments (triangles)
-    dim = 2  # Maillage 2D
+    dim = 2
     entities = gmsh.model.getEntities(dim)
 
+    # Récupérer tous les tags de surface et créer un mapping vers des indices 0..n
+    surface_tags = sorted([tag for (d, tag) in entities])
+    tag_to_index = {tag: i for i, tag in enumerate(surface_tags)}  # par exemple {3: 0, 7: 1, 12: 2}
+
     triangles = []
-    surface_indices = None
 
     for entity in entities:
-        entity_dim, entity_tag = entity  # entity_tag est l'index de la surface
-
+        entity_dim, entity_tag = entity
         element_types, element_tags, node_tags = gmsh.model.mesh.getElements(entity_dim, entity_tag)
 
         for etype, nodes in zip(element_types, node_tags):
-            if etype == 2:  # Type 2 = Triangles
+            if etype == 2:  # Triangles
                 num_triangles = len(nodes) // 3
-                surface_indices = np.full((1, num_triangles), entity_tag)  # Créer une ligne avec le tag de surface
-                triangles.append(np.vstack((np.array(nodes).reshape(-1, 3).T, surface_indices)))  # Ajouter la 4e ligne
+                surface_idx = tag_to_index[entity_tag]  # index consécutif commençant à 0
+                surface_indices = np.full((1, num_triangles), surface_idx)
+                triangles.append(np.vstack((np.array(nodes).reshape(-1, 3).T, surface_indices)))
 
-    # Convertir la liste en un tableau numpy (4xT)
     t = np.hstack(triangles) if triangles else np.array([])
 
-    # verifier si save_mat_path existe sinon le creer
     if not os.path.exists(os.path.dirname(save_mat_path)):
         os.makedirs(os.path.dirname(save_mat_path))
         print(f"Folder '{os.path.dirname(save_mat_path)}' was created successfully.")
 
-    # Sauvegarder les données dans un fichier .mat
     sio.savemat(save_mat_path, {"p": p, "t": t})
 
-    # Fermer Gmsh
     gmsh.finalize()
-
-    # print(f"matlab file stored in {save_mat_path} successfully")
 
 def extract_ModelMsh_to_mat(model_name, save_mat_path):
     gmsh.model.setCurrent(model_name)

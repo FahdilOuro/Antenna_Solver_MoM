@@ -158,8 +158,10 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
     if monopole:
         index_feeding_edges = np.argsort(dist_squared, axis=0)[:2, :]  # (2, N)
         index_feeding_edges = index_feeding_edges.flatten(order='F')   # (2*N,)
+        print(f"index_feeding_edges = {index_feeding_edges}")
     else:
         index_feeding_edges = np.argmin(dist_squared, axis=0)          # (N,)
+        print(f"index_feeding_edges = {index_feeding_edges}")
 
     # --- Application de la tension avec phase progressive si simulate_array ---
     if simulate_array_antenna:
@@ -167,8 +169,11 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
         phase = 0  # ex: 0 (broadside), -2 * np.pi / 3 (end-fire), etc.
         phase_shift = np.exp(1j * phase * np.arange(N))
         voltage[index_feeding_edges] = voltage_amplitude * edges.edges_length[index_feeding_edges] * phase_shift
+        print("voltage[index_feeding_edges] = ", voltage[index_feeding_edges])
     else:
         voltage[index_feeding_edges] = voltage_amplitude * edges.edges_length[index_feeding_edges]
+
+        print("voltage[index_feeding_edges] = ", voltage[index_feeding_edges])
 
     # --- Résolution du système linéaire (Z * I = V) ---
     current = np.linalg.solve(matrice_z, voltage)
