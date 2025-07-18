@@ -22,32 +22,28 @@ from utils.point_field import radiated_scattered_field_at_a_point
 
 def compute_dipole_center_moment(triangles_data, edges_data, current_data):
     """
-        Calcule les centres et moments dipolaires associés aux arêtes d'un maillage.
+    Calcule les centres et moments dipolaires associés aux arêtes d'un maillage.
 
-        Paramètres :
-            * triangles_data : Objet contenant les données des triangles, y compris leurs centres.
-            * edges_data : Objet contenant les informations sur les arêtes (nombre total, longueurs, etc.).
-            * current_data : Tableau contenant les courants électriques sur chaque arête.
+    Paramètres :
+        * triangles_data : Objet avec .triangles_center (3xN), .triangles_plus, .triangles_minus (indices)
+        * edges_data : Objet avec .edges_length (N), .total_number_of_edges (int)
+        * current_data : Tableau complexe 1D de courants sur chaque arête (N,)
 
-        Retourne :
-         * dipole_center : Coordonnées des centres des dipôles associés aux arêtes (matrice 3xN).
-         * dipole_moment : Moments dipolaires complexes pour chaque arête (matrice 3xN).
+    Retourne :
+        * dipole_center : np.ndarray (3 x N), centres des dipôles
+        * dipole_moment : np.ndarray (3 x N), moments dipolaires complexes
     """
-    # Initialisation des centres et moments dipolaires
-    dipole_center = np.zeros((3, edges_data.total_number_of_edges))
-    dipole_moment = np.zeros((3, edges_data.total_number_of_edges), dtype=complex)
+    # Récupération des centres des triangles plus et moins
+    point_plus_center = triangles_data.triangles_center[:, triangles_data.triangles_plus]
+    point_minus_center = triangles_data.triangles_center[:, triangles_data.triangles_minus]
 
-    # Calcul des centres et moments pour chaque arête
-    for edge in range(edges_data.total_number_of_edges):
-        # Coordonnées des centres des triangles associés à l'arête
-        point_plus_center = triangles_data.triangles_center[:, triangles_data.triangles_plus[edge]]
-        point_minus_center = triangles_data.triangles_center[:, triangles_data.triangles_minus[edge]]
+    # Calcul vectorisé des centres des dipôles
+    dipole_center = 0.5 * (point_plus_center + point_minus_center)
 
-        # Coordonnées des centres des triangles associés à l'arête
-        dipole_center[:, edge] = 0.5 * (point_plus_center + point_minus_center)
-
-        # Moment dipolaire : longueur de l'arête × courant × différence des centres des triangles
-        dipole_moment[:, edge] = edges_data.edges_length[edge] * current_data[edge] * (-point_plus_center + point_minus_center)
+    # Calcul vectorisé des moments dipolaires
+    delta = -point_plus_center + point_minus_center
+    scaling = edges_data.edges_length * current_data  # (N,)
+    dipole_moment = delta * scaling  # Broadcasting (3,N) * (N,) → (3,N)
 
     return dipole_center, dipole_moment
 

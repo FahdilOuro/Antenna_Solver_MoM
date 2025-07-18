@@ -9,7 +9,7 @@ from rwg.rwg4 import DataManager_rwg4
 from utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
 
 
-def compute_observation_points(r, angle, phi):
+'''def compute_observation_points(r, angle, phi):
     """
         Calcule les points d'observation sur une sphère de rayon donné.
 
@@ -31,7 +31,34 @@ def compute_observation_points(r, angle, phi):
 
 # Points pour deux valeurs d'azimut spécifiques (phi = 0° et phi = 90°)
 phi_0 = 0                # Azimut de 0 radians
-phi_90 = 0.5 * np.pi     # Azimut de 90°
+phi_90 = 0.5 * np.pi     # Azimut de 90°'''
+
+import numpy as np
+
+def compute_circle_points(radius, num_points, plane="yz"):
+    """
+    Calcule les points d'observation disposés en cercle dans un plan spécifié.
+
+    Paramètres :
+        radius : Rayon du cercle
+        num_points : Nombre de points
+        plane : Plan du cercle ("yz", "xy", "xz")
+
+    Retour :
+        np.ndarray de forme (num_points+1, 3)
+    """
+    angles = np.linspace(0, 2 * np.pi, num_points)
+    x = radius * np.cos(angles)
+    y = radius * np.sin(angles)
+
+    if plane == "yz":
+        return np.column_stack((np.zeros_like(x), x, y))  # (0, y, z)
+    elif plane == "xy":
+        return np.column_stack((x, y, np.zeros_like(x)))  # (x, y, 0)
+    elif plane == "xz":
+        return np.column_stack((x, np.zeros_like(x), y))  # (x, 0, z)
+    else:
+        raise ValueError("Plane must be 'yz', 'xy', or 'xz'")
 
 
 def compute_polar(observation_point_list_phi, numbers_of_points, eta, complex_k, dipole_moment, dipole_center, total_power):
@@ -93,9 +120,9 @@ def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
 
     if scattering :
-        frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)
+        _, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)
     elif radiation:
-        frequency, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=radiation)
+        _, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=radiation)
 
     total_power, *_ = load_gain_power_data(filename_gain_power_to_load)
 
@@ -110,12 +137,16 @@ def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load
     # Calcul des points d'observation pour Phi = 0° et Phi = 90°
     theta = np.linspace(0, 2 * np.pi, numbers_of_points)    # Angles theta (0 à 360°)
 
-    observation_point_list_phi0 = compute_observation_points(radius, theta, phi_0)
-    observation_point_list_phi90 = compute_observation_points(radius, theta, phi_90)
+    """ observation_point_list_phi0 = compute_observation_points(radius, theta, phi_0)
+    observation_point_list_phi90 = compute_observation_points(radius, theta, phi_90) """
+
+    points_yz = compute_circle_points(radius, numbers_of_points, plane="yz")
+    points_xy = compute_circle_points(radius, numbers_of_points, plane="xy")
+
 
     # Calcul des diagrammes polaires d'intensité
-    polar_0 = compute_polar(observation_point_list_phi0, numbers_of_points, eta, complex_k, dipole_moment, dipole_center, total_power)
-    polar_90 = compute_polar(observation_point_list_phi90, numbers_of_points, eta, complex_k, dipole_moment, dipole_center, total_power)
+    polar_0 = compute_polar(points_yz, numbers_of_points, eta, complex_k, dipole_moment, dipole_center, total_power)
+    polar_90 = compute_polar(points_xy, numbers_of_points, eta, complex_k, dipole_moment, dipole_center, total_power)
 
     # Visualisation du diagramme polaire
     fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
@@ -123,7 +154,7 @@ def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load
     ax.plot(theta, polar_90, color='blue', label='Phi = 90°')
 
     # Configuration des axes et légendes
-    ax.set_theta_zero_location("N")    # 0° au nord
+    # ax.set_theta_zero_location("N")    # 0° au nord
     ax.set_theta_direction(-1)         # Sens horaire pour les angles
     ax.set_rlabel_position(-22.5)      # Position des étiquettes radiales
     ax.text(0, max(polar_0) + 5, "z", ha='center', va='bottom', fontsize=10, color='red')
