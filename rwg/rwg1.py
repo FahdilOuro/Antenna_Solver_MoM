@@ -356,9 +356,9 @@ def filter_complexes_jonctions(point_data, triangle_data, edge_data):
         triangle_data.set_triangles_plus_minus(triangles_plus, triangles_minus)
         edge_data.compute_edges_length(point_data)
 
-        print(f"Suppression de {len(remove)} jonctions en T.")
-    else:
-        print("Aucune jonction complexe trouvée.")
+        # print(f"Suppression de {len(remove)} jonctions en T.")
+    """ else:
+        print("Aucune jonction complexe trouvée.") """
 
 
 class DataManager_rwg1:

@@ -1,22 +1,66 @@
+import os
 import numpy as np
+from scipy.io import savemat
+from scipy.io import loadmat
 from matplotlib import pyplot as plt
 import plotly.graph_objects as go
 from efield.efield4 import plot_smith_chart
 from src.radiation_algorithm.radiation_algorithm import radiation_algorithm
 
 
-def generate_frequencies(fLow, fHigh, fC, step):
-    if (fC - fLow) % step != 0:
-        raise ValueError("fC ne tombe pas sur un pas de fréquence. Ajuste fLow, fC ou le step.")
-
+def generate_freq_step(fLow, fHigh, step=2e6):
     nPoints = int((fHigh - fLow) // step) + 1
     frequencies = [fLow + i * step for i in range(nPoints)]
-    fC_included = fC in frequencies
-    fC_index = frequencies.index(fC) if fC_included else None
 
-    return frequencies, fC_index, nPoints
+    return frequencies
 
-def plot_impedance_curve(impedances, fLow, fHigh, f_resonance):
+def frequency_sweep(mat_file, frequencies, feed_point):
+    Z0 = 50
+    s11_db = []
+    impedances = []
+    nPoints = len(frequencies)
+
+    for idx, frequency in enumerate(frequencies):
+        impedance, _ = radiation_algorithm(mat_file, frequency, feed_point, voltage_amplitude=1, show=False)
+        impedances.append(impedance)
+        s11 = (impedance - Z0) / (impedance + Z0)
+        s11_db.append(20 * np.log10(abs(s11)))
+        print(f"Simulation {idx+1}/{nPoints} | f = {frequency/1e6:.2f} MHz | S11 = {s11_db[-1]:.2f} dB")
+
+    """ min_index = np.argmin(s11_db)
+    f_resonance = frequencies[min_index]
+    Z_at_res = impedances[min_index]
+
+    print(f"\nRésultats de simulation :")
+    print(f"→ Fréquence de résonance = {f_resonance / 1e6:.2f} MHz")
+    print(f"→ Impédance à f_res      = {Z_at_res:.2f} Ω") """
+
+    # Extraction du nom de l'antenne depuis le chemin de mat_file
+    antenna_name = os.path.splitext(os.path.basename(mat_file))[0]
+    output_dir = "data/antennas_sweep"
+    os.makedirs(output_dir, exist_ok=True)
+    output_matfile = os.path.join(output_dir, f"{antenna_name}_freq_sweep.mat")
+
+    # Préparation des données à sauvegarder
+    data_to_save = {
+        'frequencies': np.array(frequencies),
+        'impedances': np.array(impedances),
+        's11_db': np.array(s11_db),
+    }
+
+    # Sauvegarde dans un fichier .mat
+    savemat(output_matfile, data_to_save)
+
+def load_freq_sweep_data(filepath):
+    data = loadmat(filepath)
+
+    frequencies = data.get('frequencies', np.array([])).squeeze()
+    impedances = data.get('impedances', np.array([])).squeeze()
+    s11_db = data.get('s11_db', np.array([])).squeeze()
+
+    return frequencies, impedances, s11_db
+
+def plot_impedance_curve(impedances, fLow, fHigh, f_resonance=None):
     plt.style.use('fivethirtyeight')
     plt.rcParams['font.family'] = 'JetBrains Mono'
     frequencies = np.linspace(fLow, fHigh, len(impedances))
@@ -24,20 +68,21 @@ def plot_impedance_curve(impedances, fLow, fHigh, f_resonance):
     real_parts = [z.real for z in impedances]
     imag_parts = [z.imag for z in impedances]
 
-    # Trouver l'indice de la fréquence de résonance la plus proche
-    idx_res = np.argmin(np.abs(frequencies - f_resonance))
-    f_res_mhz = frequencies_mhz[idx_res]
-    R_res = real_parts[idx_res]
-    X_res = imag_parts[idx_res]
-
     fig_size = 12
     Fibonacci = (1 + np.sqrt(5)) / 2
     plt.figure(figsize=(fig_size, fig_size / Fibonacci))
     plt.plot(frequencies_mhz, real_parts, label="Résistance (Re(Z))", color='red', linewidth=2.5)
     plt.plot(frequencies_mhz, imag_parts, label="Réactance (Im(Z))", color='blue', linewidth=2.5)
-    # Ligne verticale à la fréquence de résonance
-    plt.axvline(f_res_mhz, color='green', linestyle='--', 
-                label=f"Résonance: {f_res_mhz:.2f} MHz\nRe(Z)={R_res:.2f} Ω, Im(Z)={X_res:.2f} Ω")
+
+    # Si f_resonance est donné, tracer la ligne verticale
+    if f_resonance is not None:
+        idx_res = np.argmin(np.abs(frequencies - f_resonance))
+        f_res_mhz = frequencies_mhz[idx_res]
+        R_res = real_parts[idx_res]
+        X_res = imag_parts[idx_res]
+        plt.axvline(f_res_mhz, color='green', linestyle='--', 
+                    label=f"Résonance: {f_res_mhz:.2f} MHz\nRe(Z)={R_res:.2f} Ω, Im(Z)={X_res:.2f} Ω")
+
     plt.xlabel("Fréquence (MHz)")
     plt.ylabel("Impédance (Ω)")
     plt.title("Évolution de l'impédance vs Fréquence")
@@ -46,36 +91,6 @@ def plot_impedance_curve(impedances, fLow, fHigh, f_resonance):
     plt.tight_layout()
     plt.show()
 
-def frequency_sweep(mat_file, start_frequency, fC, stop_frequency, feed_point):
-    frequencies, _, nPoints = generate_frequencies(start_frequency, stop_frequency, fC, 1e5)
-    Z0=50
-    s11_db = []
-    impedances = []
-    nPoints = len(frequencies)
-    for idx, frequency in enumerate(frequencies):
-        visualiser = (frequency == fC)
-        impedance, _ = radiation_algorithm(mat_file, frequency, feed_point, voltage_amplitude=0.5, show=visualiser)
-        impedances.append(impedance)
-        s11 = (impedance - Z0) / (impedance + Z0)
-        s11_db.append(20 * np.log10(abs(s11)))
-        print(f"Simulation {idx+1}/{nPoints} | f = {frequency/1e6:.2f} MHz | S11 = {s11_db[-1]:.2f} dB")
-    
-    min_index = np.argmin(s11_db)
-    f_resonance = frequencies[min_index]
-    Z_at_res = impedances[min_index]
-    R_res = Z_at_res.real
-    X_res = Z_at_res.imag
-
-    plot_smith_chart(impedances, frequencies, fC)
-
-    plot_impedance_curve(impedances, start_frequency, stop_frequency, f_resonance)
-
-
-    print(f"\nRésultats de simulation :")
-    print(f"→ Fréquence de résonance = {f_resonance / 1e6:.2f} MHz")
-    print(f"→ Impédance à f_res      = {Z_at_res:.2f} Ω")
-
-    return f_resonance, s11_db, R_res, X_res
 
 def plot_s11_curve(s11_db, fLow, fHigh, fC=None):
     plt.style.use('fivethirtyeight')

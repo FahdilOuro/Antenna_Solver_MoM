@@ -155,8 +155,8 @@ def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load
 
     # Configuration des axes et légendes
     # ax.set_theta_zero_location("N")    # 0° au nord
-    ax.set_theta_direction(-1)         # Sens horaire pour les angles
-    ax.set_rlabel_position(-22.5)      # Position des étiquettes radiales
+    # ax.set_theta_direction(-1)         # Sens horaire pour les angles
+    ax.set_rlabel_position(-30)      # Position des étiquettes radiales
     ax.text(0, max(polar_0) + 5, "z", ha='center', va='bottom', fontsize=10, color='red')
     ax.legend()
     ax.grid(True)

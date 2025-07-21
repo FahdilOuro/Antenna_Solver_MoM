@@ -36,7 +36,7 @@ def simulate(frequencies, ifa_meander_mat, fC, feed_point):
     nPoints = len(frequencies)
     for idx, frequency in enumerate(frequencies):
         visualiser = (frequency == fC)
-        impedance, _ = radiation_algorithm(ifa_meander_mat, frequency, feed_point, 0.5, show=visualiser, save_image=True)
+        impedance, _ = radiation_algorithm(ifa_meander_mat, frequency, feed_point, voltage_amplitude=0.5, show=visualiser, save_image=True)
         impedances.append(impedance)
         s11 = (impedance - Z0) / (impedance + Z0)
         s11_db.append(20 * np.log10(abs(s11)))

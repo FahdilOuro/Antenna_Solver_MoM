@@ -34,12 +34,12 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
     # Définition des arêtes et calcul de leurs longueurs
     edges = triangles.get_edges()
 
-    print(f"\nNombre de triangles = {triangles.total_of_triangles}")
-    print(f"\nNombre d'elements de maillage (edges) = {edges.total_number_of_edges}\n")
+    """ print(f"\nNombre de triangles = {triangles.total_of_triangles}")
+    print(f"\nNombre d'elements de maillage (edges) = {edges.total_number_of_edges}\n") """
 
     filter_complexes_jonctions(points, triangles, edges)          # Filtrage des jonctions complexes pour simplifier la structure du maillage
 
-    print(f"\nNombre d'elements de maillage (edges) = {edges.total_number_of_edges}\n")
+    # print(f"\nNombre d'elements de maillage (edges) = {edges.total_number_of_edges}\n")
 
     edges.compute_edges_length(points)
     
@@ -90,10 +90,10 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
     frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power = calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude, monopole, simulate_array_antenna)
 
     # Affichage des résultats, gestion des scalaires et des tableaux
-    print(f"\nLa valeur de l'impédance d'entrée de l'antenne {base_name} = {format_impedance(impedance)} Ohm")
+    """ print(f"\nLa valeur de l'impédance d'entrée de l'antenne {base_name} = {format_impedance(impedance)} Ohm")
     print(f"Gap current of {base_name} = {format_array(gap_current)}")
     print(f"Gap voltage of {base_name} = {format_array(gap_voltage)}")
-    print(f"La valeur de feed_power  = {format_array(feed_power)}\n")
+    print(f"La valeur de feed_power  = {format_array(feed_power)}\n") """
 
     # Sauvegarde des données de courant
     save_folder_name_current = 'data/antennas_current/'
@@ -105,7 +105,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
     # Calcul des courants de surface à partir du courant total
     surface_current_density = calculate_current_density(current, triangles, edges, vecteurs_rho)
 
-    print(f"\nSurface current density of {base_name}: min = {np.min(surface_current_density):.7f} [A/m], max = {np.max(surface_current_density):.7f} [A/m]\n")
+    # print(f"\nSurface current density of {base_name}: min = {np.min(surface_current_density):.7f} [A/m], max = {np.max(surface_current_density):.7f} [A/m]\n")
 
     # Visualisation des courants de surface
     if show:
