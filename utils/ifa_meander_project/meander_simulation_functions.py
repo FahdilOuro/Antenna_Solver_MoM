@@ -7,7 +7,7 @@ def simulate_frequency_sweep(frequencies, fC, ifa_meander_mat, feed_point, volta
     nPoints = len(frequencies)
     for idx, frequency in enumerate(frequencies):
         visualiser = (frequency == fC)
-        impedance, _ = radiation_algorithm(ifa_meander_mat, frequency, feed_point, voltage_amplitude, show=visualiser)
+        impedance, *_ = radiation_algorithm(ifa_meander_mat, frequency, feed_point, voltage_amplitude, show=visualiser)
         impedances.append(impedance)
         s11 = (impedance - Z0) / (impedance + Z0)
         s11_db.append(20 * np.log10(abs(s11)))
@@ -199,7 +199,7 @@ def loop_in_interval(fLow, fHigh, nPoints, fC, accuracy, ifa_meander_mat, feed_p
             index_fC = count
         else:
             show = False
-        impedance, _ = radiation_algorithm(ifa_meander_mat, frequency, feed_point, voltage_amplitude, show)
+        impedance, *_ = radiation_algorithm(ifa_meander_mat, frequency, feed_point, voltage_amplitude, show)
         impedances.append(impedance)
         s11 = (impedance - Z0) / (impedance + Z0)
         s11_db.append(20 * np.log10(abs(s11)))

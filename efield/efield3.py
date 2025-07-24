@@ -119,10 +119,12 @@ def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load
     # Chargement des données nécessaires
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
 
-    if scattering :
+    if scattering:
         _, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)
     elif radiation:
         _, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=radiation)
+    elif (radiation is False and scattering is False) or (radiation is True and scattering is True):
+        raise ValueError("Either radiation or scattering must be True, but not both or neither.")
 
     total_power, *_ = load_gain_power_data(filename_gain_power_to_load)
 

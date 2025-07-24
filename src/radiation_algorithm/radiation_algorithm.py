@@ -87,7 +87,10 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
     filename_impedance = save_folder_name_impedance + save_file_name_impedance
 
     # Calcul du courant induit sur l'antenne par l'onde incidente
-    frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power = calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude, monopole, simulate_array_antenna)
+    frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power, index_feeding_edges = calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude, monopole, simulate_array_antenna)
+
+    """ # informations sur la donnee current a savoir le shape et le type et le nombre de lignes et columnes
+    print(f"\nShape of current data: {current.shape}, Type: {current.dtype}") """
 
     # Affichage des résultats, gestion des scalaires et des tableaux
     """ print(f"\nLa valeur de l'impédance d'entrée de l'antenne {base_name} = {format_impedance(impedance)} Ohm")
@@ -136,4 +139,4 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
             fig.write_image(pdf_path, format="pdf")
             print(f"\nImage sauvegardée au format PDF : {pdf_path}\n")
 
-    return impedance, surface_current_density
+    return impedance, current, gap_current, gap_voltage, feed_power, index_feeding_edges, surface_current_density

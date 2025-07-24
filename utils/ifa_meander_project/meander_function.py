@@ -324,9 +324,7 @@ def radiation_ifa(mesh1, frequency, feed_point, voltage_amplitude, show):
     filename_impedance = save_folder_name_impedance + save_file_name_impedance
 
     # Calcul du courant induit sur l'antenne par l'onde incidente
-    frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power = calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude)
-
-    
+    frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power, index_feeding_edges = calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude)
 
     # Sauvegarde des données de courant
     save_folder_name_current = 'data/antennas_current/'

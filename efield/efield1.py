@@ -48,10 +48,12 @@ def calculate_electric_magnetic_field_at_point(filename_mesh2_to_load, filename_
     # 2. Chargement des données de maillage et des courants à partir des fichiers MAT
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
 
-    if scattering :
+    if scattering:
         frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)
     elif radiation:
         frequency, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=radiation)
+    elif (radiation is False and scattering is False) or (radiation is True and scattering is True):
+        raise ValueError("Either radiation or scattering must be True, but not both or neither.")
 
     # 3. Calcul du nombre d'onde k et de sa composante complexe
     k = omega / light_speed_c    # Nombre d'onde (en rad/m)

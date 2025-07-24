@@ -8,7 +8,7 @@ def simulate_frequency_sweep(frequencies, fC, ifa_meander_mat, feed_point, volta
     fc_index = np.where(frequencies == fC)[0][0]
     for idx, frequency in enumerate(frequencies):
         visualiser = (frequency == fC)
-        impedance, _ = radiation_algorithm(ifa_meander_mat, frequency, feed_point, voltage_amplitude, show=visualiser)
+        impedance, *_ = radiation_algorithm(ifa_meander_mat, frequency, feed_point, voltage_amplitude, show=visualiser)
         impedances.append(impedance)
         s11 = (impedance - Z0) / (impedance + Z0)
         s11_db.append(20 * np.log10(abs(s11)))

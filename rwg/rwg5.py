@@ -120,7 +120,7 @@ def compute_aspect_ratios(points):
         "z": 0.3,
     }
 
-def visualize_surface_current(points_data, triangles_data, surface_current_density, feed_point, title="Antennas Surface Current"):
+def visualize_surface_current(points_data, triangles_data, surface_current_density, feed_point=None, title="Antennas Surface Current"):
     """
         Visualise la densité de courant surfacique sur une surface triangulée en 3D à l'aide de Plotly.
 
@@ -174,16 +174,17 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
         title='',
         aspectratio=aspect_ratios,
     )
-    # Ajout du/des feed-point(s) en rouge et en évidence
-    feed_point = np.atleast_2d(feed_point)  # S'assure que feed_point est de forme (n, 3)
-    fig.add_trace(go.Scatter3d(
-        x=feed_point[:, 0],
-        y=feed_point[:, 1],
-        z=feed_point[:, 2],
-        mode='markers+text',
-        marker=dict(size=6, color='red', symbol='circle'),
-        name='Feed Point(s)'
-    ))
+    # Ajout du/des feed-point(s) en rouge et en évidence si feed_point n'est pas None
+    if feed_point is not None:
+        feed_point = np.atleast_2d(feed_point)  # S'assure que feed_point est de forme (n, 3)
+        fig.add_trace(go.Scatter3d(
+            x=feed_point[:, 0],
+            y=feed_point[:, 1],
+            z=feed_point[:, 2],
+            mode='markers+text',
+            marker=dict(size=6, color='red', symbol='circle'),
+            name='Feed Point(s)'
+        ))
     # Configuration de la légende
     fig.update_layout(
         scene=dict(

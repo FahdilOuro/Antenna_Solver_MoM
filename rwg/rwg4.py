@@ -60,23 +60,27 @@ def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incid
 
     # Initialisation du vecteur de tension (second membre des équations de MoM)
     voltage = np.zeros(edges.total_number_of_edges, dtype=complex)
+    
+    # === Préparation des centres de triangles associés aux arêtes ===
+    centers_plus = triangles.triangles_center[:, triangles.triangles_plus]    # (3, N_edges)
+    centers_minus = triangles.triangles_center[:, triangles.triangles_minus]  # (3, N_edges)
 
-    # Calcul du vecteur "voltage" basé sur les produits scalaires pour chaque arête
-    for edge in range(edges.total_number_of_edges):
-        # Contribution du triangle associé à l'arête (côté "+" du triangle)
-        scalar_product_plus = np.dot(kv, triangles.triangles_center[:, triangles.triangles_plus[edge]])
-        em_plus = np.dot(polarization, np.exp(-1j * scalar_product_plus))
+    # === Calcul des produits scalaires kv . r_plus et kv . r_minus ===
+    scalar_product_plus = np.einsum('i,ij->j', kv, centers_plus)   # (N_edges,)
+    scalar_product_minus = np.einsum('i,ij->j', kv, centers_minus) # (N_edges,)
 
-        # Contribution du triangle associé à l'arête (côté "-" du triangle)
-        scalar_product_minus = np.dot(kv, triangles.triangles_center[:, triangles.triangles_minus[edge]])
-        em_minus = np.dot(polarization, np.exp(-1j * scalar_product_minus))
+    # === Calcul des facteurs d'onde complexes (em_plus et em_minus) ===
+    # Broadcasting : (3, 1) * (1, N_edges) -> (3, N_edges)
+    em_plus = polarization[:, None] * np.exp(-1j * scalar_product_plus)[None, :]
+    em_minus = polarization[:, None] * np.exp(-1j * scalar_product_minus)[None, :]
 
-        # Calcul des contributions scalaires des deux côtés
-        scalar_plus = np.sum(em_plus * vecteurs_rho.vecteur_rho_plus[:, edge])
-        scalar_minus = np.sum(em_minus * vecteurs_rho.vecteur_rho_minus[:, edge])
+    # === Produits scalaires avec vecteurs rho ===
+    # em_plus et vecteur_rho_plus sont tous deux (3, N_edges)
+    scalar_plus = np.einsum('ij,ij->j', em_plus, vecteurs_rho.vecteur_rho_plus)   # (N_edges,)
+    scalar_minus = np.einsum('ij,ij->j', em_minus, vecteurs_rho.vecteur_rho_minus) # (N_edges,)
 
-        # Assemblage de la contribution totale au vecteur "voltage"
-        voltage[edge] = edges.edges_length[edge] * (scalar_plus / 2 + scalar_minus / 2)
+    # === Assemblage final du vecteur "voltage" ===
+    voltage = edges.edges_length * 0.5 * (scalar_plus + scalar_minus)  # (N_edges,)
 
     # Chronométrage du calcul
     start_time = time.time()
@@ -90,6 +94,34 @@ def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incid
 
     # Retourner les résultats principaux
     return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current
+
+def find_feed_edges(points, edges, feed_point, monopole=False):
+    # --- Normalisation de feed_point / Feed ---
+    Feed = np.asarray(feed_point.T)
+    if Feed.ndim == 1:
+        Feed = Feed.reshape(3, 1)
+    elif Feed.ndim == 2 and Feed.shape[0] == 3:
+        pass
+    else:
+        raise ValueError("feed_point doit être de forme (3,) ou (3, N)")
+    
+    # --- Calcul vectorisé des centres géométriques des arêtes ---
+    centers = 0.5 * (points.points[:, edges.first_points] + points.points[:, edges.second_points])  # (3, E)
+
+    # --- Calcul des distances entre chaque feed point et chaque arête ---
+    diff = centers[:, :, np.newaxis] - Feed[:, np.newaxis, :]  # (3, E, N)
+    dist_squared = np.sum(diff ** 2, axis=0)                   # (E, N)
+
+    # --- Sélection des arêtes à alimenter ---
+    if monopole:
+        index_feeding_edges = np.argsort(dist_squared, axis=0)[:2, :]  # (2, N)
+        index_feeding_edges = index_feeding_edges.flatten(order='F')   # (2*N,)
+        # print(f"index_feeding_edges = {index_feeding_edges}")
+    else:
+        index_feeding_edges = np.argmin(dist_squared, axis=0)          # (N,)
+        # print(f"index_feeding_edges = {index_feeding_edges}")
+    
+    return index_feeding_edges
 
 def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point, voltage_amplitude, monopole=False, simulate_array_antenna=False):
     """
@@ -138,30 +170,7 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
     # Initialisation du vecteur de tension
     voltage = np.zeros(edges.total_number_of_edges, dtype=complex)
 
-    # --- Normalisation de feed_point / Feed ---
-    Feed = np.asarray(feed_point.T)
-    if Feed.ndim == 1:
-        Feed = Feed.reshape(3, 1)
-    elif Feed.ndim == 2 and Feed.shape[0] == 3:
-        pass
-    else:
-        raise ValueError("feed_point doit être de forme (3,) ou (3, N)")
-
-    # --- Calcul vectorisé des centres géométriques des arêtes ---
-    centers = 0.5 * (points.points[:, edges.first_points] + points.points[:, edges.second_points])  # (3, E)
-
-    # --- Calcul des distances entre chaque feed point et chaque arête ---
-    diff = centers[:, :, np.newaxis] - Feed[:, np.newaxis, :]  # (3, E, N)
-    dist_squared = np.sum(diff ** 2, axis=0)                   # (E, N)
-
-    # --- Sélection des arêtes à alimenter ---
-    if monopole:
-        index_feeding_edges = np.argsort(dist_squared, axis=0)[:2, :]  # (2, N)
-        index_feeding_edges = index_feeding_edges.flatten(order='F')   # (2*N,)
-        # print(f"index_feeding_edges = {index_feeding_edges}")
-    else:
-        index_feeding_edges = np.argmin(dist_squared, axis=0)          # (N,)
-        # print(f"index_feeding_edges = {index_feeding_edges}")
+    index_feeding_edges = find_feed_edges(points, edges, feed_point, monopole)
 
     # --- Application de la tension avec phase progressive si simulate_array ---
     if simulate_array_antenna:
@@ -195,7 +204,7 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
         feed_power = 0.5 * np.real(gap_current * np.conj(gap_voltage))
 
     # Retourner les résultats
-    return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power
+    return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power, index_feeding_edges
 
 
 class DataManager_rwg4:

@@ -219,10 +219,12 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
 
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
 
-    if scattering :
+    if scattering:
         frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)
     elif radiation:
         frequency, omega, _, _, light_speed_c, eta, _, current, _, gap_current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=radiation)
+    elif (radiation is False and scattering is False) or (radiation is True and scattering is True):
+        raise ValueError("Either radiation or scattering must be True, but not both or neither.")
 
     # Chargement des données de la sphère
     sphere_points = data_sphere['p'] * 100    # Les coordonnées de la sphère sont multipliées par 100 (rayon de 100 m).
