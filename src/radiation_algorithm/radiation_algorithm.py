@@ -123,7 +123,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
             # Crée le dossier s'il n'existe pas
             if not os.path.exists(output_dir_fig_image):
                 os.makedirs(output_dir_fig_image)
-                print(f"Dossier créé : {output_dir_fig_image}")
+                # print(f"Dossier créé : {output_dir_fig_image}")
             
             # Nom du fichier PDF à enregistrer
             pdf_path = os.path.join(output_dir_fig_image, antennas_name.replace(" ", "_") + ".pdf")
@@ -137,6 +137,6 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
 
             # Sauvegarde de la figure
             fig.write_image(pdf_path, format="pdf")
-            print(f"\nImage sauvegardée au format PDF : {pdf_path}\n")
+            # print(f"\nImage sauvegardée au format PDF : {pdf_path}\n")
 
     return impedance, current, gap_current, gap_voltage, feed_power, index_feeding_edges, surface_current_density

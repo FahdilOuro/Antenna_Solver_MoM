@@ -103,9 +103,9 @@ def plot_PowerConjMatch(filename):
     fig_size = 12
     Fibonacci = (1 + np.sqrt(5)) / 2
     plt.figure(figsize=(fig_size, fig_size / Fibonacci))
-    plt.plot(frequencies, PowerConjMatch)
+    plt.plot(frequencies / 1e6, PowerConjMatch)  # Convert Hz to MHz
     plt.title('Power Conjugate Match vs Frequency')
-    plt.xlabel('Frequency (Hz)')
+    plt.xlabel('Frequency (MHz)')
     plt.ylabel('Power Conjugate Match (W)')
     plt.grid(True)
     plt.show()

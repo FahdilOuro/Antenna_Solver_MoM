@@ -23,7 +23,7 @@ from rwg.rwg3 import *
 from rwg.rwg4 import *
 from rwg.rwg5 import *
 
-def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization, load_from_matlab=True, show=False):
+def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization, load_from_matlab=True, show=True):
     """
         Implémente l'algorithme de diffusion électromagnétique pour une antenne.
     """
