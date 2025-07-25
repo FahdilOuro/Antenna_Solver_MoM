@@ -16,7 +16,13 @@ def format_array(arr):
     else:
         return "[" + ", ".join(str(a) for a in np.ravel(arr)) + "]"
 
-def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_from_matlab=True, monopole=False, simulate_array_antenna=False, show=True, save_image=False):
+def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_from_matlab=True, monopole=False, 
+                        simulate_array_antenna=False, show=True, save_image=False,
+                        load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None):
+    if (not load_lumped_elements and (LoadPoint is not None or LoadValue is not None or LoadDir is not None)) or \
+        (load_lumped_elements and (LoadPoint is None or LoadValue is None or LoadDir is None)):
+         raise ValueError("Incoherent parameters: If 'load_lumped_elements' is False, 'LoadPoint', 'LoadValue', and 'LoadDir' must all be None. If 'load_lumped_elements' is True, all three must be provided (not None).")
+    
     # Chargement du fichier de maillage
     p, t = load_mesh_file(mesh1, load_from_matlab)
 
@@ -73,11 +79,21 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
     filename_mesh2_to_load = save_folder_name_mesh2 + save_file_name_mesh2
 
     # Calcul des constantes électromagnétiques et de la matrice d'impédance Z
-    omega, mu, epsilon, light_speed_c, eta, matrice_z = calculate_z_matrice(triangles,
-                                                                            edges,
-                                                                            barycentric_triangles,
-                                                                            vecteurs_rho,
-                                                                            frequency)
+    if load_lumped_elements:
+        omega, mu, epsilon, light_speed_c, eta, matrice_z, _ = calculate_z_matrice_lumped_elements(points, 
+                                                                                                   triangles, 
+                                                                                                   edges, 
+                                                                                                   barycentric_triangles, 
+                                                                                                   vecteurs_rho, frequency, 
+                                                                                                   LoadPoint, 
+                                                                                                   LoadValue, 
+                                                                                                   LoadDir)
+    else:
+        omega, mu, epsilon, light_speed_c, eta, matrice_z = calculate_z_matrice(triangles,
+                                                                                edges,
+                                                                                barycentric_triangles,
+                                                                                vecteurs_rho,
+                                                                                frequency)
 
     # Sauvegarde des données d'impédance
     save_folder_name_impedance = 'data/antennas_impedance/'

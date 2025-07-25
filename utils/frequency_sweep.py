@@ -11,7 +11,7 @@ def generate_freq_step(fLow, fHigh, step=2e6):
 
     return frequencies
 
-def frequency_sweep(mat_file, frequencies, feed_point, voltage_amplitude=1):
+def frequency_sweep(mat_file, frequencies, feed_point, voltage_amplitude=1, load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None):
     Z0 = 50
     s11_db = []
     impedances = []
@@ -24,7 +24,7 @@ def frequency_sweep(mat_file, frequencies, feed_point, voltage_amplitude=1):
 
     for idx, frequency in enumerate(frequencies):
         impedance, current, gap_current, gap_voltage, feed_power, index_feeding_edges, _ = radiation_algorithm(
-            mat_file, frequency, feed_point, voltage_amplitude=voltage_amplitude, show=False)
+            mat_file, frequency, feed_point, voltage_amplitude=voltage_amplitude, show=False, load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None)
         impedances.append(impedance)
         currents.append(current)
         gap_currents.append(gap_current)

@@ -43,17 +43,93 @@ def calculate_z_matrice(triangles, edges, barycentric_triangles, vecteurs_rho, f
     factor_a     = factor * (1j * omega * edges.edges_length / 4) * constant_1  # Facteur pour le calcul des potentiels vectoriels
     factor_fi    = factor * edges.edges_length * constant_2                     # Facteur pour le calcul des potentiels scalaires
 
-    # Chronométrage pour évaluer les performances
-    start_time = time.time()
+    # Calcul de la matrice d'impédance
+    matrice_z = impedance_matrice_z(edges, triangles, barycentric_triangles, vecteurs_rho, complexe_k, factor_a, factor_fi)
+
+    return omega, mu, epsilon, light_speed_c, eta, matrice_z
+
+def calculate_z_matrice_lumped_elements(points, triangles, edges, barycentric_triangles, vecteurs_rho, frequency, LoadPoint, LoadValue, LoadDir):
+    """
+        Calcule la matrice d'impédance électromagnétique pour un système donné.
+
+        Paramètres :
+            * triangles : Objet représentant les triangles du maillage.
+            * edges : Objet représentant les arêtes du maillage.
+            * barycentric_triangles : Objet contenant les données barycentriques des triangles.
+            * vecteurs_rho : Objet contenant les vecteurs Rho associés aux triangles.
+            * frequency : Fréquence du signal électromagnétique (en Hz).
+
+        Retourne :
+            * omega : Pulsation angulaire (rad/s).
+            * mu : Perméabilité magnétique du vide (H/m).
+            * epsilon : Permittivité du vide (F/m).
+            * light_speed_c : Vitesse de la lumière dans le vide (m/s).
+            * eta : Impédance caractéristique de l'espace libre (Ω).
+            * matrice_z : Matrice d'impédance calculée.
+    """
+
+    # Définition des paramètres électromagnétiques
+    epsilon = 8.854e-12  # Permittivité du vide (F/m)
+    mu = 1.257e-6        # Perméabilité magnétique du vide (H/m)
+
+    # Calcul des constantes électromagnétiques
+    light_speed_c = 1 / np.sqrt(epsilon * mu)  # Vitesse de la lumière dans le vide (m/s)
+    eta = np.sqrt(mu / epsilon)                # Impédance caractéristique de l'espace libre (Ω)
+    omega = 2 * np.pi * frequency              # Pulsation angulaire (rad/s)
+    k = omega / light_speed_c                  # Nombre d'onde (rad/m)
+    complexe_k = 1j * k                        # Nombre d'onde complexe pour les calculs
+
+    # Définition des facteurs pour optimiser les calculs
+    constant_1   = mu / (4 * np.pi)                        # Constante pour le calcul des champs magnétiques
+    constant_2   = 1 / (1j * 4 * np.pi * omega * epsilon)  # Constante pour le calcul des champs électriques
+    factor      = 1 / 9                                    # Facteur de pondération pour les calculs intégrés
+
+    # Facteurs spécifiques liés aux arêtes
+    factor_a     = factor * (1j * omega * edges.edges_length / 4) * constant_1  # Facteur pour le calcul des potentiels vectoriels
+    factor_fi    = factor * edges.edges_length * constant_2                     # Facteur pour le calcul des potentiels scalaires
 
     # Calcul de la matrice d'impédance
     matrice_z = impedance_matrice_z(edges, triangles, barycentric_triangles, vecteurs_rho, complexe_k, factor_a, factor_fi)
 
-    # Fin du chronométrage
-    elapsed_time = time.time() - start_time
-    # print(f"Temps écoulé pour le calcul de la matrice Z : {elapsed_time:.6f} secondes")
+    # Lumped impedance implementation
+    # The informaion needed for lumped elements :
+    #       LoadPoint                       Lumped element locations
+    #       LoadValue                       Vector of L, C, and R
+    #       LoadDir                         "Direction" of lumped element
 
-    return omega, mu, epsilon, light_speed_c, eta, matrice_z
+    LoadPoint = LoadPoint.T  # (3, LNumber)
+    LoadValue = LoadValue.T  # (3, LNumber)
+    LoadDir   = LoadDir.T    # (3, LNumber)
+
+    LNumber = LoadPoint.shape[1]
+
+    L_vals = LoadValue[0]
+    C_vals = LoadValue[1]
+    R_vals = LoadValue[2]
+    DeltaZ = 1j * omega * L_vals + 1 / (1j * omega * C_vals) + R_vals
+
+    ImpArray = []
+    tol = 1e-3  # Tolerance for orientation
+
+    for k in range(LNumber):
+        EdgeCenters = 0.5 * (points[:, edges.first_points] + points[:, edges.second_points])  # (3, EdgesTotal)
+        EdgeVectors = (points[:, edges.first_points] - points[:, edges.second_points]) / edges.edges_length[np.newaxis, :]
+
+        diff = EdgeCenters - LoadPoint[:, k][:, np.newaxis]
+        Dist = np.linalg.norm(diff, axis=0)
+        Orien = np.abs(np.einsum('ij,i->j', EdgeVectors, LoadDir[:, k]))
+
+        index = np.argsort(Dist)
+
+        for idx in index:
+            if Orien[idx] < tol:
+                ImpArray.append(idx)
+                matrice_z[idx, idx] += edges.edges_length[idx]**2 * DeltaZ[k]
+                break
+
+    ImpArray = np.array(ImpArray)  # Convert to numpy array for consistency
+
+    return omega, mu, epsilon, light_speed_c, eta, matrice_z, ImpArray
 
 class DataManager_rwg3:
     """
