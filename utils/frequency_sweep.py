@@ -23,8 +23,12 @@ def frequency_sweep(mat_file, frequencies, feed_point, voltage_amplitude=1, load
     nPoints = len(frequencies)
 
     for idx, frequency in enumerate(frequencies):
-        impedance, current, gap_current, gap_voltage, feed_power, index_feeding_edges, _ = radiation_algorithm(
-            mat_file, frequency, feed_point, voltage_amplitude=voltage_amplitude, show=False, load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None)
+        impedance, current, gap_current, gap_voltage, feed_power, index_feeding_edges, _ = radiation_algorithm(mat_file, frequency, 
+                                                                                                               feed_point, voltage_amplitude=voltage_amplitude, 
+                                                                                                               show=False,
+                                                                                                               load_lumped_elements=load_lumped_elements, 
+                                                                                                               LoadPoint=LoadPoint, LoadValue=LoadValue, 
+                                                                                                               LoadDir=LoadDir)
         impedances.append(impedance)
         currents.append(current)
         gap_currents.append(gap_current)

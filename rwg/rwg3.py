@@ -48,6 +48,51 @@ def calculate_z_matrice(triangles, edges, barycentric_triangles, vecteurs_rho, f
 
     return omega, mu, epsilon, light_speed_c, eta, matrice_z
 
+def compute_lumped_impedance(load_values, omega):
+    """
+    Calcule Z = jωL + 1/(jωC) + R à partir de load_values (3, N),
+    avec traitement spécial :
+    - C = None ⇒ remplacé par très grande valeur (C = 1e64)
+    - C = 0    ⇒ lève une erreur explicite
+    - L, R : None ou 0 ⇒ traités comme 0 (aucune inductance ou résistance)
+    """
+    N = load_values.shape[1]
+
+    # Initialisation
+    L_vals = np.zeros(N, dtype=np.complex128)
+    C_vals = np.empty(N, dtype=np.complex128)
+    R_vals = np.zeros(N, dtype=np.complex128)
+
+    for i in range(N):
+        L = load_values[0, i]
+        C = load_values[1, i]
+        R = load_values[2, i]
+
+        # L
+        if L not in (None, 0):
+            L_vals[i] = L
+
+        # C
+        if C is None:
+            C_vals[i] = 1e64  # Simule C très grand ⇒ Z_C ≈ 0
+        elif C == 0:
+            raise ValueError(f"Valeur de C invalide (0) au point {i}. Utilisez `None` pour ignorer C.")
+        else:
+            C_vals[i] = C
+
+        # R
+        if R not in (None, 0):
+            R_vals[i] = R
+
+    Z_L = 1j * omega * L_vals
+    with np.errstate(divide='ignore', invalid='ignore'):
+        Z_C = 1 / (1j * omega * C_vals)
+    Z_R = R_vals
+
+    DeltaZ = Z_L + Z_C + Z_R
+
+    return DeltaZ
+
 def calculate_z_matrice_lumped_elements(points, triangles, edges, barycentric_triangles, vecteurs_rho, frequency, LoadPoint, LoadValue, LoadDir):
     """
         Calcule la matrice d'impédance électromagnétique pour un système donné.
@@ -103,17 +148,15 @@ def calculate_z_matrice_lumped_elements(points, triangles, edges, barycentric_tr
 
     LNumber = LoadPoint.shape[1]
 
-    L_vals = LoadValue[0]
-    C_vals = LoadValue[1]
-    R_vals = LoadValue[2]
-    DeltaZ = 1j * omega * L_vals + 1 / (1j * omega * C_vals) + R_vals
+    DeltaZ = compute_lumped_impedance(LoadValue, omega)
+    # print(f"DeltaZ = {DeltaZ}")
 
     ImpArray = []
     tol = 1e-3  # Tolerance for orientation
 
     for k in range(LNumber):
-        EdgeCenters = 0.5 * (points[:, edges.first_points] + points[:, edges.second_points])  # (3, EdgesTotal)
-        EdgeVectors = (points[:, edges.first_points] - points[:, edges.second_points]) / edges.edges_length[np.newaxis, :]
+        EdgeCenters = 0.5 * (points.points[:, edges.first_points] + points.points[:, edges.second_points])  # (3, EdgesTotal)
+        EdgeVectors = (points.points[:, edges.first_points] - points.points[:, edges.second_points]) / edges.edges_length[np.newaxis, :]
 
         diff = EdgeCenters - LoadPoint[:, k][:, np.newaxis]
         Dist = np.linalg.norm(diff, axis=0)
