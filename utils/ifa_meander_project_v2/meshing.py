@@ -1,5 +1,5 @@
 import gmsh
-from utils.gmsh_function import generate_surface_mesh, rectangle_surface, apply_mesh_size, write, run
+from utils.gmsh_function import *
 
 def antenna_ifa_meander(meander_x, meander_y, terminal_x, terminal_y, feed_x, feed_y, save_mesh_folder, mesh_name, mesh_size):
     gmsh.initialize()

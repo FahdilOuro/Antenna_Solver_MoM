@@ -2,7 +2,8 @@ from src.radiation_algorithm.radiation_algorithm import radiation_algorithm
 from efield.efield4 import *
 import numpy as np
 
-from utils.frequency_sweep import load_cst_data, plot_smith_chart_CST_MoM
+# from utils.frequency_sweep import load_cst_data, plot_smith_chart_CST_MoM
+from efield.efield4 import load_cst_data, plot_smith_chart_CST_MoM
 
 def analysis(frequencies, ifa_meander_mat, feed_point):
     Z0=50
