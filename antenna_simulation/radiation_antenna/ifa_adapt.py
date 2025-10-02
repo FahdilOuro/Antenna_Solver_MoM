@@ -1,26 +1,26 @@
 from utils.gmsh_function import *
 
-print("This code is write to simulate an antenna with adatative meshing code.")
+print("This code is written to simulate an antenna with adaptive meshing.")
 
-# -------------------------------------- Files names --------------------------------------
+# -------------------------------------- File names --------------------------------------
 
 mesh_name = 'radiate_ifa1_Adapt.msh'
 save_mesh_folder = 'data/gmsh_files/'
 ifa1_Adapt_mat = 'data/antennas_mesh/radiate_ifa1_Adapt.mat'
 ifa1_Adapt_msh = save_mesh_folder + mesh_name
 
-# -------------------------------------- antenna creation code --------------------------------------
+# -------------------------------------- Antenna creation code --------------------------------------
 
 gmsh.initialize()
 
 model_name  = "ifa_1_adapt"
 feed_point = [0.0025, 0.1, 0]
-feed_lenght = 0.005
+feed_length = 0.005
 
-# Création du modèle
+# Create the model
 gmsh.model.add(model_name)
 
-# Définition des points
+# Define points
 p0 = gmsh.model.occ.addPoint(0, 0, 0)
 p1 = gmsh.model.occ.addPoint(0, 0.1, 0)
 p2 = gmsh.model.occ.addPoint(0, 0.155, 0)
@@ -35,20 +35,20 @@ p10 = gmsh.model.occ.addPoint(0.005, 0.1, 0)
 p11 = gmsh.model.occ.addPoint(0.05, 0.1, 0)
 p12 = gmsh.model.occ.addPoint(0.05, 0, 0)
 
-# Liste des points dans l'ordre
+# List points in order
 points = [p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12]
-# Création des lignes entre chaque point consécutif, et fermeture du contour (dernier vers premier)
+
+# Create lines between consecutive points and close the loop (last to first)
 lines = [gmsh.model.occ.addLine(points[i], points[(i + 1) % len(points)]) for i in range(len(points))]
 cl = gmsh.model.occ.addCurveLoop(lines)
 ifa_1 = gmsh.model.occ.addPlaneSurface([cl])
 
-apply_mesh_size(feed_lenght*10)
-
+apply_mesh_size(feed_length * 10)
 generate_surface_mesh()
 
-# -------------------------------------- Adapt antenna code --------------------------------------
+# -------------------------------------- Adaptive antenna code --------------------------------------
 
 run()
-refine_antenna(model_name, 6.059e+8, mesh_name, feed_point, feed_lenght, ifa1_Adapt_msh, ifa1_Adapt_mat, save_mesh_folder)
+refine_antenna(model_name, 6.059e+8, mesh_name, feed_point, feed_length, ifa1_Adapt_msh, ifa1_Adapt_mat, save_mesh_folder)
 
 gmsh.finalize()

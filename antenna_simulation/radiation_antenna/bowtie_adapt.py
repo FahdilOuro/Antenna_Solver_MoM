@@ -11,9 +11,9 @@ radiate_bowtie_msh_gmsh = save_mesh_folder + mesh_name
 
 # -------------------------------------- antenna creation code --------------------------------------
 
-width = 0.5   # Largeur totale
-hight = 1.0   # Hauteur totale
-width_finite = 0.1 # Largeur de la ligne d'alimentation
+width = 0.5        # Total width
+hight = 1.0        # Total height
+width_finite = 0.1 # Width of the feed line
 hight_up = 2.0
 feed_point = [0, 0, 0]
 model_name  = "bowtie_antenna"

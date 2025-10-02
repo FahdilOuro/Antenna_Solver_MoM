@@ -60,16 +60,16 @@ def generate_surface_mesh():
     gmsh.model.mesh.generate(2)  # Générer le maillage en 2D
     
 def write(save_folder_path, file_name="new_mesh.msh"):
-    # Assure que save_folder_path est un dossier, pas un fichier
+    # Ensure save_folder_path is a folder, not a file
     if not os.path.isdir(save_folder_path):
         print(f"The folder '{save_folder_path}' does not exist.")
         os.makedirs(save_folder_path)
         print(f"Folder '{save_folder_path}' was created successfully.")
 
-    # Construction du chemin complet du fichier
+    # Construct the full file path
     save_path = os.path.join(save_folder_path, file_name)
 
-    # Écriture du fichier
+    # Write the file
     gmsh.write(save_path)
     # print(f"The .msh file was successfully saved to: '{save_path}'")
 
@@ -90,21 +90,21 @@ def rectangle_surface(x_rect, y_rect):
 
     return rect_surface
 
-# -------------------------------A MODIFIER POUR LE REFIERMENT --------------------
+# ------------------------------- TO BE MODIFIED FOR RE-CLOSING --------------------
 
 def read_mesh_msh(fichier_msh):
     gmsh.initialize()
     # gmsh.option.setNumber("General.Terminal", 0)
     gmsh.open(str(fichier_msh))
 
-    # Récupérer les nœuds
+    # Retrieve the nodes
     vtags, vxyz, _ = gmsh.model.mesh.getNodes()
     vxyz = vxyz.reshape((-1, 3))  # (N, 3)
 
-    # Créer un mapping tag → index
+    # Create a mapping tag → index
     vmap = {tag: idx for idx, tag in enumerate(vtags)}
 
-    # Récupérer les éléments de type triangle (type 2)
+    # Retrieve elements of type triangle (type 2)
     triangles_tags, evtags = gmsh.model.mesh.getElementsByType(2)
     evtags = np.array([vmap[tag] for tag in evtags])
     triangles = evtags.reshape((-1, 3))  # (T, 3)
@@ -138,15 +138,17 @@ def remeshing_model(mesh, currents, mesh_size, feed_point, mesh_dividend):
     copy_mesh(save_bowtie, new_model)
     print(f"creation of new model {new_model}")
 
-    # Calculer la taille de maillage basée sur le champ de courant
+    # Compute mesh size based on the current field
     # sf_ele = compute_size_field_based_on_current(mesh_bowtie.vxyz, mesh_bowtie.triangles, currents_bowtie, lenght_feed_high, feed_point, r_threshold=lenght_feed_high, N=100)
     # mesh[0], mesh[1], mesh[2], mesh.vxyz, mesh.triangles, mesh.triangles_tags
     sf_ele = compute_size_from_current(mesh.vxyz, mesh.triangles, currents, mesh_size, feed_point, mesh_dividend, r_threshold=mesh_size*2)
-    # Afficher le champ de taille
+    
+    # Display the size field
     sf_view = gmsh.view.add("mesh size field")
     gmsh.view.addModelData(sf_view, 0, new_model, "ElementData", mesh.triangles_tags, sf_ele[:, None])
     gmsh.plugin.setNumber("Smooth", "View", gmsh.view.getIndex(sf_view))
     gmsh.plugin.run("Smooth")
+    
     return sf_view
 
 def post_processing_meshing(model_name, sf_view):
@@ -184,9 +186,9 @@ def extract_msh_to_mat(file_msh_path, save_mat_path):
     dim = 2
     entities = gmsh.model.getEntities(dim)
 
-    # Récupérer tous les tags de surface et créer un mapping vers des indices 0..n
+    # Retrieve all surface tags and create a mapping to indices 0..n
     surface_tags = sorted([tag for (d, tag) in entities])
-    tag_to_index = {tag: i for i, tag in enumerate(surface_tags)}  # par exemple {3: 0, 7: 1, 12: 2}
+    tag_to_index = {tag: i for i, tag in enumerate(surface_tags)}
 
     triangles = []
 
@@ -197,7 +199,7 @@ def extract_msh_to_mat(file_msh_path, save_mat_path):
         for etype, nodes in zip(element_types, node_tags):
             if etype == 2:  # Triangles
                 num_triangles = len(nodes) // 3
-                surface_idx = tag_to_index[entity_tag]  # index consécutif commençant à 0
+                surface_idx = tag_to_index[entity_tag]
                 surface_indices = np.full((1, num_triangles), surface_idx)
                 triangles.append(np.vstack((np.array(nodes).reshape(-1, 3).T, surface_indices)))
 
@@ -213,54 +215,56 @@ def extract_msh_to_mat(file_msh_path, save_mat_path):
 
 def extract_ModelMsh_to_mat(model_name, save_mat_path):
     gmsh.model.setCurrent(model_name)
-    # Récupérer tous les nœuds (points)
+    # Retrieve all nodes (points)
     node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-    N = len(node_tags)  # Nombre de points
+    N = len(node_tags)  # Number of points
 
-    # Restructurer les coordonnées en un tableau 3xN
+    # Reshape coordinates into a 3xN array
     p = np.array(node_coords).reshape(-1, 3).T  # (3xN)
 
-    # Extraire les éléments (triangles)
-    dim = 2  # Maillage 2D
+    # Extract elements (triangles)
+    dim = 2  # 2D mesh
     entities = gmsh.model.getEntities(dim)
 
     triangles = []
     surface_indices = None
 
     for entity in entities:
-        entity_dim, entity_tag = entity  # entity_tag est l'index de la surface
+        entity_dim, entity_tag = entity  # entity_tag is the surface index
 
         element_types, element_tags, node_tags = gmsh.model.mesh.getElements(entity_dim, entity_tag)
 
         for etype, nodes in zip(element_types, node_tags):
             if etype == 2:  # Type 2 = Triangles
                 num_triangles = len(nodes) // 3
-                surface_indices = np.full((1, num_triangles), entity_tag)  # Créer une ligne avec le tag de surface
-                triangles.append(np.vstack((np.array(nodes).reshape(-1, 3).T, surface_indices)))  # Ajouter la 4e ligne
+                surface_indices = np.full((1, num_triangles), entity_tag)  # Create a row with the surface tag
+                triangles.append(np.vstack((np.array(nodes).reshape(-1, 3).T, surface_indices)))  # Add 4th row
 
-    # Convertir la liste en un tableau numpy (4xT)
+    # Convert the list into a numpy array (4xT)
     t = np.hstack(triangles) if triangles else np.array([])
 
-    # Sauvegarder les données dans un fichier .mat
+    # Save data to a .mat file
     sio.savemat(save_mat_path, {"p": p, "t": t})
 
-    print(f"matlab file stored in {save_mat_path} successfully")
+    print(f"MATLAB file stored in {save_mat_path} successfully")
 
-# -------------------------------A modifier eventuellement--------------------
+# -------------------------------To be modified if necessary--------------------
 
 def save_gmsh_log(mesh_name, output_path):
-    """Enregistre les logs de GMSH dans un fichier texte avec un format clair et structuré."""
+    """
+        Saves GMSH logs to a text file in a clear and structured format.
+    """
 
     model_name = os.path.splitext(os.path.basename(mesh_name))[0]
 
-    # Récupérer les logs
+    # Retrieve logs
     logs = gmsh.logger.get()
 
-    # Assurer l'existence du dossier de logs
+    # Ensure the log folder exists
     log_dir = "data/gmsh_log/"
     os.makedirs(log_dir, exist_ok=True)
 
-    # Déterminer le chemin du fichier log
+    # Determine the log file path
     log_file = os.path.join(log_dir, f"mesh_log_{model_name}.txt")
 
     with open(log_file, "w", encoding="utf-8") as f:
@@ -269,14 +273,14 @@ def save_gmsh_log(mesh_name, output_path):
         f.write(f"Mesh file location: {os.path.abspath(output_path)}\n")
         f.write(f"-------------------------------------\n\n")
 
-        # Écriture des logs de Gmsh
+        # Write Gmsh logs
         for log in logs:
             f.write(log + "\n")
 
-    print(f"Log saved in: {log_file}")  # Confirmation en console
+    print(f"Log saved in: {log_file}")
 
 def refine_antenna(model_name, frequency, mesh_name, feed_point, mesh_size, file_name_msh, file_name_mat, save_mesh_folder, max_iterations=10):
-    tolerance = 1e-3  # tolérance sur la variation d'impédance
+    tolerance = 1e-3  # Tolerance for convergence of impedance
     prev_impedance = None
 
     for iteration in range(max_iterations):
@@ -296,12 +300,12 @@ def refine_antenna(model_name, frequency, mesh_name, feed_point, mesh_size, file
         run()
 
         if prev_impedance is not None:
-            # Calcul de la variation relative ou absolue
+            # Calcul of variation of impedance
             variation = np.abs(impedance - prev_impedance)
             print(f"Iteration {iteration}: impedance = {impedance}, variation = {variation}")
 
             if variation < tolerance:
-                print("Convergence atteinte")
+                print("convergence reached")
                 break
             
         prev_impedance = impedance

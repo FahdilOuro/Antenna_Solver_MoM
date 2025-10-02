@@ -9,9 +9,9 @@ from utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_fi
 
 
 def compute_electric_magnetic_field_at_point_for_single_frequency(frequency, triangles, edges, current, observation_point, eta, light_speed_c):
-    omega = 2 * np.pi * frequency              # Pulsation angulaire (rad/s)
-    k = omega / light_speed_c                  # Nombre d'onde (en rad/m)
-    complex_k = 1j * k                         # Composante complexe du nombre d'onde
+    omega = 2 * np.pi * frequency              # Angular frequency (rad/s)
+    k = omega / light_speed_c                  # Wave number (rad/m)
+    complex_k = 1j * k                         # Complex component of wave number
 
     dipole_center, dipole_moment = compute_dipole_center_moment(triangles, edges, current)
     e_field_total, h_field_total, *_ = compute_e_h_field(observation_point, eta, complex_k, dipole_moment, dipole_center)
@@ -23,8 +23,8 @@ def efield_1_sweep(filename_mesh2_to_load, frequencies, currents, observation_po
 
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
 
-    epsilon = 8.854e-12  # Permittivité du vide (F/m)
-    mu = 1.257e-6        # Perméabilité magnétique du vide (H/m)
+    epsilon = 8.854e-12  # Vacuum permittivity (F/m)
+    mu = 1.257e-6        # Vacuum permeability (H/m)
     light_speed_c = 1 / np.sqrt(epsilon * mu)
     eta = np.sqrt(mu / epsilon)
 
@@ -45,10 +45,10 @@ def efield_1_sweep(filename_mesh2_to_load, frequencies, currents, observation_po
 
 def save_efield_1_data(filename, frequencies, e_fields, observation_point):
     """
-    Enregistre les données dans un fichier .mat à la manière du script MATLAB.
+    Saves the data into a .mat file similar to the MATLAB script.
     
-    Paramètres :
-        filename : str — nom de fichier .mat
+    Parameters:
+        filename : str — .mat file name
         frequencies : ndarray (N_freq,)
         e_fields : ndarray (3, N_freq)
         observation_point : ndarray (3,)
@@ -67,12 +67,12 @@ def save_efield_1_data(filename, frequencies, e_fields, observation_point):
 
 def load_efield_1_data(filepath):
     """
-    Charge les données sauvegardées par save_efield_1_data depuis un fichier .mat.
+    Loads data saved by save_efield_1_data from a .mat file.
 
-    Paramètres :
-        filepath : str — nom de fichier .mat
+    Parameters:
+        filepath : str — .mat file name
 
-    Retourne :
+    Returns:
         frequencies : ndarray (N_freq,)
         e_fields : ndarray (3, N_freq)
         observation_point : ndarray (3,)
@@ -85,7 +85,7 @@ def load_efield_1_data(filepath):
 
 def plot_efield_components(frequencies, e_fields):
     """
-    Affiche les amplitudes des composantes Ex, Ey, Ez en fonction de la fréquence (en MHz).
+        Plots the amplitudes of Ex, Ey, Ez components as a function of frequency (in MHz).
     """
     fig_size = 12
     Fibonacci = (1 + np.sqrt(5)) / 2
@@ -96,15 +96,15 @@ def plot_efield_components(frequencies, e_fields):
     plt.plot(freqs_mhz, np.abs(e_fields[1, :]), label='|Ey|')
     plt.plot(freqs_mhz, np.abs(e_fields[2, :]), label='|Ez|')
     plt.grid(True)
-    plt.xlabel("Fréquence (MHz)")
-    plt.ylabel("Amplitude du champ électrique (V/m)")
-    plt.title("Composantes du champ électrique")
+    plt.xlabel("Frequency (MHz)")
+    plt.ylabel("Electric Field Amplitude (V/m)")
+    plt.title("Electric Field Components")
     plt.legend()
     plt.show()
 
 def plot_ex_phase(frequencies, e_fields):
     """
-    Affiche la phase non ambigüe de la composante Ex (fréquence en MHz).
+        Plots the unambiguous phase of the Ex component (frequency in MHz).
     """
     fig_size = 12
     Fibonacci = (1 + np.sqrt(5)) / 2
@@ -114,15 +114,15 @@ def plot_ex_phase(frequencies, e_fields):
 
     plt.plot(freqs_mhz, phase_ex, label='Phase Ex')
     plt.grid(True)
-    plt.xlabel("Fréquence (MHz)")
-    plt.ylabel("Phase de Ex (rad)")
-    plt.title("Phase de la composante Ex")
+    plt.xlabel("Frequency (MHz)")
+    plt.ylabel("Ex Phase (rad)")
+    plt.title("Phase of the Ex Component")
     plt.legend()
     plt.show()
 
 def plot_ey_phase(frequencies, e_fields):
     """
-    Affiche la phase non ambigüe de la composante Ey (fréquence en MHz).
+        Plots the unambiguous phase of the Ey component (frequency in MHz).
     """
     fig_size = 12
     Fibonacci = (1 + np.sqrt(5)) / 2
@@ -132,15 +132,15 @@ def plot_ey_phase(frequencies, e_fields):
 
     plt.plot(freqs_mhz, phase_ey, label='Phase Ey')
     plt.grid(True)
-    plt.xlabel("Fréquence (MHz)")
-    plt.ylabel("Phase de Ey (rad)")
-    plt.title("Phase de la composante Ey")
+    plt.xlabel("Frequency (MHz)")
+    plt.ylabel("Ey Phase (rad)")
+    plt.title("Phase of the Ey Component")
     plt.legend()
     plt.show()
 
 def plot_ez_phase(frequencies, e_fields):
     """
-    Affiche la phase non ambigüe de la composante Ez (fréquence en MHz).
+        Plots the unambiguous phase of the Ez component (frequency in MHz).
     """
     fig_size = 12
     Fibonacci = (1 + np.sqrt(5)) / 2
@@ -150,8 +150,8 @@ def plot_ez_phase(frequencies, e_fields):
 
     plt.plot(freqs_mhz, phase_ez, label='Phase Ez')
     plt.grid(True)
-    plt.xlabel("Fréquence (MHz)")
-    plt.ylabel("Phase de Ez (rad)")
-    plt.title("Phase de la composante Ez")
+    plt.xlabel("Frequency (MHz)")
+    plt.ylabel("Ez Phase (rad)")
+    plt.title("Phase of the Ez Component")
     plt.legend()
     plt.show()

@@ -3,53 +3,53 @@ import numpy as np
 
 def radiated_scattered_field_at_a_point(point, eta, parameter_k, dipole_moment, dipole_center):
     """
-        Calcule des champs électriques E et magnétique H rayonnés/dispersés
-        par un ensemble de dipôles au point d'observation donné.
+    Calculates the radiated and scattered electric (E) and magnetic (H) fields
+    from a set of dipoles at a given observation point.
 
-        Paramètres :
-            * point (np.n-d-array) : Coordonnées du point d'observation, de taille (3,).
-            * eta (float) : Impédance caractéristique du milieu.
-            * parameter_k (complex float) : Nombre d'onde complexe, où omega est la pulsation angulaire et c la vitesse de la lumière.
-            * dipole_moment (np.n-d-array) : Moments dipolaires des dipôles, de taille (3, N), où N est le nombre de dipôles.
-            * dipole_center (np.n-d-array) : Positions des dipôles dans l'espace, de taille (3, N).
+    Parameters:
+        * point (np.ndarray) : Coordinates of the observation point, shape (3,).
+        * eta (float) : Characteristic impedance of the medium.
+        * parameter_k (complex float) : Complex wavenumber, where omega is angular frequency and c is the speed of light.
+        * dipole_moment (np.ndarray) : Dipole moments, shape (3, N), N = number of dipoles.
+        * dipole_center (np.ndarray) : Positions of dipoles, shape (3, N).
 
-        Retourne :
-            * e_field (np.n-d-array) : Champ électrique au point d'observation, de taille (3, N).
-            * h_field (np.n-d-array) : Champ magnétique au point d'observation, de taille (3, N).
+    Returns:
+        * e_field (np.ndarray) : Electric field at the observation point, shape (3, N).
+        * h_field (np.ndarray) : Magnetic field at the observation point, shape (3, N).
 
-        Description :
-            * Cette fonction modélise les champs électromagnétiques rayonnés et dispersés par un tableau de dipôles dans un milieu donné.
-            * Elle utilise des formules classiques dérivées des équations de Maxwell pour un dipôle oscillant.
+    Description:
+        * Models the electromagnetic fields radiated and scattered by an array of dipoles.
+        * Uses classical formulas derived from Maxwell's equations for oscillating dipoles.
 
-        Calculs principaux :
-            1. Distance et vecteur entre le point d'observation et chaque dipôle.
-            2. Facteurs géométriques et d'atténuation en fonction de la distance.
-            3. Contribution des moments dipolaires au champ électrique et magnétique.
+    Main calculations:
+        1. Distance vector between the observation point and each dipole.
+        2. Geometric and attenuation factors based on distance.
+        3. Contribution of dipole moments to the electric and magnetic fields.
     """
-    # Constante normalisée pour les champs
+    # Normalization constants for the fields
     c = 4 * np.pi
     constant_h = parameter_k / c
     constant_e = eta / c
 
-    # Calcul du vecteur entre le point d'observation et les centres des dipôles
-    r = point.reshape(3, 1) - dipole_center       # (3, N) : vecteurs distance
-    r_norm = np.sqrt(np.sum(r ** 2, axis=0))      # Norme de r : (1, N)
-    r_norm2 = r_norm ** 2                         # Distance au carré : (1, N)
+    # Vector from observation point to dipole centers
+    r = point.reshape(3, 1) - dipole_center       # (3, N)
+    r_norm = np.sqrt(np.sum(r ** 2, axis=0))      # Norm of r, shape (N,)
+    r_norm2 = r_norm ** 2                         # Squared distance
 
-    # Calcul de l'atténuation exponentielle due à la distance
-    exp = np.exp(-parameter_k * r_norm)    # Facteur exponentiel : (N)
+    # Exponential attenuation factor
+    exp = np.exp(-parameter_k * r_norm)           # Shape (N,)
 
-    # Calcul des facteurs géométriques
-    parameter_c = (1 / r_norm2) * (1 + (1 / (parameter_k * r_norm)))  # Facteur c (1, N)
-    parameter_d = np.sum(r * dipole_moment, axis=0) / r_norm2  # Facteur d (1, N)
+    # Geometric factors
+    parameter_c = (1 / r_norm2) * (1 + (1 / (parameter_k * r_norm)))  # Shape (N,)
+    parameter_d = np.sum(r * dipole_moment, axis=0) / r_norm2          # Shape (N,)
 
-    # Calcul du terme Paramètre M
-    parameter_m = parameter_d * r  # (3, N)
+    # Parameter M term
+    parameter_m = parameter_d * r                 # Shape (3, N)
 
-    # Calcul du champ magnétique H
+    # Magnetic field H
     h_field = constant_h * np.cross(dipole_moment, r, axis=0) * parameter_c * exp  # (3, N)
 
-    # Calcul du champ électrique E
+    # Electric field E
     e_field = constant_e * ((parameter_m - dipole_moment) * (parameter_k / r_norm + parameter_c) + 2 * parameter_m * parameter_c) * exp  # (3, N)
 
     return e_field, h_field

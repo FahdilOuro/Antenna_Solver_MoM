@@ -6,7 +6,6 @@ from utils.ifa_meander_project_v2.meshing import *
 
 import time
 from matplotlib import pyplot as plt
-import os
 
 def adapt_with_ratio_square(distance_meandre, largeur_piste, ratio):
     return distance_meandre / (ratio**2), largeur_piste / (ratio**2)
@@ -17,7 +16,7 @@ def adapt_with_ratio_cube(distance_meandre, largeur_piste, ratio):
 def creation_ifa(msh_file, mat_file, largeur, hauteur, width, dist_meandre, feed, x_t, y_t, save_mesh_folder, mesh_name, mesh_size):
     x, y, N, distance_meandre = ifa_creation(largeur, hauteur, width, dist_meandre)
     x_m, y_m = trace_meander(x, y, width)
-    feed_wid = width # La largeur de la piste est la meme partout
+    feed_wid = width                # The width of the track is the same everywhere.
     feed_x = np.array([0, distance_meandre, distance_meandre, 0])
     feed_y = np.array([feed + feed_wid/2, feed + feed_wid/2, feed -feed_wid/2, feed - feed_wid/2])
     antenna_ifa_meander(x_m, y_m, x_t, y_t, feed_x, feed_y, save_mesh_folder, mesh_name, mesh_size)
@@ -25,24 +24,25 @@ def creation_ifa(msh_file, mat_file, largeur, hauteur, width, dist_meandre, feed
     return N, distance_meandre
 
 def plot_s11_curve(fLow, fHigh, nPoints, s11_db, fC=None):
-    plt.style.use('fivethirtyeight')
-    plt.rcParams['font.family'] = 'JetBrains Mono'
+    plt.style.use('seaborn-v0_8-talk')
+    plt.rcParams['font.family'] = 'Lucida Console'
+    plt.rcParams['font.size'] = 11
     frequencies = np.linspace(fLow, fHigh, nPoints)
     frequencies_mhz = np.array(frequencies) / 1e6
     s11_db = np.array(s11_db)
 
-    # Trouver le minimum de S11
+    # Find the minimum of S11
     min_index = np.argmin(s11_db)
     f_resonance = frequencies[min_index] / 1e6
     s11_min = s11_db[min_index]
 
-    # Tracé
+    # Plot
     fig_size = 12
     Fibonacci = (1 + np.sqrt(5)) / 2
     plt.figure(figsize=(fig_size, fig_size / Fibonacci))
     plt.plot(frequencies_mhz, s11_db, label="S11 (dB)", color='blue')
     plt.plot(f_resonance, s11_min, 'ro', 
-            label=f"Résonance: {f_resonance:.2f} MHz (S11={s11_min:.2f} dB)")
+            label=f"Resonance: {f_resonance:.2f} MHz (S11={s11_min:.2f} dB)")
     
     if fC:
         fC_mhz = fC / 1e6
@@ -51,9 +51,9 @@ def plot_s11_curve(fLow, fHigh, nPoints, s11_db, fC=None):
         plt.axvline(fC_mhz, color='green', linestyle='--', 
                    label=f"fC = {fC_mhz:.2f} MHz (S11={s11_fc:.2f} dB)")
 
-    plt.xlabel("Fréquence (MHz)")
+    plt.xlabel("Frequency (MHz)")
     plt.ylabel("S11 (dB)")
-    plt.title("Courbe de S11 vs Fréquence")
+    plt.title("S11 curve vs Frequency")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -70,14 +70,14 @@ def optimize_ifa(msh_file, mat_file,
     while iteration <= max_iter and not converged:
         try:
             print(f"\n------------------------------------------------------Iteration N°{iteration}------------------------------------------------------\n")
-            print(f"distance meandres = {distance_meandre * 1000:.3f} mm\n")
+            print(f"distance meanders = {distance_meandre * 1000:.3f} mm\n")
             
             N_list_elem, new_distance_meandre_elem = creation_ifa(msh_file, mat_file, a, b, largeur_piste, distance_meandre, feed, x_t, y_t, save_mesh_folder, mesh_name, mesh_size)
             print(f"Number of meanders = {N_list_elem}\n")
 
-            print(f"New distance meandres = {new_distance_meandre_elem * 1000:.3f} mm")
-            print(f"Largeur de piste ifa = {largeur_piste * 1000:.3f} mm")
-            print(f"position feed = {feed * 1000:.3f} mm\n")
+            print(f"New distance meanders = {new_distance_meandre_elem * 1000:.3f} mm")
+            print(f"IFA track width = {largeur_piste * 1000:.3f} mm")
+            print(f"feed position = {feed * 1000:.3f} mm\n")
 
             frequence_resonance, s11_db, R_res, X_res = simulate(frequencies, mat_file, frequence_Coupure, feed_point)
             # Q = calculate_Q(frequencies, s11_db, frequence_resonance)
@@ -93,13 +93,13 @@ def optimize_ifa(msh_file, mat_file,
                 s11_fc = s11_db[fc_index]
                 if s11_fc < -10 or min_s11 < -20:
                     converged = True
-                    print("\nRequired Accuracy is met!")
+                    print("\nRequired accuracy is met!")
                     break
                 else:
-                    print("\nOn cherche le matching !!!")
+                    print("\nLooking for matching!!!")
 
                     if ratio == 1:
-                        print("Ratio == 1 on modifie le feed parce quon a pas une bonne adaptation")
+                        print("Ratio == 1, modifying the feed because matching is not good")
                         ratio_adapt_feed = math.sqrt(R_res / 50)
                         feed = max(min(feed / ratio_adapt_feed, b - 3 * largeur_piste / 2 - 2.5 / 1000), largeur_piste / 2)
                     else:
@@ -107,24 +107,24 @@ def optimize_ifa(msh_file, mat_file,
 
                         feed = max(min(feed * ratio**2, b - 3 * largeur_piste / 2 - 2.5 / 1000), largeur_piste / 2)
 
-                        print(f"\nresultat feed = {feed * 1000:.3f} mm")
+                        print(f"\nfeed result = {feed * 1000:.3f} mm")
 
                     if feed >= b - 3 * largeur_piste / 2 - 2.5 / 1000 or feed <= largeur_piste / 2:
                         distance_meandre, largeur_piste = adapt_with_ratio_square(distance_meandre, largeur_piste, ratio)
 
-                    feed_point       = [0, feed, 0]
+                    feed_point       = np.array([0, feed, 0])
 
             elif abs(frequence_resonance - frequence_Coupure) < 0.07 * frequence_Coupure:
                 print(f"\nWe are within 2% of fc!\n")
                 feed = max(min(feed * ratio**2, b - 3 * largeur_piste / 2 - 2.5 / 1000), largeur_piste / 2)
 
                 if feed >= b - 3 * largeur_piste / 2 - 2.5 / 1000 or feed <= largeur_piste / 2:
-                    print("\nBord extreme atteint\n")
+                    print("\nExtreme border reached\n")
                     distance_meandre, largeur_piste = adapt_with_ratio_square(distance_meandre, largeur_piste, ratio)
                 
-                feed_point       = [0, feed, 0]
+                feed_point       = np.array([0, feed, 0])
             else:
-                print(f"\nWe are FAR of fc!\n")
+                print(f"\nWe are FAR from fc!\n")
                 distance_meandre, largeur_piste = adapt_with_ratio_square(distance_meandre, largeur_piste, ratio)
             
             iteration += 1
@@ -135,8 +135,8 @@ def optimize_ifa(msh_file, mat_file,
     simulation_time = end_time - start_time
     simulation_time_minutes = simulation_time / 60
     simulation_time_seconds = simulation_time % 60
-    print(f"Temps de simulation : {simulation_time_minutes:.0f} minutes et {simulation_time_seconds:.2f} secondes")
+    print(f"Simulation time: {simulation_time_minutes:.0f} minutes and {simulation_time_seconds:.2f} seconds")
     if converged:
-        print(f"Convergence atteinte à l'itération {iteration}")
+        print(f"Convergence reached at iteration {iteration}")
     else:
-        print(f"Convergence non atteinte après {max_iter} itérations")
+        print(f"Convergence not reached after {max_iter} iterations")

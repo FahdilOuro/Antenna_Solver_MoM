@@ -7,23 +7,23 @@ def antenna_ifa_meander(meander_x, meander_y, terminal_x, terminal_y, feed_x, fe
     gmsh.model.add(model_name)
 
     ifa_meander = rectangle_surface(meander_x, meander_y)
-    # print("tag du ifa_meander =", ifa_meander)
+    # print("tag of ifa_meander =", ifa_meander)
 
     ifa_feed = rectangle_surface(feed_x, feed_y)
-    # print("tag du ifa_meander =", ifa_meander)
+    # print("tag of ifa_feed =", ifa_feed)
 
-    # Creation du terminal
+    # Creation of the terminal
     terminal = rectangle_surface(terminal_x, terminal_y)
 
-    # Fusion du terminal et du meander
+    # Fusion of the terminal and the meander
     antenna_ifa_meander, _ = gmsh.model.occ.fuse([(2, ifa_meander)], [(2, terminal), (2, ifa_feed)])
 
-    # Synchronisation et sauvegarde
+    # Synchronization and saving
     gmsh.model.occ.synchronize()
     
     apply_mesh_size(mesh_size)
 
-    # Afficher le modèle dans l’interface Gmsh
+    # Display the model in Gmsh interface
     generate_surface_mesh()
 
     # run()

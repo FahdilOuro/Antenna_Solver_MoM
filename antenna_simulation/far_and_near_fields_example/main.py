@@ -6,16 +6,16 @@ from efield.efield3 import antenna_directivity_pattern
 
 if __name__ == "__main__":
     """
-        Script principal pour l'analyse des antennes.
+        Main script for antenna analysis.
 
-        Étapes principales :
-            1. Chargement des fichiers contenant les données des antennes (maillage, courant, gain/power).
-            2. Calcul et affichage des champs électromagnétiques au niveau d'un point donné.
-            3. Calcul de la distribution d'intensité du rayonnement sur une sphère.
-            4. Génération des diagrammes de directivité.
+        Main steps:
+            1. Load files containing antenna data (mesh, current, gain/power).
+            2. Compute and display electromagnetic fields at a given point.
+            3. Compute the radiation intensity distribution over a sphere.
+            4. Generate directivity patterns.
     """
 
-    # Fichiers d'entrée pour différents types d'antennes
+    # Input files for different types of antennas
     filename_mesh2_plate = 'data/antennas_mesh2/plate_mesh2.mat'
     filename_current_plate = 'data/antennas_current/plate_current.mat'
     filename_gain_power_plate = 'data/antennas_gain_power/plate_gain_power.mat'
@@ -40,33 +40,33 @@ if __name__ == "__main__":
     filename_current_slot = 'data/antennas_current/slot_current.mat'
     filename_gain_power_slot = 'data/antennas_gain_power/slot_gain_power.mat'
 
-    # Maillage dense pour une sphère utilisée dans les calculs de rayonnement
+    # Dense mesh for a sphere used in radiation calculations
     filename_sphere_dense = 'data/sphere_mesh/sphere_dense.mat'
 
 
-    # Point d'observation pour le calcul des champs
+    # Observation point for field calculations
     observation_point = np.array([5, 0, 0])
 
-    # Listes des fichiers d'entrée regroupés par type d'antenne
+    # Lists of input files grouped by antenna type
     filename_mesh2 = [filename_mesh2_plate, filename_mesh2_platecoarse, filename_mesh2_platefine, filename_mesh2_dipole, filename_mesh2_bowtie, filename_mesh2_slot]
     filename_current = [filename_current_plate, filename_current_platecoarse, filename_current_platefine, filename_current_dipole, filename_current_bowtie, filename_current_slot]
     filename_gain_power = [filename_gain_power_plate, filename_gain_power_platecoarse, filename_gain_power_platefine, filename_gain_power_dipole, filename_gain_power_bowtie, filename_gain_power_slot]
 
-    # Boucle sur chaque type d'antenne pour effectuer les calculs et visualisations
+    # Loop over each antenna type to perform calculations and visualizations
     for mesh2, current, gain_power in zip(filename_mesh2, filename_current, filename_gain_power):
         print(f"Processing antenna with mesh: {mesh2}")
 
-        # Étape 1 : Calcul du champ électrique et magnétique à un point donné
+        # Step 1: Calculate electric and magnetic fields at a given observation point
         print("Calculating electric and magnetic fields at observation point...")
         calculate_electric_magnetic_field_at_point(mesh2, current, observation_point)
 
-        # Étape 2 : Distribution de l'intensité du rayonnement sur une sphère
+        # Step 2: Radiation intensity distribution over sphere surface
         print("Calculating radiation intensity distribution over sphere surface...")
         radiation_intensity_distribution_over_sphere_surface(mesh2, current, filename_sphere_dense)
 
-        # Étape 3 : Génération du diagramme de directivité
+        # Step 3: Generate antenna directivity pattern
         print("Generating antenna directivity pattern...")
         antenna_directivity_pattern(mesh2, current, gain_power)
 
-        # Ligne vide pour séparer les sorties des différentes antennes
+        # Empty line to separate outputs for different antennas
         print('')

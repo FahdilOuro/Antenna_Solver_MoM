@@ -7,36 +7,46 @@ from rwg.rwg1 import Points, Triangles, Edges
 
 class Barycentric_triangle:
     """
-        Classe pour calculer et stocker les centres barycentriques d'un maillage triangulaire.
+    Class to calculate and store barycentric centers of a triangular mesh.
 
-        Cette classe utilise les coordonnées des sommets des triangles et leurs centres géométriques pour
-        calculer les centres barycentriques associés aux subdivisions des triangles en neuf sous-triangles.
+    This class uses the vertex coordinates of triangles and their geometric centers to
+    compute the barycentric centers associated with subdividing each triangle into nine sub-triangles.
     """
 
     def __init__(self):
         """
-            Initialise l'objet avec un attribut pour stocker les centres barycentriques.
+        Initializes the object with an attribute to store barycentric centers.
         """
         self.barycentric_triangle_center = None
     
-    # version 2 :
     def calculate_barycentric_center(self, point_data, triangles_data):
+        """
+        Calculates the barycentric centers for all triangles in the mesh.
+
+        Parameters:
+            * point_data: Points object containing the coordinates of the mesh points.
+            * triangles_data: Triangles object containing the triangle indices and their geometric centers.
+
+        This method computes points at fractions 1/3 and 2/3 along the triangle edges,
+        and then calculates the nine barycentric centers for each triangle, stacking
+        the results in a 3×9×N array.
+        """
         points = point_data.points                             # (3, M)
         triangles = triangles_data.triangles                   # (3, N)
         triangles_center = triangles_data.triangles_center     # (3, N)
         total_of_triangles = triangles_data.total_of_triangles # N
 
-        # Récupération des points des sommets pour tous les triangles
+        # Retrieve vertex points for all triangles
         pt1 = points[:, triangles[0]]  # (3, N)
         pt2 = points[:, triangles[1]]  # (3, N)
         pt3 = points[:, triangles[2]]  # (3, N)
 
-        # Calcul des vecteurs côtés
+        # Compute edge vectors
         v12 = pt2 - pt1  # (3, N)
         v23 = pt3 - pt2  # (3, N)
         v13 = pt3 - pt1  # (3, N)
 
-        # Points aux fractions 1/3 et 2/3
+        # Points at fractions 1/3 and 2/3 along each edge
         pt12_1 = pt1 + (1/3) * v12
         pt12_2 = pt1 + (2/3) * v12
         pt23_1 = pt2 + (1/3) * v23
@@ -44,9 +54,9 @@ class Barycentric_triangle:
         pt13_1 = pt1 + (1/3) * v13
         pt13_2 = pt1 + (2/3) * v13
 
-        c = triangles_center  # alias plus court
+        c = triangles_center  # shorter alias
 
-        # Calcul des 9 centres barycentriques
+        # Compute the 9 barycentric centers
         bary_1 = (pt12_1 + pt13_1 + pt1) / 3
         bary_2 = (pt12_1 + pt12_2 + c) / 3
         bary_3 = (pt12_2 + pt23_1 + pt2) / 3
@@ -57,7 +67,7 @@ class Barycentric_triangle:
         bary_8 = (pt23_2 + pt13_2 + c) / 3
         bary_9 = (pt23_2 + pt13_2 + pt3) / 3
 
-        # Empilement dans un tableau final (3, 9, N)
+        # Stack into the final array (3, 9, N)
         self.barycentric_triangle_center = np.stack([
             bary_1, bary_2, bary_3, bary_4, bary_5,
             bary_6, bary_7, bary_8, bary_9
@@ -65,32 +75,31 @@ class Barycentric_triangle:
 
     def set_barycentric_center(self, barycentric_triangle_center):
         """
-            Définit manuellement les centres barycentriques.
+        Manually sets the barycentric centers.
 
-            Paramètres :
-            barycentric_triangle_center (n-d-array) : Tableau 3 x 9 x N contenant les centres barycentriques à définir.
+        Parameters:
+            barycentric_triangle_center (n-d-array): 3 x 9 x N array containing the barycentric centers to set.
         """
         self.barycentric_triangle_center = barycentric_triangle_center
 
 
 class Vecteurs_Rho:
     """
-        Classe pour calculer et gérer les vecteurs Rho associés aux triangles plus et moins des arêtes dans un maillage.
+    Class to calculate and manage the Rho vectors associated with the "plus" and "minus" triangles of edges in a mesh.
 
-        Les vecteurs Rho représentent des vecteurs reliant un point spécifique d'un triangle (opposé à l'arête considérée)
-        à son centre géométrique ou à ses centres barycentriques.
+    The Rho vectors represent vectors connecting a specific point of a triangle (opposite to the considered edge)
+    to its geometric center or to its barycentric centers.
     """
 
     def __init__(self):
         """
-            Initialise les attributs pour stocker les vecteurs Rho.
+        Initializes the attributes to store the Rho vectors.
         """
         self.vecteur_rho_plus = None
         self.vecteur_rho_minus = None
         self.vecteur_rho_barycentric_plus = None
         self.vecteur_rho_barycentric_minus = None
     
-    # version 4
     def calculate_vecteurs_rho(self, points_data, triangles_data, edges_data, barycentric_triangle_data):
         points = points_data.points  # (3, N_points)
         triangles = triangles_data.triangles  # (3, N_triangles)
@@ -108,23 +117,23 @@ class Vecteurs_Rho:
         self.vecteur_rho_barycentric_plus = np.zeros((3, 9, total_number_of_edges))
         self.vecteur_rho_barycentric_minus = np.zeros((3, 9, total_number_of_edges))
 
-        # --- Traitement vectorisé pour les triangles "plus" ---
+        # --- Vectorized processing for “plus” triangles ---
         triangles_plus_sommets = triangles[:, triangles_plus]  # (3, N_edges)
         edges_fp = edges_first_points
         edges_sp = edges_second_points
 
-        # Détection du sommet opposé
+        # Detection of the opposite vertex
         mask_plus = (triangles_plus_sommets != edges_fp) & (triangles_plus_sommets != edges_sp)  # (3, N_edges)
-        # Pour chaque arête, trouver l'indice du sommet opposé
+        # For each edge, find the index of the opposite vertex
         indices_opposes_plus = np.argmax(mask_plus, axis=0)  # (N_edges,)
         index_point_vecteur_plus = triangles_plus_sommets[indices_opposes_plus, np.arange(total_number_of_edges)]  # (N_edges,)
         point_vecteurs_plus = points[:, index_point_vecteur_plus]  # (3, N_edges)
 
-        # Calcul des vecteurs Rho "plus"
+        # Calculation of Rho “plus” vectors
         self.vecteur_rho_plus = triangles_center[:, triangles_plus] - point_vecteurs_plus
         self.vecteur_rho_barycentric_plus = barycentric_triangle_center[:, :, triangles_plus] - point_vecteurs_plus[:, None, :]
 
-        # --- Traitement vectorisé pour les triangles "moins" ---
+        # --- Vectorized processing for “minus” triangles ---
         triangles_minus_sommets = triangles[:, triangles_minus]  # (3, N_edges)
 
         mask_minus = (triangles_minus_sommets != edges_fp) & (triangles_minus_sommets != edges_sp)
@@ -132,19 +141,19 @@ class Vecteurs_Rho:
         index_point_vecteur_minus = triangles_minus_sommets[indices_opposes_minus, np.arange(total_number_of_edges)]
         point_vecteurs_minus = points[:, index_point_vecteur_minus]
 
-        # Calcul des vecteurs Rho "moins"
+        # Calculation of Rho “minus” vectors
         self.vecteur_rho_minus = point_vecteurs_minus - triangles_center[:, triangles_minus]
         self.vecteur_rho_barycentric_minus = point_vecteurs_minus[:, None, :] - barycentric_triangle_center[:, :, triangles_minus]
 
     def set_vecteurs_rho(self, vecteur_rho_plus, vecteur_rho_minus, vecteur_rho_barycentric_plus, vecteur_rho_barycentric_minus):
         """
-            Définit manuellement les vecteurs Rho.
+            Manually sets the Rho vectors.
 
-            Paramètres :
-                * vecteur_rho_plus (n-d-array) : Vecteurs Rho pour les triangles "plus".
-                * vecteur_rho_minus (n-d-array) : Vecteurs Rho pour les triangles "moins".
-                * vecteur_rho_barycentric_plus (n-d-array) : Vecteurs barycentriques pour les triangles "plus".
-                * vecteur_rho_barycentric_minus (n-d-array) : Vecteurs barycentriques pour les triangles "moins".
+            Parameters:
+                * vecteur_rho_plus (n-d-array) : Rho vectors for the "plus" triangles.
+                * vecteur_rho_minus (n-d-array) : Rho vectors for the "minus" triangles.
+                * vecteur_rho_barycentric_plus (n-d-array) : Barycentric vectors for the "plus" triangles.
+                * vecteur_rho_barycentric_minus (n-d-array) : Barycentric vectors for the "minus" triangles.
         """
         self.vecteur_rho_plus = vecteur_rho_plus
         self.vecteur_rho_minus = vecteur_rho_minus
@@ -154,30 +163,30 @@ class Vecteurs_Rho:
 
 class DataManager_rwg2:
     """
-        Classe pour sauvegarder et charger des données liées à un maillage et ses propriétés dans des fichiers MAT.
+        Class to save and load mesh-related data and its properties in MAT files.
 
-        Fournit des méthodes statiques pour :
-            * Sauvegarder les données enrichies dans un fichier MAT.
-            * Charger les données à partir d'un fichier MAT existant.
+        Provides static methods to:
+            * Save enriched data into a MAT file.
+            * Load data from an existing MAT file.
     """
     @staticmethod
     def save_data(filename_mesh1, save_folder_name, barycentric_triangle_data, vecteurs_rho_data):
         """
-            Sauvegarde les données dans un fichier MAT après les avoir enrichies.
+            Saves the data into a MAT file after enriching it.
 
-            Paramètres :
-                * filename_mesh1 (str) : Chemin du fichier MAT initial contenant les données de maillage.
-                * save_folder_name (str) : Nom du dossier où le fichier enrichi sera sauvegardé.
-                * barycentric_triangle_data (Barycentric_triangle) : Données barycentriques du triangle.
-                * vecteurs_rho_data (Vecteurs_Rho) : Données des vecteurs Rho.
+            Parameters:
+                * filename_mesh1 (str) : Path to the initial MAT file containing mesh data.
+                * save_folder_name (str) : Name of the folder where the enriched file will be saved.
+                * barycentric_triangle_data (Barycentric_triangle) : Barycentric triangle data.
+                * vecteurs_rho_data (Vecteurs_Rho) : Rho vectors data.
 
-            Retourne :
-            save_file_name (str) : Nom du fichier MAT sauvegardé.
+            Returns:
+                save_file_name (str) : Name of the saved MAT file.
         """
-        # Chargement des données initiales
+        # Load the initial data
         data = loadmat(filename_mesh1)
 
-        # Ajout des nouvelles données
+        # Add the new data
         new_data = {
             'barycentric_triangle_center' : barycentric_triangle_data.barycentric_triangle_center,
             'vecteur_rho_plus' : vecteurs_rho_data.vecteur_rho_plus,
@@ -187,50 +196,45 @@ class DataManager_rwg2:
         }
         data.update(new_data)
 
-
-        # Génération du nom du fichier de sauvegarde
+        # Generate the save file name
         base_name = os.path.splitext(os.path.basename(filename_mesh1))[0]
-        base_name = base_name.replace('_mesh1', '')  # Suppression de '_mesh1'
-        # Ajout de la partie '_mesh2'
-        save_file_name = base_name + '_mesh2.mat'
+        base_name = base_name.replace('_mesh1', '')  # Remove '_mesh1'
+        save_file_name = base_name + '_mesh2.mat'    # Add '_mesh2'
         full_save_path = os.path.join(save_folder_name, save_file_name)
 
-        # Création du dossier si nécessaire
-        if not os.path.exists(save_folder_name): # Vérification et création du dossier si nécessaire
+        # Create folder if needed
+        if not os.path.exists(save_folder_name):
             os.makedirs(save_folder_name)
-            # print(f"Directory '{save_folder_name}' created.")
 
-        # Sauvegarde des données dans un fichier MAT
+        # Save the data into the MAT file
         savemat(full_save_path, data)
-        # print(f"Data saved successfully to {full_save_path}")
         return save_file_name
 
     @staticmethod
     def load_data(filename):
         """
-            Charge les données d'un fichier MAT et initialise les objets associés.
+            Loads data from a MAT file and initializes the associated objects.
 
-            Paramètres :
-            filename (str) : Chemin du fichier MAT contenant les données.
+            Parameters:
+                filename (str) : Path to the MAT file containing the data.
 
-            Retourne :
-            (tuple) : Contient les objets Points, Triangles, Edges, Barycentric_triangle et Vecteurs_Rho.
+            Returns:
+                (tuple) : Contains the objects Points, Triangles, Edges, Barycentric_triangle, and Vecteurs_Rho.
 
-            Exception :
-                * FileNotFoundError : Si le fichier n'existe pas.
-                * KeyError : Si une clé attendue est absente des données.
-                * ValueError : Si les données sont mal formées.
+            Exceptions:
+                * FileNotFoundError : If the file does not exist.
+                * KeyError : If an expected key is missing in the data.
+                * ValueError : If the data is malformed.
         """
         try:
-            # Vérification de l'existence du fichier
+            # Check if the file exists
             if not os.path.isfile(filename):
                 raise FileNotFoundError(f"File '{filename}' does not exist.")
 
-            # Chargement des données
+            # Load the data
             data = loadmat(filename)
 
-
-            # Initialisation des objets avec les données chargées
+            # Initialize objects with the loaded data
             points = Points(points_data=data['points'].squeeze())
             triangles = Triangles(triangles_data=data['triangles'].squeeze())
             edges = Edges(first_points=data['edge_first_points'].squeeze(), second_points=data['edge_second_points'].squeeze())
@@ -240,12 +244,14 @@ class DataManager_rwg2:
             barycentric_triangle = Barycentric_triangle()
             barycentric_triangle.set_barycentric_center(barycentric_triangle_center=data['barycentric_triangle_center'].squeeze())
             vecteurs_rho = Vecteurs_Rho()
-            vecteurs_rho.set_vecteurs_rho(vecteur_rho_plus=data['vecteur_rho_plus'].squeeze(),
-                                          vecteur_rho_minus=data['vecteur_rho_minus'].squeeze(),
-                                          vecteur_rho_barycentric_plus=data['vecteur_rho_barycentric_plus'].squeeze(),
-                                          vecteur_rho_barycentric_minus=data['vecteur_rho_barycentric_minus'].squeeze())
-            # print(f"Data loaded from {filename}")
+            vecteurs_rho.set_vecteurs_rho(
+                vecteur_rho_plus=data['vecteur_rho_plus'].squeeze(),
+                vecteur_rho_minus=data['vecteur_rho_minus'].squeeze(),
+                vecteur_rho_barycentric_plus=data['vecteur_rho_barycentric_plus'].squeeze(),
+                vecteur_rho_barycentric_minus=data['vecteur_rho_barycentric_minus'].squeeze()
+            )
             return points, triangles, edges, barycentric_triangle, vecteurs_rho
+
         except FileNotFoundError as e:
             print(f"Error: {e}")
         except KeyError as e:

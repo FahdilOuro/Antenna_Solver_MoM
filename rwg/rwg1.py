@@ -7,79 +7,80 @@ from scipy.io import savemat, loadmat
 
 class Points:
     """
-        Classe représentant un ensemble de points dans un espace tridimensionnel.
+        Class representing a set of points in a three-dimensional space.
 
-        Cette classe permet de stocker des points 3D et de fournir des informations
-        sur les dimensions (longueur, largeur, hauteur) de l'espace occupé par ces points.
+        This class stores 3D points and provides information
+        about the dimensions (length, width, height) of the space occupied by these points.
 
-        Attributs :
-            * points (n-d-array) : Un tableau numpy contenant les coordonnées des points sous forme (3, N),
-                                où N est le nombre total de points dans l'espace 3D.
-            * total_of_points (int) : Le nombre total de points présents dans l'ensemble.
-            * length (float) : La longueur (dimension maximale sur l'axe X) de l'ensemble de points.
-            * width (float) : La largeur (dimension maximale sur l'axe Y) de l'ensemble de points.
-            * height (float) : La hauteur (dimension maximale sur l'axe Z) de l'ensemble de points.
+        Attributes:
+            * points (ndarray): A numpy array containing the coordinates of the points in shape (3, N),
+                                where N is the total number of points in 3D space.
+            * total_of_points (int): The total number of points in the set.
+            * length (float): The length (maximum dimension along the X axis) of the point set.
+            * width (float): The width (maximum dimension along the Y axis) of the point set.
+            * height (float): The height (maximum dimension along the Z axis) of the point set.
     """
 
     def __init__(self, points_data):
         """
-            Initialise un objet de la classe Points avec les données de coordonnées.
+            Initialize a Points object with coordinate data.
 
-            Paramètres :
-            points_data (n-d-array) : Un tableau numpy de forme (3, N) représentant les coordonnées
-                                     des N points dans l'espace 3D. La première ligne contient
-                                     les coordonnées X, la deuxième Y et la troisième Z des points.
+            Parameters:
+                points_data (ndarray): A numpy array of shape (3, N) representing the coordinates
+                                       of N points in 3D space. The first row contains
+                                       the X coordinates, the second row the Y coordinates,
+                                       and the third row the Z coordinates of the points.
         """
         self.points = points_data
-        # Le nombre total de points est défini par le nombre de colonnes du tableau (points_data).
+        # The total number of points is defined by the number of columns in the array (points_data).
         self.total_of_points = self.points.shape[1]
 
-        # Calcul des dimensions de l'espace occupé par les points
-        self.length = max(points_data[0]) - min(points_data[0])  # Différence entre les valeurs maximales et minimales sur l'axe X
-        self.width = max(points_data[1]) - min(points_data[1])   # Différence entre les valeurs maximales et minimales sur l'axe Y
-        self.height = max(points_data[2]) - min(points_data[2])  # Différence entre les valeurs maximales et minimales sur l'axe Z
+        # Compute the dimensions of the space occupied by the points
+        self.length = max(points_data[0]) - min(points_data[0])  # Difference between max and min values along the X axis
+        self.width = max(points_data[1]) - min(points_data[1])   # Difference between max and min values along the Y axis
+        self.height = max(points_data[2]) - min(points_data[2])  # Difference between max and min values along the Z axis
 
     def get_point_coordinates(self, index):
         """
-            Récupère les coordonnées d'un point donné par son index.
+        Retrieve the coordinates of a point given its index.
 
-            Paramètre :
-            index (int) : L'index du point dont les coordonnées doivent être retournées.
+        Parameters:
+            index (int): Index of the point whose coordinates must be returned.
 
-            Retour :
-            n-d-array : Un tableau contenant les coordonnées (X, Y, Z) du point spécifié.
+        Returns:
+            np.ndarray: A 1D array containing the coordinates (X, Y, Z) of the specified point.
         """
-        return self.points[index]
+        return self.points[:, index]
 
 
 class Triangles:
     """
-        Classe représentant un ensemble de triangles dans un maillage 3D.
+        Class representing a set of triangles in a 3D mesh.
 
-        Cette classe permet de stocker des triangles, de calculer leurs propriétés géométriques
-        (aires, centres) et de détecter des arêtes communes entre les triangles.
+        This class stores triangles, computes their geometric properties
+        (areas, centers), and detects common edges between triangles.
 
-        Attributs :
-            * triangles (n-d-array) : Un tableau numpy de forme (3, N) représentant les indices des sommets
-                                   de chaque triangle dans l'espace 3D.
-            * total_of_triangles (int) : Le nombre total de triangles dans l'ensemble.
-            * triangles_area (n-d-array) : Un tableau contenant les aires de chaque triangle.
-            * triangles_center (n-d-array) : Un tableau contenant les coordonnées du centre de chaque triangle.
-            * triangles_plus (n-d-array) : Un tableau contenant les indices des triangles qui partagent une arête commune.
-            * triangles_minus (n-d-array) : Un tableau contenant les indices des triangles qui partagent une arête commune.
+        Attributes:
+            * triangles (n-d-array): A numpy array of shape (3, N) representing the vertex indices
+                                     of each triangle in 3D space.
+            * total_of_triangles (int): The total number of triangles in the set.
+            * triangles_area (n-d-array): An array containing the areas of each triangle.
+            * triangles_center (n-d-array): An array containing the coordinates of each triangle’s center.
+            * triangles_plus (n-d-array): An array containing the indices of triangles that share a common edge.
+            * triangles_minus (n-d-array): An array containing the indices of triangles that share a common edge.
     """
 
     def __init__(self, triangles_data):
         """
-            Initialise un objet de la classe Triangles avec les données des triangles.
+            Initialize a Triangles object with triangle data.
 
-            Paramètre :
-            triangles_data (n-d-array) : Un tableau numpy de forme (3, N) représentant les indices
-                                        des sommets de chaque triangle. Chaque colonne représente
-                                        un triangle et contient trois indices pour les sommets du triangle.
+            Parameter:
+            triangles_data (n-d-array): A numpy array of shape (3, N) representing the vertex indices
+                                        of each triangle. Each column represents one triangle
+                                        and contains three indices for its vertices.
         """
         self.triangles = triangles_data
-        self.triangles = self.triangles.astype(int)  # Conversion explicite pour éviter les erreurs
+        self.triangles = self.triangles.astype(int)          # Explicit conversion to avoid errors
         self.total_of_triangles = triangles_data.shape[1]
         self.triangles_area = None
         self.triangles_center = None
@@ -88,69 +89,69 @@ class Triangles:
 
     def filter_triangles(self):
         """
-        Filtre les triangles dont la quatrième ligne est > 1.
+        Filter triangles where the fourth row is > 1.
         """
         if self.triangles.shape[0] < 4:
-            raise ValueError("Les données de triangles doivent avoir au moins 4 lignes.")
-        # Filtrage des triangles valides en fonction de la quatrième ligne
+            raise ValueError("Triangle data must have at least 4 rows.")
+        # Filter valid triangles based on the fourth row
         valid_indices = np.where(self.triangles[3, :] <= 1)[0]
         self.triangles = self.triangles[:, valid_indices].astype(int)
         self.total_of_triangles = self.triangles.shape[1]
 
     def calculate_triangles_area_and_center(self, points_data):
         """
-            Calcule les aires et les centres de tous les triangles.
+            Compute the areas and centers of all triangles.
 
-            Cette méthode utilise les coordonnées des points du maillage pour calculer l'aire et le centre de chaque triangle.
-            L'aire est calculée en utilisant le produit vectoriel des vecteurs formés par les sommets du triangle.
-            Le centre est calculé comme la moyenne des coordonnées des trois sommets du triangle.
+            This method uses the mesh point coordinates to compute the area and the center of each triangle.
+            The area is calculated using the cross product of the vectors formed by the triangle’s vertices.
+            The center is computed as the average of the coordinates of the three vertices.
 
-            Paramètre :
-            points_data (Points) : Un objet de la classe Points qui contient les coordonnées des points du maillage.
+            Parameter:
+            points_data (Points): An object of the Points class containing the mesh point coordinates.
         """
         if self.triangles_area is None and self.triangles_center is None:
             points = points_data.points
-            # Initialisation des tableaux pour les aires et les centres des triangles
+            # Initialize arrays for triangle areas and centers
             self.triangles_area = np.zeros(self.total_of_triangles)
             self.triangles_center = np.zeros((3, self.total_of_triangles))
             for index_triangle in range(self.total_of_triangles):
-                triangle = self.triangles[:3, index_triangle]               # On enregistre l'indice des trois sommets du triangle
-                # Vecteurs pour calculer l'aire avec le produit vectoriel
+                triangle = self.triangles[:3, index_triangle]               # Indices of the three vertices of the triangle
+                # Vectors to compute the area using the cross product
                 vecteur_1 = points[:, triangle[0]] - points[:, triangle[1]]
                 vecteur_2 = points[:, triangle[2]] - points[:, triangle[1]]
-                # Aire du triangle (produit vectoriel divisé par 2)
+                # Triangle area (cross product norm divided by 2)
                 self.triangles_area[index_triangle] = np.linalg.norm(np.cross(vecteur_1, vecteur_2)) / 2
-                # Centre du triangle (moyenne des coordonnées des sommets)
+                # Triangle center (mean of the vertex coordinates)
                 self.triangles_center[:, index_triangle] = np.sum(points[:, triangle], axis=1) / 3
 
     def set_triangles_area_and_center(self, triangles_area, triangles_center):
         """
-            Définit les aires et centres des triangles manuellement.
+            Manually set the areas and centers of triangles.
 
-            Paramètres :
-                * triangles_area (n-d-array) : Tableau des aires des triangles.
-                * triangles_center (n-d-array) : Tableau des centres des triangles.
+            Parameters:
+                * triangles_area (n-d-array): Array of triangle areas.
+                * triangles_center (n-d-array): Array of triangle centers.
         """
         self.triangles_area = triangles_area
         self.triangles_center = triangles_center
 
     def get_edges(self):
         """
-            Détecte les arêtes communes entre les triangles et détermine les relations de triangle "plus" et "minus".
+            Detect common edges between triangles and determine the "plus" and "minus" triangle relations.
             
-            Cette méthode analyse les triangles pour trouver les arêtes communes et les classer en paires
-            de triangles ayant une arête partagée. Les indices des triangles ayant des arêtes communes sont
-            enregistrés dans les tableaux triangles_plus et triangles_minus. 
+            This method analyzes triangles to find common edges and classify them into pairs
+            of triangles sharing an edge. The indices of the triangles with common edges are
+            stored in the arrays triangles_plus and triangles_minus. 
 
-            Note : enregistre les arrêtes partagées entre plus de deux triangles.
+            Note: records edges shared between more than two triangles.
 
-            Retour :
-            Edges : Un objet de la classe Edges représentant les arêtes communes entre triangles.
+            Return:
+            Edges: An object of the Edges class representing the common edges between triangles.
         """
         triangles = self.triangles[:3].T  # (n_triangles, 3)
         edge_dict = defaultdict(list)
 
-        # Générer les arêtes pour chaque triangle
+        # Generate edges for each triangle
         tri_indices = np.arange(triangles.shape[0])
         edges = np.stack([
             np.sort(triangles[:, [0, 1]], axis=1),
@@ -158,7 +159,7 @@ class Triangles:
             np.sort(triangles[:, [2, 0]], axis=1)
         ], axis=1)  # shape (n_triangles, 3, 2)
 
-        # Ajouter chaque arête dans un dictionnaire de la forme (n1, n2) -> [tri1, tri2, ...]
+        # Add each edge to a dictionary of the form (n1, n2) -> [tri1, tri2, ...]
         for tri_idx, tri_edges in zip(tri_indices, edges):
             for edge in tri_edges:
                 edge_key = tuple(edge)
@@ -169,7 +170,7 @@ class Triangles:
         triangles_minus = []
 
         for edge, tris in edge_dict.items():
-            # Pour chaque paire unique de triangles partageant l’arête
+            # For each unique pair of triangles sharing the edge
             for t1, t2 in combinations(tris, 2):
                 edge_points.append(edge)
                 triangles_plus.append(t1)
@@ -184,11 +185,11 @@ class Triangles:
     
     def set_triangles_plus_minus(self, triangles_plus, triangles_minus):
         """
-            Définit manuellement les triangles qui partagent des arêtes communes.
+            Manually set the triangles that share common edges.
 
-            Paramètres :
-            * triangles_plus (n-d-array) : Indices des triangles ayant des arêtes communes dans l'ordre "plus".
-            * triangles_minus (n-d-array) : Indices des triangles ayant des arêtes communes dans l'ordre "minus".
+            Parameters:
+            * triangles_plus (n-d-array): Indices of the triangles sharing common edges in the "plus" order.
+            * triangles_minus (n-d-array): Indices of the triangles sharing common edges in the "minus" order.
         """
         self.triangles_plus = triangles_plus
         self.triangles_minus = triangles_minus
@@ -196,25 +197,25 @@ class Triangles:
 
 class Edges:
     """
-        Classe représentant un ensemble d'arêtes dans un maillage 3D.
+        Class representing a set of edges in a 3D mesh.
 
-        Cette classe permet de stocker les arêtes du maillage définies par des paires de points
-        et de calculer la longueur de chaque arête.
+        This class stores the edges of the mesh defined by pairs of points
+        and computes the length of each edge.
 
-        Attributs :
-            * first_points (n-d-array) : Un tableau numpy contenant les indices des premiers points de chaque arête.
-            * second_points (n-d-array) : Un tableau numpy contenant les indices des deuxièmes points de chaque arête.
-            * edges_length (n-d-array) : Un tableau contenant la longueur de chaque arête.
-            * total_number_of_edges (int) : Le nombre total d'arêtes dans l'ensemble.
+        Attributes:
+            * first_points (n-d-array): A numpy array containing the indices of the first points of each edge.
+            * second_points (n-d-array): A numpy array containing the indices of the second points of each edge.
+            * edges_length (n-d-array): An array containing the length of each edge.
+            * total_number_of_edges (int): The total number of edges in the set.
     """
 
     def __init__(self, first_points, second_points):
         """
-                Initialise un objet de la classe Edges avec les indices des points définissant les arêtes.
+            Initialize an Edges object with the indices of the points defining the edges.
 
-                Paramètres :
-                    * first_points (n-d-array) : Tableau contenant les indices des premiers points de chaque arête.
-                    * second_points (n-d-array) : Tableau contenant les indices des deuxièmes points de chaque arête.
+            Parameters:
+                * first_points (n-d-array): Array containing the indices of the first points of each edge.
+                * second_points (n-d-array): Array containing the indices of the second points of each edge.
         """
         self.first_points = first_points
         self.second_points = second_points
@@ -223,29 +224,29 @@ class Edges:
 
     def compute_edges_length(self, point_data):
         """
-            Calcule les longueurs de toutes les arêtes.
+            Compute the lengths of all edges.
 
-            Cette méthode utilise les coordonnées des points du maillage pour calculer la longueur
-            de chaque arête en utilisant la norme euclidienne entre les points définissant l'arête.
+            This method uses the coordinates of the mesh points to calculate the length
+            of each edge using the Euclidean norm between the two points defining the edge.
 
-            Paramètre :
-            point_data (Points) : Un objet de la classe Points contenant les coordonnées des points du maillage.
+            Parameter:
+            point_data (Points): A Points object containing the coordinates of the mesh points.
         """
         points = point_data.points
         edges_length = []
         for edge in range(self.total_number_of_edges):
-            # Calcul de la longueur de l'arête en utilisant la norme euclidienne entre les deux points
+            # Compute the edge length using the Euclidean norm between the two points
             edge_length = np.linalg.norm(points[:, self.first_points[edge]] - points[:, self.second_points[edge]])
             edges_length.append(edge_length)
         self.edges_length = np.array(edges_length)       
 
     def set_edges(self, first_points, second_points):
         """
-            Définit manuellement les points qui définissent les arêtes.
+            Manually set the points defining the edges.
 
-            Paramètres :
-                * first_points (n-d-array) : Tableau des indices des premiers points de chaque arête.
-                * second_points (n-d-array) : Tableau des indices des deuxièmes points de chaque arête.
+            Parameters:
+                * first_points (n-d-array): Array of indices of the first points of each edge.
+                * second_points (n-d-array): Array of indices of the second points of each edge.
         """
         self.first_points = first_points
         self.second_points = second_points
@@ -253,97 +254,97 @@ class Edges:
 
     def set_edge_length(self, edge_length):
         """
-            Définit manuellement les longueurs des arêtes.
+            Manually set the lengths of the edges.
 
-            Paramètre :
-            edge_length (n-d-array) : Tableau des longueurs des arêtes.
+            Parameter:
+            edge_length (n-d-array): Array of edge lengths.
         """
         self.edges_length = edge_length
 
 
-def load_mesh_file(filename, load_from_matlab = True):
+def load_mesh_file(filename, load_from_matlab=True):
     """
-        Charge un fichier MAT contenant un maillage et retourne les points et triangles du maillage.
+        Load a MAT file containing a mesh and return the mesh points and triangles.
 
-        Cette fonction charge un fichier MATLAB MAT et extrait les données des points et des triangles.
-        Si le fichier provient d'un fichier MATLAB, elle ajuste les indices des triangles (qui commencent
-        souvent à '1' dans MATLAB) en les convertissant à un format commençant à 0.
+        This function loads a MATLAB MAT file and extracts the point and triangle data.
+        If the file comes from MATLAB, it adjusts the triangle indices (which often start at '1' in MATLAB)
+        by converting them to a zero-based format.
 
-        Paramètres :
-            * filename (str) : Le nom du fichier .mat à charger.
-            * load_from_matlab (bool) : Si True, les indices des triangles seront ajustés pour commencer à 0
-                                       (MATLAB commence les indices à 1, mais en Python, ils commencent à 0).
+        Parameters:
+            * filename (str): The name of the .mat file to load.
+            * load_from_matlab (bool): If True, the triangle indices will be adjusted to start at 0
+                                       (MATLAB indices start at 1, but Python uses 0-based indexing).
 
-        Retour :
-            * points (n-d-array) : Un tableau numpy de forme (3, N) contenant les coordonnées des points du maillage.
-            * triangles (n-d-array) : Un tableau numpy de forme (4, M) contenant les indices des sommets des triangles.
+        Returns:
+            * points (n-d-array): A numpy array of shape (3, N) containing the mesh point coordinates.
+            * triangles (n-d-array): A numpy array of shape (4, M) containing the indices of the triangle vertices.
 
-        Levée des exceptions :
-        FileNotFoundError : Si le fichier n'existe pas.
-        RuntimeError : Si une erreur survient lors du chargement du fichier.
-        ValueError : Si le fichier ne contient pas les variables 'p' (points) et 't' (triangles).
+        Exceptions raised:
+            FileNotFoundError: If the file does not exist.
+            RuntimeError: If an error occurs while loading the file.
+            ValueError: If the file does not contain the variables 'p' (points) and 't' (triangles).
     """
     try:
-        mesh = loadmat(filename)  # Charge le fichier MAT
+        mesh = loadmat(filename)  # Load the MAT file
     except FileNotFoundError:
-        raise FileNotFoundError(f"Le fichier '{filename}' est introuvable.")  # Erreur si le fichier n'existe pas
+        raise FileNotFoundError(f"The file '{filename}' was not found.")  # Error if file does not exist
     except Exception as error:
-        raise RuntimeError(f"Erreur lors du chargement du fichier : {error}")  # Erreur générale lors du chargement
+        raise RuntimeError(f"Error while loading the file: {error}")  # General error during loading
 
-    # Validation des variables requises dans le fichier MAT
+    # Validate required variables in the MAT file
     if 'p' not in mesh or 't' not in mesh:
-        raise ValueError("Le fichier doit contenir les variables 'p' (points) et 't' (triangles).")  # Vérification des données
+        raise ValueError("The file must contain the variables 'p' (points) and 't' (triangles).")  # Data check
 
-    points = mesh['p']  # Extraire les points du maillage (3 x N)
-    triangles = mesh['t']  # Extraire les triangles du maillage (4 x M)
+    points = mesh['p']  # Extract mesh points (3 x N)
+    triangles = mesh['t']  # Extract mesh triangles (4 x M)
 
-    # Si le fichier provient de MATLAB, ajuster les indices des triangles pour commencer à 0 (au lieu de 1).
+    # If the file comes from MATLAB, adjust indices to start from 0 (instead of 1).
     if load_from_matlab:
-        triangles[:3] = triangles[:3] - 1  # Les indices dans MATLAB commencent à '1', donc on les convertit à '0'
+        triangles[:3] = triangles[:3] - 1  # MATLAB indices start at '1', so we convert them to '0'
 
-    return points, triangles  # Retourne les données extraites
+    return points, triangles  # Return extracted data
 
 def filter_complexes_jonctions(point_data, triangle_data, edge_data):
     """
-    Supprime les arêtes issues de jonctions en T : lorsque trois triangles partagent la même arête.
-    Cela correspond à des incohérences dans un maillage (non-manifold ou artefacts topologiques).
+    Remove edges from T-junctions: when three triangles share the same edge.
+    This corresponds to inconsistencies in a mesh (non-manifold geometry or topological artifacts).
 
-    Paramètres :
-        point_data : données des points (utilisé ici pour recalculer les longueurs d’arêtes après suppression)
-        triangle_data : contient les triangles et les liens triangle_plus / triangle_minus
-        edge_data : contient les arêtes (first_points, second_points)
+    Parameters:
+        point_data : point data (used here to recompute edge lengths after removal)
+        triangle_data : contains triangles and their triangle_plus / triangle_minus relations
+        edge_data : contains edges (first_points, second_points)
 
-    Comportement :
-        Supprime les arêtes identiques (dans un sens ou dans l’autre) lorsqu’elles apparaissent trois fois.
+    Behavior:
+        Removes identical edges (regardless of orientation) when they appear three times.
     """
     triangles = triangle_data.triangles
     triangles_plus = triangle_data.triangles_plus
     triangles_minus = triangle_data.triangles_minus
 
-    # Représentation des arêtes
+    # Edge representation
     edges = np.vstack((edge_data.first_points, edge_data.second_points))  # shape (2, n_edges)
-    edges_inv = edges[::-1, :]  # arêtes inversées
+    edges_inv = edges[::-1, :]  # reversed edges
 
     remove = []
 
     for i in range(edge_data.total_number_of_edges):
         current_edge = edges[:, i].reshape(2, 1)
-        # On répète l’arête courante autant de fois qu’il y a d’arêtes
+        # Repeat current_edge as many times as there are edges
         repeated_edge = np.tile(current_edge, (1, edges.shape[1]))
 
-        # Cherche les arêtes identiques à current_edge (dans le même sens ou inverse)
+        # Find edges identical to current_edge (same or reversed orientation)
         is_same_forward = np.all(edges == repeated_edge, axis=0)
         is_same_backward = np.all(edges_inv == repeated_edge, axis=0)
         same_edges_indices = np.where(is_same_forward | is_same_backward)[0]
 
-        # Si cette arête est identifiée trois fois : jonction en T
+        # If this edge is identified three times: T-junction
         if len(same_edges_indices) == 3:
-            # Vérifie que les labels des triangles associés sont identiques
+            # Check if the labels of associated triangles are identical
             t_plus_labels = triangles[3, triangles_plus[same_edges_indices]]
             t_minus_labels = triangles[3, triangles_minus[same_edges_indices]]
             same_label = t_plus_labels == t_minus_labels
 
-            # On retire uniquement les arêtes dont les deux triangles ont le même label
+            # Remove only edges whose two triangles have the same label
             to_remove = same_edges_indices[np.where(same_label)[0]]
             remove.extend(to_remove)
 
@@ -356,33 +357,33 @@ def filter_complexes_jonctions(point_data, triangle_data, edge_data):
         triangle_data.set_triangles_plus_minus(triangles_plus, triangles_minus)
         edge_data.compute_edges_length(point_data)
 
-        # print(f"Suppression de {len(remove)} jonctions en T.")
+        # print(f"Removed {len(remove)} T-junctions.")
     """ else:
-        print("Aucune jonction complexe trouvée.") """
+        print("No complex junctions found.") """
 
 
 class DataManager_rwg1:
     @staticmethod
     def save_data(filename, save_folder_name, points_data, triangles_data, edges_data):
         """
-            Sauvegarde les données (points, triangles, arêtes, etc.) dans un fichier MAT
+        Saves mesh data (points, triangles, edges, etc.) into a MAT file.
 
-            Cette méthode prend les données du maillage, les organise dans un dictionnaire,
-            puis les sauvegarde sous forme de fichier MAT dans le dossier spécifié.
+        This method takes the mesh data, organizes it into a dictionary,
+        and saves it as a MAT file in the specified folder.
 
-            Paramètres :
-                * filename (str) : Le nom du fichier d'origine (utilisé pour générer le nom de sauvegarde).
-                * save_folder_name (str) : Le dossier ou le fichier de sauvegarde sera stocké.
-                * points_data (Points) : Un objet de la classe Points contenant les données des points du maillage.
-                * triangles_data (Triangles) : Un objet de la classe Triangles contenant les données des triangles du maillage.
-                * edges_data (Edges) : Un objet de la classe Edges contenant les données des arêtes du maillage.
+        Parameters:
+            * filename (str): The original file name (used to generate the save file name).
+            * save_folder_name (str): The folder where the save file will be stored.
+            * points_data (Points): A Points object containing the mesh point data.
+            * triangles_data (Triangles): A Triangles object containing the mesh triangle data.
+            * edges_data (Edges): An Edges object containing the mesh edge data.
 
-            Retourne :
-            str : Le nom du fichier sauvegardé.
+        Returns:
+            str: The name of the saved file.
         """
-        mesh = loadmat(filename)  # Charge le fichier MAT
+        mesh = loadmat(filename)  # Load the MAT file
 
-        # Crée un dictionnaire contenant toutes les données à sauvegarder
+        # Create a dictionary containing all data to save
         data = {
             'points' : points_data.points,
             'triangles' : triangles_data.triangles,
@@ -395,69 +396,62 @@ class DataManager_rwg1:
             'triangles_center' : triangles_data.triangles_center
         }
 
-        # Génère le nom du fichier de sauvegarde à partir du nom d'origine
-        base_name = os.path.splitext(os.path.basename(filename))[0]  # Retire l'extension du fichier original
+        # Generate the save file name based on the original file name
+        base_name = os.path.splitext(os.path.basename(filename))[0]  # Remove original file extension
         save_file_name = base_name + '_mesh1.mat'
-        full_save_path = os.path.join(save_folder_name, save_file_name)  # Chemin complet pour la sauvegarde
+        full_save_path = os.path.join(save_folder_name, save_file_name)  # Full path to save
 
-        # Vérifie si le dossier existe, sinon crée le dossier
-        if not os.path.exists(save_folder_name): # Vérification et création du dossier si nécessaire
+        # Check if the folder exists, otherwise create it
+        if not os.path.exists(save_folder_name):
             os.makedirs(save_folder_name)
-            # print(f"Directory '{save_folder_name}' created.")
 
-        # Sauvegarde les données dans le fichier MAT
+        # Save data to MAT file
         savemat(full_save_path, data)
-        # print(f"Data saved successfully to {full_save_path}")
 
-        # Retourne le nom du fichier sauvegardé
+        # Return the name of the saved file
         return save_file_name
 
     @staticmethod
     def load_data(filename):
         """
-            Charge les données d'un fichier MAT et retourne les objets Points, Triangles et Edges correspondants.
+        Loads mesh data from a MAT file and returns corresponding Points, Triangles, and Edges objects.
 
-            Cette méthode charge les données du fichier MAT, les décompresse et crée des objets
-            pour les points, les triangles et les arêtes, puis les initialise avec les données chargées.
+        This method loads data from the MAT file, decompresses it, creates objects
+        for points, triangles, and edges, and initializes them with the loaded data.
 
-            Paramètres :
-            filename (str) : Le nom du fichier à charger.
+        Parameters:
+            filename (str): The file name to load.
 
-            Retourne :
-            tuple : Un tuple contenant les objets Points, Triangles, et Edges.
+        Returns:
+            tuple: A tuple containing Points, Triangles, and Edges objects.
         """
         try:
-            # Vérifier si le fichier existe avant de le charger
+            # Check if the file exists before loading
             if not os.path.isfile(filename):
                 raise FileNotFoundError(f"File '{filename}' does not exist.")
 
-            # Charge le fichier .mat
+            # Load the .mat file
             data = loadmat(filename)
 
-            # Lors du chargement des données, les dimensions peuvent être compressées (avec 'squeeze')
-            # On crée les objets en passant les données extraites.
+            # Squeeze dimensions if needed and create objects
             points = Points(points_data=data['points'].squeeze())
             triangles = Triangles(triangles_data=data['triangles'].squeeze())
-            edges = Edges(first_points=data['edge_first_points'].squeeze(), second_points=data['edge_second_points'].squeeze())
-            triangles.set_triangles_plus_minus(triangles_plus=data['triangles_plus'].squeeze(), triangles_minus=data['triangles_minus'].squeeze())
-            triangles.set_triangles_area_and_center(triangles_area=data['triangles_area'].squeeze(), triangles_center=data['triangles_center'].squeeze())
+            edges = Edges(first_points=data['edge_first_points'].squeeze(),
+                          second_points=data['edge_second_points'].squeeze())
+            triangles.set_triangles_plus_minus(triangles_plus=data['triangles_plus'].squeeze(),
+                                               triangles_minus=data['triangles_minus'].squeeze())
+            triangles.set_triangles_area_and_center(triangles_area=data['triangles_area'].squeeze(),
+                                                    triangles_center=data['triangles_center'].squeeze())
             edges.set_edge_length(edge_length=data['edges_length'].squeeze())
 
-            # Affiche un message confirmant le succès du chargement des données
-            # print(f"Data loaded from {filename}")
-
-            # Retourne les objets créés
+            # Return the created objects
             return points, triangles, edges
 
         except FileNotFoundError as e:
-            # Gère l'exception si le fichier n'existe pas
             print(f"Error: {e}")
         except KeyError as e:
-            # Gère l'exception si une clé est manquante dans les données du fichier
             print(f"Key Error: {e}")
         except ValueError as e:
-            # Gère les erreurs de données malformées ou incorrectes
             print(f"Value Error (likely malformed data): {e}")
         except Exception as e:
-            # Gère toute autre exception non prévue
             print(f"An unexpected error occurred: {e}")

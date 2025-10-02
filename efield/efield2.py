@@ -1,8 +1,9 @@
 """
- Ce code calcule et visualise la répartition de l'intensité de radiation (U) d'un champ électromagnétique rayonné ou diffusé par une surface,
- sur une sphère imaginaire qui entoure l'objet rayonnant. La sphère sert à simuler la réception des ondes à une distance donnée,
- et les calculs permettent de déterminer des paramètres comme la puissance totale rayonnée et le gain.
- Calcul la densité de radiation et l'intensité de radiation distribués sur la sphere
+This code calculates and visualizes the distribution of radiation intensity (U) of an electromagnetic field
+that is either radiated or scattered by a surface, over an imaginary sphere surrounding the radiating object.
+The sphere serves to simulate the reception of waves at a given distance,
+and the computations allow the determination of parameters such as the total radiated power and the gain.
+It computes the radiation density and the radiation intensity distributed over the sphere.
 """
 import os
 
@@ -16,27 +17,27 @@ from utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_fi
 
 def compute_aspect_ratios(points_data):
     """
-        Calcule les rapports d'échelle pour l'affichage 3D.
+    Computes scaling ratios for 3D visualization.
 
-        Cette fonction prend en entrée un ensemble de points 3D (x, y, z), et retourne les rapports d'échelle
-        pour les axes x, y et z afin de garantir une représentation uniforme lors de la visualisation 3D.
+    This function takes as input a set of 3D points (x, y, z) and returns the scaling
+    ratios for the x, y, and z axes to ensure a uniform representation during 3D visualization.
 
-        Paramètres :
-        points_data : tuple ou n-d-array de forme (3, N), où N est le nombre de points.
-          Il contient les coordonnées x, y et z des points 3D à afficher.
+    Parameters:
+    points_data : tuple or n-d-array of shape (3, N), where N is the number of points.
+        Contains the x, y, and z coordinates of the 3D points to be displayed.
 
-        Retourne :
-        Un dictionnaire avec les rapports d'échelle normalisés pour chaque axe ('x', 'y', 'z') afin d'ajuster
-          l'affichage 3D avec une échelle uniforme.
+    Returns:
+    A dictionary with the normalized scaling ratios for each axis ('x', 'y', 'z'),
+    ensuring a consistent scale for 3D visualization.
     """
 
-    # Extraction des coordonnées x, y et z à partir de points_data
+    # Extract x, y, and z coordinates from points_data
     x_, y_, z_ = points_data
 
-    # Calcul de l'échelle globale (figure scale) en prenant la plus grande différence entre les axes
+    # Compute the overall figure scale by taking the largest difference among the axes
     fig_scale = max(max(x_) - min(x_), max(y_) - min(y_), max(z_) - min(z_))
 
-    # Calcul des rapports d'échelle pour chaque axe par rapport à l'échelle globale
+    # Compute the scaling ratios for each axis relative to the overall scale
     return {
         "x": (max(x_) - min(x_)) / fig_scale,
         "y": (max(y_) - min(y_)) / fig_scale,
@@ -45,176 +46,180 @@ def compute_aspect_ratios(points_data):
 
 def visualize_surface_current(points_data, triangles_data, radiation_intensity, title="Antennas Surface Current"):
     """
-        Visualise la densité de courant surfacique en utilisant Plotly.
+        Visualizes the surface current density using Plotly.
 
-        Cette fonction permet de créer une visualisation 3D de la densité de courant surfacique sur un modèle d'antenne,
-        en utilisant la bibliothèque Plotly pour une présentation interactive. La surface est coloriée en fonction de
-        l'intensité de radiation, avec un colormap pour mieux représenter la distribution des intensités.
+        This function creates a 3D visualization of the surface current density on an antenna model,
+        using the Plotly library for interactive presentation. The surface is colored according to
+        the radiation intensity, with a colormap to better represent the intensity distribution.
 
-        Paramètres :
-            * points_data : tuple ou n-d-array de forme (3, N), où N est le nombre de points.
-              Il contient les coordonnées x, y et z des points 3D des sommets de l'antenne.
-            * triangles_data : n-d-array de forme (3, M), où M est le nombre de triangles.
-              Il contient les indices des sommets pour chaque triangle de la surface de l'antenne.
-            * radiation_intensity : n-d-array, la densité de courant ou l'intensité de radiation associée
-              à chaque triangle. Cette valeur sera utilisée pour colorier la surface.
-            * title : str, titre de la visualisation (optionnel). Par défaut, il est défini sur "Antennas Surface Current".
+        Parameters:
+            * points_data: tuple or n-d-array of shape (3, N), where N is the number of points.
+            It contains the x, y, and z coordinates of the 3D vertices of the antenna.
+            * triangles_data: n-d-array of shape (3, M), where M is the number of triangles.
+            It contains the vertex indices for each triangle of the antenna surface.
+            * radiation_intensity: n-d-array, the current density or radiation intensity associated
+            with each triangle. This value will be used to color the surface.
+            * title: str, title of the visualization (optional). Default is "Antennas Surface Current".
 
-        Retourne :
-        fig : Objet Plotly, la figure 3D représentant la densité de courant surfacique colorée par l'intensité de radiation.
+        Returns:
+        fig: Plotly object, the 3D figure representing the surface current density colored by radiation intensity.
     """
-    # Extraction des coordonnées des sommets (x, y, z) à partir de points_data
-    x_, y_, z_ = points_data  # Coordonnées X, Y, Z des points
+    # Extract vertex coordinates (x, y, z) from points_data
+    x_, y_, z_ = points_data  # X, Y, Z coordinates of the points
 
-    # Création des simplices pour Plotly (les indices des sommets de chaque triangle)
-    simplices = triangles_data[:3, :].T  # Transpose pour passer de [3, n_triangles] à [n_triangles, 3]
+    # Create simplices for Plotly (vertex indices of each triangle)
+    simplices = triangles_data[:3, :].T  # Transpose to go from [3, n_triangles] to [n_triangles, 3]
 
-    # Calcul des rapports d'échelle pour ajuster les proportions de la visualisation
+    # Compute aspect ratios to adjust the visualization proportions
     aspect_ratios = compute_aspect_ratios(points_data)
 
-    # Création de la figure avec trisurf de Plotly
+    # Create the figure using Plotly's trisurf
     fig = ff.create_trisurf(
-        x=x_,                            # Coordonnées X des sommets
-        y=y_,                            # Coordonnées Y des sommets
-        z=z_,                            # Coordonnées Z des sommets
-        simplices=simplices,             # Indices des sommets de chaque triangle
-        colormap="Rainbow",              # Colormap pour la coloration de la surface
-        plot_edges=False,                # Ne pas afficher les bords des triangles
-        color_func=radiation_intensity,  # Utilisation de la densité de courant normalisée pour colorer
-        show_colorbar=True,              # Affichage de la barre de couleurs
-        # title=title,                     # Titre de la visualisation
-        title='',                     # Titre de la visualisation
-        aspectratio=dict(aspect_ratios), # Ajustement des rapports d'échelle pour l'affichage 3D
+        x=x_,                            # X coordinates of vertices
+        y=y_,                            # Y coordinates of vertices
+        z=z_,                            # Z coordinates of vertices
+        simplices=simplices,             # Vertex indices of each triangle
+        colormap="Rainbow",              # Colormap for surface coloring
+        plot_edges=False,                # Do not display triangle edges
+        color_func=radiation_intensity,  # Use normalized current density to color the surface
+        show_colorbar=True,              # Display colorbar
+        # title=title,                     # Visualization title
+        title='',                        # Visualization title
+        aspectratio=dict(aspect_ratios), # Adjust aspect ratios for 3D display
     )
 
-    # Retour de la figure Plotly créée
+    # Return the created Plotly figure
     return fig
 
-def save_gain_power_data(save_folder_name, save_file_name, total_power, gain_linear, gain_logarithmic):
+def save_gain_power_data(save_folder_name, save_file_name, total_power, gain_linear, gain_logarithmic, efficiency_total):
     """
-    Sauvegarde les données de puissance totale et de gain dans un fichier .mat.
+    Save total power and gain data into a .mat file.
 
-    Cette fonction permet de sauvegarder les résultats de puissance totale et les gains linéaire et logarithmique dans un fichier
-    MATLAB (MAT) pour une utilisation ultérieure ou une analyse complémentaire.
+    This function saves the total power results and the linear and logarithmic gains
+    into a MATLAB (MAT) file for later use or further analysis.
 
-    Paramètres :
-        * save_folder_name : str, le nom du dossier où le fichier sera sauvegardé. Si le dossier n'existe pas, il sera créé.
-        * save_file_name : str, le nom du fichier à sauvegarder (doit inclure l'extension .mat).
-        * total_power : float ou n-d-array, la valeur de la puissance totale calculée.
-        * gain_linear : float ou n-d-array, le gain linéaire calculé (exprimé en facteur multiplicatif).
-        * gain_logarithmic : float ou n-d-array, le gain logarithmique calculé (exprimé en dB).
+    Parameters:
+        * save_folder_name : str, name of the folder where the file will be saved. If the folder does not exist, it will be created.
+        * save_file_name : str, name of the file to save (must include the .mat extension).
+        * total_power : float or n-d-array, calculated total power value.
+        * gain_linear : float or n-d-array, calculated linear gain (expressed as a multiplicative factor).
+        * gain_logarithmic : float or n-d-array, calculated logarithmic gain (expressed in dB).
 
-    Effet de bord :
-        * Crée le dossier spécifié s'il n'existe pas.
-        * Sauvegarde un fichier .mat contenant les données de puissance et de gain à l'emplacement spécifié.
+    Side effects:
+        * Creates the specified folder if it does not exist.
+        * Saves a .mat file containing power and gain data at the specified location.
     """
-    # Construction du chemin complet pour le fichier à sauvegarder
+    # Build the full path for the file to save
     full_save_path = os.path.join(save_folder_name, save_file_name)
 
-    # Vérification si le dossier existe et création si nécessaire
-    if not os.path.exists(save_folder_name):  # Vérification et création du dossier si nécessaire
+    # Check if the folder exists and create it if necessary
+    if not os.path.exists(save_folder_name):  # Check and create folder if needed
         os.makedirs(save_folder_name)
         print(f"Directory '{save_folder_name}' created.")
 
-    # Préparation des données à sauvegarder dans un dictionnaire
+    # Prepare the data to save in a dictionary
     data_gain_power = {
         'totalPower': total_power,
         'gainLinear': gain_linear,
-        'gainLogarithmic': gain_logarithmic
+        'gainLogarithmic': gain_logarithmic,
+        'efficiencyTotal': efficiency_total
     }
 
-    # Sauvegarde des données dans le fichier .mat
+    # Save the data into the .mat file
     savemat(full_save_path, data_gain_power)
     print(f"Data saved successfully to {full_save_path}")
 
 def load_gain_power_data(filename_to_load):
     """
-        Charge les données de puissance et de gain à partir d'un fichier .mat.
+        Load power and gain data from a .mat file.
 
-        Cette fonction charge un fichier MATLAB (MAT) contenant les résultats de puissance et de gain linéaire et logarithmique,
-        en récupérant les données associées à ces paramètres. Elle gère également les erreurs possibles durant le processus de
-        chargement des données.
+        This function loads a MATLAB (MAT) file containing total power, linear gain, and logarithmic gain results,
+        retrieving the data associated with these parameters. It also handles possible errors during the data
+        loading process.
 
-        Paramètre :
-        filename_to_load : str, le chemin complet du fichier .mat à charger.
+        Parameter:
+        filename_to_load : str, full path of the .mat file to load.
 
-        Retour :
-            * total_power : float ou n-d-array, la puissance totale chargée depuis le fichier.
-            * gain_linear : float ou n-d-array, le gain linéaire chargé depuis le fichier.
-            * gain_logarithmic : float ou n-d-array, le gain logarithmique (en dB) chargé depuis le fichier.
+        Returns:
+            * total_power : float or n-d-array, total power loaded from the file.
+            * gain_linear : float or n-d-array, linear gain loaded from the file.
+            * gain_logarithmic : float or n-d-array, logarithmic gain (in dB) loaded from the file.
+            * efficiency_total : float or n-d-array, efficiency loaded from the file.
 
-        Exceptions :
-            * FileNotFoundError : levée si le fichier spécifié n'existe pas.
-            * KeyError : levée si l'une des clés attendues ('totalPower', 'gainLinear', 'gainLogarithmic') est manquante dans le fichier.
-            * ValueError : levée si les données sont malformées ou corrompues.
-            * Exception générale : levée pour toute autre erreur inattendue.
+        Exceptions:
+            * FileNotFoundError : raised if the specified file does not exist.
+            * KeyError : raised if one of the expected keys ('totalPower', 'gainLinear', 'gainLogarithmic', 'efficiencyTotal') is missing in the file.
+            * ValueError : raised if the data is malformed or corrupted.
+            * General Exception : raised for any other unexpected error.
     """
     try:
-        # Vérification si le fichier existe avant de le charger
+        # Check if the file exists before loading
         if not os.path.isfile(filename_to_load):
             raise FileNotFoundError(f"File '{filename_to_load}' does not exist.")
 
-        # Chargement des données depuis le fichier .mat
+        # Load data from the .mat file
         data = loadmat(filename_to_load)
 
-        # Extraction des données : puissance totale, gain linéaire et gain logarithmique
+        # Extract data: total power, linear gain, and logarithmic gain
         total_power = data['totalPower'].squeeze()
         gain_linear = data['gainLinear'].squeeze()
         gain_logarithmic = data['gainLogarithmic'].squeeze()
+        efficiency_total = data['efficiencyTotal'].squeeze()
 
         print(f"Data loaded from {filename_to_load}")
 
-        # Retour des données extraites
-        return total_power, gain_linear, gain_logarithmic
+        # Return extracted data
+        return total_power, gain_linear, gain_logarithmic, efficiency_total
+    
     except FileNotFoundError as e:
-        # Gestion des erreurs si le fichier n'est pas trouvé
+        # Handle errors if the file is not found
         print(f"Error: {e}")
 
     except KeyError as e:
-        # Gestion des erreurs si une clé est manquante dans le fichier .mat
+        # Handle errors if a key is missing in the .mat file
         print(f"Key Error: {e}")
 
     except ValueError as e:
-        # Gestion des erreurs si les données sont malformées
+        # Handle errors if the data is malformed
         print(f"Value Error (likely malformed data): {e}")
 
     except Exception as e:
-        # Gestion des erreurs inattendues
+        # Handle unexpected errors
         print(f"An unexpected error occurred: {e}")
 
 def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load, filename_current_to_load, filename_sphere_to_load, 
-                                                         scattering = False, radiation = False, save_image=False):
+                                                         scattering = False, radiation = False, voltage_amplitude=0.5, show=True, save_image=False):
     """
-        Calcule et visualise la distribution d'intensité de radiation et de gain sur la surface d'une sphère entourant une antenne.
+        Calculate and visualize the radiation intensity and gain distribution on the surface of a sphere surrounding an antenna.
 
-        Cette fonction charge les données nécessaires (maillage, courants, sphère), effectue des calculs de champ électromagnétique
-        pour chaque triangle de la sphère, et calcule des métriques telles que la puissance totale, le gain linéaire et logarithmique.
-        Les résultats sont ensuite sauvegardés et visualisés.
+        This function loads the necessary data (mesh, currents, sphere), performs electromagnetic field calculations
+        for each triangle of the sphere, and computes metrics such as total power, linear gain, and logarithmic gain.
+        The results are then saved and visualized.
 
-        Paramètres :
+        Parameters:
             * filename_mesh2_to_load : str
-                Chemin du fichier contenant les données de maillage de l'antenne (triangles, points, etc.).
+                Path to the file containing the antenna mesh data (triangles, points, etc.).
             * filename_current_to_load : str
-                Chemin du fichier contenant les données de courant sur l'antenne.
+                Path to the file containing the current data on the antenna.
             * filename_sphere_to_load : str
-                Chemin du fichier contenant les données de la sphère (coordonnées et triangles).
+                Path to the file containing the sphere data (coordinates and triangles).
 
-        Retour :
-        Aucun retour explicite. Les résultats sont sauvegardés dans un fichier et visualisés.
+        Returns:
+        No explicit return. The results are saved to a file and visualized.
 
-        Étapes principales :
-            1. Chargement des données d'entrée (maillage, courants, sphère).
-            2. Calcul des champs électromagnétiques sur les triangles de la sphère.
-            3. Calcul des métriques de radiation : puissance totale, gain linéaire et logarithmique.
-            4. Sauvegarde des résultats calculés.
-            5. Visualisation des résultats sous forme de distribution de gain sur la sphère.
+        Main steps:
+            1. Load input data (mesh, currents, sphere).
+            2. Calculate electromagnetic fields on the sphere's triangles.
+            3. Compute radiation metrics: total power, linear and logarithmic gain.
+            4. Save the computed results.
+            5. Visualize the results as a gain distribution over the sphere.
     """
 
-    #  Extraction du nom de base du fichier sans l'extension et modification du nom
+    # Extract the base file name without extension and modify the name
     base_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0]
     base_name = base_name.replace('_mesh2', '')
 
-    # Chargement des fichiers contenant les données de maillage, courants et sphère
+    # Load files containing mesh, current, and sphere data
     data_sphere = loadmat(filename_sphere_to_load)
 
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
@@ -226,23 +231,23 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     elif (radiation is False and scattering is False) or (radiation is True and scattering is True):
         raise ValueError("Either radiation or scattering must be True, but not both or neither.")
 
-    # Chargement des données de la sphère
-    sphere_points = data_sphere['p'] * 100    # Les coordonnées de la sphère sont multipliées par 100 (rayon de 100 m).
-    sphere_triangles = data_sphere['t'] - 1   # Conversion des indices MATLAB (1-based) en indices Python (0-based).
+    # Load sphere data
+    sphere_points = data_sphere['p'] * 100    # Sphere coordinates are scaled by 100 (radius of 100 m).
+    sphere_triangles = data_sphere['t'] - 1   # Convert MATLAB indices (1-based) to Python indices (0-based).
 
-    # Calcul du nombre d'onde k et de sa composante complexe
-    k = omega / light_speed_c    # Nombre d'onde (en rad/m).
-    complex_k = 1j * k           # Composante complexe.
+    # Compute wave number k and its complex component
+    k = omega / light_speed_c    # Wave number (in rad/m).
+    complex_k = 1j * k           # Complex component.
 
-    # Affichage de la fréquence et de la longueur d'onde
+    # Display frequency and wavelength
     print('')
     print(f"Frequency = {frequency} Hz")
-    print(f"Longueur d'onde lambda = {light_speed_c / frequency} m")
+    print(f"Wavelength lambda = {light_speed_c / frequency} m")
 
-    # Calcul des dipôles et des moments dipolaires (en complexe)
+    # Compute dipoles and dipole moments (complex)
     dipole_center, dipole_moment = compute_dipole_center_moment(triangles, edges, current)
 
-    # Initialisation pour le calcul des champs et de la puissance totale
+    # Initialization for field and total power calculation
     sphere_total_of_triangles = sphere_triangles.shape[1]
     total_power = 0
     observation_point = np.zeros((3, sphere_total_of_triangles))
@@ -254,7 +259,7 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     w = np.zeros(sphere_total_of_triangles)
     u = np.zeros(sphere_total_of_triangles)
 
-    # Boucle sur chaque triangle de la sphère pour calculer les champs et l'énergie
+    # Loop over each triangle of the sphere to calculate fields and energy
     for triangle_in_sphere in range(sphere_total_of_triangles):
         sphere_triangle = sphere_triangles[:, triangle_in_sphere]
         observation_point[:, triangle_in_sphere] = np.sum(sphere_points[:, sphere_triangle], axis=1) / 3
@@ -274,15 +279,16 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
         vecteur_2 = sphere_points[:, sphere_triangle[2]] - sphere_points[:, sphere_triangle[1]]
         sphere_triangle_area[triangle_in_sphere] = np.linalg.norm(np.cross(vecteur_1, vecteur_2)) / 2
 
-        # Contribution de chaque triangle à la puissance totale
+        # Contribution of each triangle to the total power
         total_power += w[triangle_in_sphere] * sphere_triangle_area[triangle_in_sphere]
 
     print('')
 
-    # Calcul of the antenna directivity : is a measure of how focused an antenna's radiation pattern is in a specific direction compared to an idealized isotropic antenna that radiates equally in all directions.
+    # Calculation of the antenna directivity: it is a measure of how focused an antenna's radiation pattern is in a specific direction 
+    # compared to an idealized isotropic antenna that radiates equally in all directions.
     # It quantifies the antenna's ability to concentrate radiated power in a particular direction.
     # Here we call it gain
-    # Calcul du gain (linéaire et logarithmique)
+    # Calculation of gain (linear and logarithmic)
     gain_linear = 4 * np.pi * u / total_power
     gain_logarithmic = 10 * np.log10(gain_linear)
     gain_linear_max = 4 * np.pi * np.max(u) / total_power
@@ -290,10 +296,10 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
 
     print(f"Total Power : {total_power : 4f}")
     print(f"Gain Linear : {gain_linear_max : 4f}")
-    print(f"Gain Logarithmic : {gain_logarithmic_max : 4f} dB")
+    print(f"Gain Logarithmic (Max) : {gain_logarithmic_max : 4f} dBi")
     if radiation:
         print(f"\ngap_current = {gap_current}")
-        # Si gap_current est un array, prendre la norme ou la valeur absolue du premier élément
+        # If gap_current is an array, take the norm or absolute value of the first element
         if isinstance(gap_current, np.ndarray):
             gap_current_abs = np.abs(gap_current)
             if gap_current_abs.size == 1:
@@ -305,12 +311,23 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
         radiation_resistance = 2 * total_power / gap_current_val**2
         print(f"Radiation Resistance : {radiation_resistance : 4f} Ohms")
 
-    # Sauvegarde des résultats calculés
+        V_gap = voltage_amplitude  # Supply voltage in volts
+        P_in = 0.5 * V_gap * gap_current_val
+        print(f"Input Power (P_in) : {P_in:.4f} W")
+
+        efficiency_total = total_power / P_in
+        print(f"Total Efficiency : {efficiency_total:.4f}")
+
+        if efficiency_total > 1:
+            print("Warning: Total Efficiency is greater than 1, which is physically impossible. Please check the calculations.")
+            efficiency_total = 1.0  # Limit total efficiency to 1
+
+    # Save the calculated results
     save_gain_power_folder_name = 'data/antennas_gain_power/'
     save_gain_power_file_name = base_name + '_gain_power.mat'
-    save_gain_power_data(save_gain_power_folder_name, save_gain_power_file_name, total_power, gain_linear_max, gain_logarithmic_max)
+    save_gain_power_data(save_gain_power_folder_name, save_gain_power_file_name, total_power, gain_linear_max, gain_logarithmic_max, efficiency_total)
 
-    # Visualisation des résultats
+    # Visualization of the results
     plot_name_gain = base_name + ' gain distribution over a large sphere surface'
     sphere_total_of_points = sphere_points.shape[1]
     poynting_vector_point = np.zeros((3, sphere_total_of_points))
@@ -335,37 +352,34 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
                                                                       dipole_center)
 
     u_points_db = 10 * np.log10(4 * np.pi * u_points / total_power)
-    seuil_db = max(u_points_db) - 20
-    u_points_db = np.maximum(u_points_db[:sphere_total_of_points] - seuil_db, 0.01)
+    threshold_db = max(u_points_db) - 20
+    u_points_db = np.maximum(u_points_db[:sphere_total_of_points] - threshold_db, 0.01)
     sphere_points_update = u_points_db * sphere_points / 1000
 
-    # Affichage de l'intensité de radiation
-    # fig1 = visualize_surface_current(sphere_points, sphere_triangles, u_normalize, plot_name_intensity)
-    # fig1.show()
+    if show:
+        # Visualization of the logarithmic gain
+        fig2 = visualize_surface_current(sphere_points_update, sphere_triangles, gain_logarithmic, plot_name_gain)
+        fig2.show()
 
-    # Visualisation du gain logarithmique
-    fig2 = visualize_surface_current(sphere_points_update, sphere_triangles, gain_logarithmic, plot_name_gain)
-    fig2.show()
+        if save_image:
+            # Output folder path
+            output_dir_fig_image = "data/fig_image/"
+            
+            # Create the folder if it does not exist
+            if not os.path.exists(output_dir_fig_image):
+                os.makedirs(output_dir_fig_image)
+                print(f"Folder created: {output_dir_fig_image}")
+            
+            # Name of the PDF file to save
+            pdf_path = os.path.join(output_dir_fig_image, 'radiation_intensity_distribution' + ".pdf")
+            
+            # Set transparent background and remove white margins
+            fig2.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(l=0, r=0, t=0, b=0)
+            )
 
-    if save_image:
-        # Chemin du dossier de sortie
-        output_dir_fig_image = "data/fig_image/"
-        
-        # Crée le dossier s'il n'existe pas
-        if not os.path.exists(output_dir_fig_image):
-            os.makedirs(output_dir_fig_image)
-            print(f"Dossier créé : {output_dir_fig_image}")
-        
-        # Nom du fichier PDF à enregistrer
-        pdf_path = os.path.join(output_dir_fig_image, 'radiation_intensity_distribution' + ".pdf")
-        
-        # Définir le fond transparent et supprimer les marges blanches
-        fig2.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=0, r=0, t=0, b=0)
-        )
-
-        # Sauvegarde de la figure
-        fig2.write_image(pdf_path, format="pdf")
-        print(f"\nImage sauvegardée au format PDF : {pdf_path}\n")
+            # Save the figure
+            fig2.write_image(pdf_path, format="pdf")
+            print(f"\nImage saved as PDF: {pdf_path}\n")

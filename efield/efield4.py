@@ -4,8 +4,6 @@ import numpy as np
 import plotly.graph_objects as go
 
 def plot_smith_chart(impedances, frequencies, fC=None, save_image=False):
-    # fig_size and plt.figure are not used by plotly, only by matplotlib
-    # To set figure size in plotly, use width and height in update_layout
     fig_size = 15
     Fibonacci = (1 + np.sqrt(5)) / 2
 
@@ -13,19 +11,17 @@ def plot_smith_chart(impedances, frequencies, fC=None, save_image=False):
 
     Normalized_Z0 = 50  # Normalized impedance reference (Z0)
 
-    # Prepare data for Scattersmith
     smith_points = []
     for idx, Z in enumerate(impedances):
-        r = Z.real / Normalized_Z0  # Normalized resistance
-        x = Z.imag / Normalized_Z0  # Normalized reactance
+        r = Z.real / Normalized_Z0
+        x = Z.imag / Normalized_Z0
         smith_points.append(dict(
             real=r,
             imag=x,
             freq=frequencies[idx],
-            label=f'Z = {Z:.3f} at {frequencies[idx]*1e-6} MHz'
+            label=f'Z = {Z:.3f} at {frequencies[idx]*1e-6:.2f} MHz'
         ))
 
-    # Plot all points except fC in default color
     if fC is not None and fC in frequencies:
         idx_fC = frequencies.index(fC)
         # Plot all points except the highlighted one
@@ -38,19 +34,18 @@ def plot_smith_chart(impedances, frequencies, fC=None, save_image=False):
             text=[pt['label'] for i, pt in enumerate(smith_points) if i != idx_fC],
             hoverinfo='text'
         ))
-        # Highlight the specific frequency in red
+        # Highlight the specific frequency in red and show impedance value in legend
         pt = smith_points[idx_fC]
         fig.add_trace(go.Scattersmith(
             real=[pt['real']],
             imag=[pt['imag']],
             mode='markers',
             marker=dict(size=10, color='red', symbol='circle'),
-            name=f'Impedance at fC={fC*1e-6} MHz',
-            text=[pt['label']],
+            name=f"fC={fC*1e-6:.2f} MHz, Z={impedances[idx_fC]:.2f}",
+            text=[f"{pt['label']}"],
             hoverinfo='text'
         ))
     else:
-        # Plot all points normally if fC is not specified or not found
         fig.add_trace(go.Scattersmith(
             real=[pt['real'] for pt in smith_points],
             imag=[pt['imag'] for pt in smith_points],
@@ -64,34 +59,25 @@ def plot_smith_chart(impedances, frequencies, fC=None, save_image=False):
     fig.update_layout(
         title='',
         showlegend=True,
-        width=1000,  # Set your desired width here
-        height=int(1000 / Fibonacci)  # Set your desired height here
+        width=1000,
+        height=int(1000 / Fibonacci)
     )
 
     fig.show()
 
     if save_image:
-        # Chemin du dossier de sortie
         output_dir_fig_image = "data/fig_image/"
-        
-        # Crée le dossier s'il n'existe pas
         if not os.path.exists(output_dir_fig_image):
             os.makedirs(output_dir_fig_image)
-            print(f"Dossier créé : {output_dir_fig_image}")
-        
-        # Nom du fichier PDF à enregistrer
+            print(f"File created : {output_dir_fig_image}")
         pdf_path = os.path.join(output_dir_fig_image, "ifa_M_opti3_Smith_chart.pdf")
-        
-        # Mettre le fond transparent et supprimer les marges blanches
         fig.update_layout(
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             margin=dict(l=0, r=0, t=10, b=10)
         )
-        
-        # Sauvegarde de la figure
         fig.write_image(pdf_path, format="pdf")
-        print(f"\nImage sauvegardée au format PDF (fond transparent, marges minimales) : {pdf_path}\n")
+        print(f"\nImage saved in PDF format (transparent background, minimal margins) : {pdf_path}\n")
 
 def plot_single_impedance(Z):
     Normalized_Z0 = 50  # Normalized impedance reference (Z0)
@@ -118,16 +104,16 @@ def plot_single_impedance(Z):
 def calculate_Q(frequencies, s11_db, f_resonance):
     bandwidth_criterion = -3  # -3 dB bandwidth criterion
     s11_db = np.array(s11_db)
-    print(f"\nS11 en dB : {s11_db}")
+    print(f"\nS11 in dB : {s11_db}")
     threshold = np.min(s11_db) - bandwidth_criterion
-    print(f"Seuil pour la bande passante à -3 dB : {threshold:.2f} dB")
+    print(f"Threshold for -3 dB bandwidth : {threshold:.2f} dB")
 
-    # Trouver les indices où S11 est en dessous du seuil
+    # Find indices where S11 is below the threshold
     in_band = np.where(s11_db <= threshold)[0]
-    print(f"Indices où S11 <= {threshold:.2f} dB : {in_band}")
+    print(f"indices where S11 <= {threshold:.2f} dB : {in_band}")
 
     if len(in_band) < 2:
-        print("Impossible de déterminer la bande passante à -3 dB.")
+        print("Unable to determine the -3 dB bandwidth.")
         return None
 
     f_low = frequencies[in_band[0]]
@@ -136,15 +122,16 @@ def calculate_Q(frequencies, s11_db, f_resonance):
 
     Q = f_resonance / bandwidth
 
-    print(f"\nCalcul de Q :")
-    print(f"→ Bande passante (-3 dB) : {(bandwidth / 1e6):.2f} MHz")
-    print(f"→ Facteur de qualité Q  : {Q:.2f}")
+    print(f"\nCalculation of Q:")
+    print(f"→ Bandwidth (-3 dB) : {(bandwidth / 1e6):.2f} MHz")
+    print(f"→ Quality factor Q  : {Q:.2f}")
 
     return Q
 
 def plot_impedance_curve(impedances, fLow, fHigh, f_resonance=None):
-    plt.style.use('fivethirtyeight')
-    plt.rcParams['font.family'] = 'JetBrains Mono'
+    plt.style.use('seaborn-v0_8-talk')
+    plt.rcParams['font.family'] = 'Lucida Console'
+    plt.rcParams['font.size'] = 11
     frequencies = np.linspace(fLow, fHigh, len(impedances))
     frequencies_mhz = np.array(frequencies) / 1e6
     real_parts = [z.real for z in impedances]
@@ -153,47 +140,47 @@ def plot_impedance_curve(impedances, fLow, fHigh, f_resonance=None):
     fig_size = 12
     Fibonacci = (1 + np.sqrt(5)) / 2
     plt.figure(figsize=(fig_size, fig_size / Fibonacci))
-    plt.plot(frequencies_mhz, real_parts, label="Résistance (Re(Z))", color='red', linewidth=2.5)
-    plt.plot(frequencies_mhz, imag_parts, label="Réactance (Im(Z))", color='blue', linewidth=2.5)
+    plt.plot(frequencies_mhz, real_parts, label="Resistance (Re(Z))", color='red', linewidth=2.5)
+    plt.plot(frequencies_mhz, imag_parts, label="Reactance (Im(Z))", color='blue', linewidth=2.5)
 
-    # Si f_resonance est donné, tracer la ligne verticale
+    # If f_resonance is given, draw the vertical line
     if f_resonance is not None:
         idx_res = np.argmin(np.abs(frequencies - f_resonance))
         f_res_mhz = frequencies_mhz[idx_res]
         R_res = real_parts[idx_res]
         X_res = imag_parts[idx_res]
         plt.axvline(f_res_mhz, color='green', linestyle='--', 
-                    label=f"Résonance: {f_res_mhz:.2f} MHz\nRe(Z)={R_res:.2f} Ω, Im(Z)={X_res:.2f} Ω")
+                    label=f"Resonance: {f_res_mhz:.2f} MHz\nRe(Z)={R_res:.2f} Ω, Im(Z)={X_res:.2f} Ω")
 
-    plt.xlabel("Fréquence (MHz)")
-    plt.ylabel("Impédance (Ω)")
-    plt.title("Évolution de l'impédance vs Fréquence")
+    plt.xlabel("Frequency (MHz)")
+    plt.ylabel("Impedance (Ω)")
+    plt.title("Impedance vs Frequency")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
     plt.show()
 
-
 def plot_s11_curve(s11_db, fLow, fHigh, fC=None, show_min=False):
-    plt.style.use('fivethirtyeight')
-    plt.rcParams['font.family'] = 'JetBrains Mono'
+    plt.style.use('seaborn-v0_8-talk')
+    plt.rcParams['font.family'] = 'Lucida Console'
+    plt.rcParams['font.size'] = 11
     frequencies = np.linspace(fLow, fHigh, len(s11_db))
     frequencies_mhz = np.array(frequencies) / 1e6
     s11_db = np.array(s11_db)
 
-    # Trouver le minimum de S11
+    # Find the minimum of S11
     min_index = np.argmin(s11_db)
     f_resonance = frequencies[min_index] / 1e6
     s11_min = s11_db[min_index]
 
-    # Tracé
+    # Plotting
     fig_size = 12
     Fibonacci = (1 + np.sqrt(5)) / 2
     plt.figure(figsize=(fig_size, fig_size / Fibonacci))
     plt.plot(frequencies_mhz, s11_db, label="S11 (dB)", color='blue', linewidth=2.5)
     
     if show_min:
-        plt.plot(f_resonance, s11_min, 'ro', label=f"Résonance: {f_resonance:.2f} MHz (S11={s11_min:.2f} dB)", linewidth=2.5)
+        plt.plot(f_resonance, s11_min, 'ro', label=f"Resonance: {f_resonance:.2f} MHz (S11={s11_min:.2f} dB)", linewidth=2.5)
     
     if fC is not None:
         fC_mhz = fC / 1e6
@@ -202,22 +189,23 @@ def plot_s11_curve(s11_db, fLow, fHigh, fC=None, show_min=False):
         plt.axvline(fC_mhz, color='green', linestyle='--', 
                     label=f"fC = {fC_mhz:.2f} MHz (S11={s11_fc:.2f} dB)")
 
-    plt.xlabel("Fréquence (MHz)")
+    plt.xlabel("Frequency (MHz)")
     plt.ylabel("S11 (dB)")
-    plt.title("Courbe de S11 vs Fréquence")
+    plt.title("S11 vs Frequency")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
     plt.show()
 
 def plot_s11_curve_CST_MoM(s11_db, fLow, fHigh, fC=None, cst_freq_mhz=None, cst_s11_db=None):
-    plt.style.use('fivethirtyeight')
-    plt.rcParams['font.family'] = 'JetBrains Mono'
+    plt.style.use('seaborn-v0_8-talk')
+    plt.rcParams['font.family'] = 'Lucida Console'
+    plt.rcParams['font.size'] = 11
     frequencies = np.linspace(fLow, fHigh, len(s11_db))
     frequencies_mhz = frequencies / 1e6
     s11_db = np.array(s11_db)
 
-    # Trouver le minimum de S11 (Python)
+    # Find the minimum of S11 (Python)
     min_index = np.argmin(s11_db)
     f_resonance = frequencies[min_index] / 1e6
     s11_min = s11_db[min_index]
@@ -226,21 +214,21 @@ def plot_s11_curve_CST_MoM(s11_db, fLow, fHigh, fC=None, cst_freq_mhz=None, cst_
     Fibonacci = (1 + np.sqrt(5)) / 2
     plt.figure(figsize=(fig_size, fig_size / Fibonacci))
     
-    # Courbe calculée en Python
+    # Python-computed curve
     plt.plot(frequencies_mhz, s11_db, label="S11 (MoM_solver)", color='blue', linewidth=2.5)
     plt.plot(f_resonance, s11_min, 'ro', label=f"MoM_solver: {f_resonance:.2f} MHz (S11={s11_min:.2f} dB)", linewidth=2.5)
     
-    # Courbe CST si fournie
+    # CST curve if provided
     if cst_freq_mhz is not None and cst_s11_db is not None:
         plt.plot(cst_freq_mhz, cst_s11_db, label="S11 (CST)", color='red', linestyle='--', linewidth=2.5)
-        # Trouver le minimum de S11 (CST)
+        # Find the minimum of S11 (CST)
         cst_s11_db = np.array(cst_s11_db)
         min_cst_index = np.argmin(cst_s11_db)
         cst_f_resonance = cst_freq_mhz[min_cst_index]
         cst_s11_min = cst_s11_db[min_cst_index]
         plt.plot(cst_f_resonance, cst_s11_min, 'ms', label=f"CST: {cst_f_resonance:.2f} MHz (S11={cst_s11_min:.2f} dB)", markersize=10)
 
-    # Fréquence centrale
+    # Central frequency
     if fC is not None:
         fC_mhz = fC / 1e6
         idx_fc = np.argmin(np.abs(frequencies - fC))
@@ -248,53 +236,121 @@ def plot_s11_curve_CST_MoM(s11_db, fLow, fHigh, fC=None, cst_freq_mhz=None, cst_
         plt.axvline(fC_mhz, color='green', linestyle='--', 
                     label=f"fC = {fC_mhz:.2f} MHz (S11={s11_fc:.2f} dB)", linewidth=2.5)
 
-    plt.xlabel("Fréquence (MHz)")
+    plt.xlabel("Frequency (MHz)")
     plt.ylabel("S11 (dB)")
-    plt.title("Courbe de S11 vs Fréquence")
+    plt.title("S11 vs Frequency")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
     plt.show()
 
+def plot_s11_curve_MoM_vs_Experiment(s11_db_mom, fLow, fHigh, s11_db_exp=None, exp_freq_mhz=None, fC=None):
+    """
+    Plot S11 comparison between MoM_solver and experimental measurements.
+
+    Parameters:
+        s11_db_mom: S11 values (dB) from MoM_solver (array-like)
+        fLow: Start frequency (Hz)
+        fHigh: End frequency (Hz)
+        s11_db_exp: S11 values (dB) from experiment (array-like, optional)
+        exp_freq_mhz: Frequencies (MHz) for experimental data (array-like, optional)
+        fC: Central frequency (Hz, optional)
+    """
+    plt.style.use('seaborn-v0_8-talk')
+    plt.rcParams['font.family'] = 'Lucida Console'
+    plt.rcParams['font.size'] = 11
+
+    frequencies = np.linspace(fLow, fHigh, len(s11_db_mom))
+    frequencies_mhz = frequencies / 1e6
+    s11_db_mom = np.array(s11_db_mom)
+
+    # Find minimum S11 for MoM_solver
+    min_index_mom = np.argmin(s11_db_mom)
+    f_resonance_mom = frequencies_mhz[min_index_mom]
+    s11_min_mom = s11_db_mom[min_index_mom]
+
+    fig_size = 12
+    Fibonacci = (1 + np.sqrt(5)) / 2
+    fig = plt.figure(figsize=(fig_size, fig_size / Fibonacci))
+
+    # Plot MoM_solver curve
+    plt.plot(frequencies_mhz, s11_db_mom, label="S11 (MoM_solver)", color='blue', linewidth=2.5)
+    plt.plot(f_resonance_mom, s11_min_mom, 'ro', label=f"MoM_solver: {f_resonance_mom:.2f} MHz (S11={s11_min_mom:.2f} dB)", markersize=8)
+
+    # Plot experimental curve if provided
+    if s11_db_exp is not None and exp_freq_mhz is not None:
+        s11_db_exp = np.array(s11_db_exp)
+        exp_freq_mhz = np.array(exp_freq_mhz)
+        plt.plot(exp_freq_mhz, s11_db_exp, label="S11 (Experiment)", color='orange', linestyle='--', linewidth=2.5)
+        # Find minimum S11 for experiment
+        min_exp_index = np.argmin(s11_db_exp)
+        exp_f_resonance = exp_freq_mhz[min_exp_index]
+        exp_s11_min = s11_db_exp[min_exp_index]
+        plt.plot(exp_f_resonance, exp_s11_min, 'ms', label=f"Experiment: {exp_f_resonance:.2f} MHz (S11={exp_s11_min:.2f} dB)", markersize=10)
+
+    # Central frequency marker
+    if fC is not None:
+        fC_mhz = fC / 1e6
+        idx_fc = np.argmin(np.abs(frequencies_mhz - fC_mhz))
+        s11_fc = s11_db_mom[idx_fc]
+        plt.axvline(fC_mhz, color='green', linestyle='--',
+                    label=f"fC = {fC_mhz:.2f} MHz (S11={s11_fc:.2f} dB)", linewidth=2.5)
+
+    plt.xlabel("Frequency (MHz)")
+    plt.ylabel("S11 (dB)")
+    plt.title("S11 Comparison: MoM_solver vs Experimental Measurement")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    output_dir_fig_image = "data/fig_image/"
+    if not os.path.exists(output_dir_fig_image):
+        os.makedirs(output_dir_fig_image)
+        print(f"Directory created: {output_dir_fig_image}")
+    pdf_path = os.path.join(output_dir_fig_image, "MoM_solver_vs_experimental.pdf")
+    fig.patch.set_alpha(0.0)  # Transparent background
+    plt.savefig(pdf_path, format="pdf", transparent=True)
+    print(f"\nImage saved as PDF (transparent background, minimal margins): {pdf_path}\n")
+    plt.show()
+
 def plot_impedance_curve_CST_MoM(impedances, fLow, fHigh, f_resonance,
-                         cst_freq_mhz=None, cst_re_z=None, cst_im_z=None):
-    # Style propre
+                                 cst_freq_mhz=None, cst_re_z=None, cst_im_z=None):
+    # Clean style
     plt.style.use('fivethirtyeight')
     plt.rcParams['font.family'] = 'JetBrains Mono'
 
-    # Fréquences associées à la courbe Python
+    # Frequencies associated with the Python curve
     frequencies = np.linspace(fLow, fHigh, len(impedances))
     frequencies_mhz = frequencies / 1e6
     real_parts = np.real(impedances)
     imag_parts = np.imag(impedances)
 
-    # Trouver la fréquence de résonance la plus proche
+    # Find the closest resonance frequency
     idx_res = np.argmin(np.abs(frequencies - f_resonance))
     f_res_mhz = frequencies_mhz[idx_res]
     R_res = real_parts[idx_res]
     X_res = imag_parts[idx_res]
 
-    # Tracé
+    # Plot
     fig_size = 12
     Fibonacci = (1 + np.sqrt(5)) / 2
     plt.figure(figsize=(fig_size, fig_size / Fibonacci))
 
-    # Courbe Python
+    # Python curve
     plt.plot(frequencies_mhz, real_parts, label="Re(Z) (Python)", color='red', linewidth=2.5)
     plt.plot(frequencies_mhz, imag_parts, label="Im(Z) (Python)", color='blue', linewidth=2.5)
 
-    # Courbe CST si fournie
+    # CST curve if provided
     if cst_freq_mhz is not None and cst_re_z is not None and cst_im_z is not None:
         plt.plot(cst_freq_mhz, cst_re_z, label="Re(Z) (CST)", color='darkred', linestyle='--', linewidth=2)
         plt.plot(cst_freq_mhz, cst_im_z, label="Im(Z) (CST)", color='darkblue', linestyle='--', linewidth=2)
 
-    # Fréquence de résonance
+    # Resonance frequency
     plt.axvline(f_res_mhz, color='green', linestyle='--',
-                label=f"Résonance: {f_res_mhz:.2f} MHz\nRe(Z)={R_res:.2f} Ω, Im(Z)={X_res:.2f} Ω")
+                label=f"Resonance: {f_res_mhz:.2f} MHz\nRe(Z)={R_res:.2f} Ω, Im(Z)={X_res:.2f} Ω")
 
-    plt.xlabel("Fréquence (MHz)")
-    plt.ylabel("Impédance (Ω)")
-    plt.title("Évolution de l'impédance vs Fréquence")
+    plt.xlabel("Frequency (MHz)")
+    plt.ylabel("Impedance (Ω)")
+    plt.title("Impedance vs Frequency")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -302,8 +358,8 @@ def plot_impedance_curve_CST_MoM(impedances, fLow, fHigh, f_resonance,
 
 def load_cst_data(filepath):
     """
-    Charge les données CST exportées en format texte/tabulé.
-    Retourne : fréquences [MHz], magnitudes S11, phases S11 [°]
+    Load CST-exported data in text/tab-delimited format.
+    Returns: frequencies [MHz], S11 magnitudes, S11 phases [°]
     """
     frequencies = []
     mag_s11 = []
@@ -311,12 +367,12 @@ def load_cst_data(filepath):
 
     with open(filepath, 'r') as f:
         for line in f:
-            # Ignorer les lignes de commentaire
+            # Ignore comment lines
             if line.startswith('#') or line.strip() == '':
                 continue
             parts = line.strip().split()
             if len(parts) < 3:
-                continue  # ligne invalide
+                continue  # invalid line
             freq = float(parts[0])
             mag = float(parts[1])
             phase = float(parts[2])
@@ -340,7 +396,7 @@ def plot_smith_chart_CST_MoM(frequencies_own, Z_own, frequencies_cst, mag_cst, p
 
     fig = go.Figure()
 
-    # === Données "propres" ===
+    # === Own data ===
     norm_r_own = [z.real / z0 for z in Z_own]
     norm_x_own = [z.imag / z0 for z in Z_own]
     labels_own = [f'Z = {z:.3f} @ {f*1e-6:.2f} MHz' for z, f in zip(Z_own, frequencies_own)]
@@ -355,7 +411,7 @@ def plot_smith_chart_CST_MoM(frequencies_own, Z_own, frequencies_cst, mag_cst, p
         hoverinfo='text'
     ))
 
-    # === Données CST ===
+    # === CST data ===
     Z_cst = [s11_to_impedance(m, p, z0) for m, p in zip(mag_cst, phase_cst)]
     norm_r_cst = [z.real / z0 for z in Z_cst]
     norm_x_cst = [z.imag / z0 for z in Z_cst]
@@ -371,9 +427,9 @@ def plot_smith_chart_CST_MoM(frequencies_own, Z_own, frequencies_cst, mag_cst, p
         hoverinfo='text'
     ))
 
-    # === Mettre en évidence la fréquence fC sur les deux courbes ===
+    # === Highlight central frequency fC on both curves ===
     if fC is not None:
-        # Pour MoM solver
+        # For MoM solver
         idx_own = np.argmin(np.abs(np.array(frequencies_own) - fC))
         z_own_fc = Z_own[idx_own]
         fig.add_trace(go.Scattersmith(
@@ -386,7 +442,7 @@ def plot_smith_chart_CST_MoM(frequencies_own, Z_own, frequencies_cst, mag_cst, p
             hoverinfo='text'
         ))
 
-        # Pour CST
+        # For CST
         frequencies_cst_arr = np.array(frequencies_cst)
         idx_cst = np.argmin(np.abs(frequencies_cst_arr - fC/1e6))
         z_cst_fc = Z_cst[idx_cst]
@@ -401,10 +457,10 @@ def plot_smith_chart_CST_MoM(frequencies_own, Z_own, frequencies_cst, mag_cst, p
         ))
 
     fig.update_layout(
-        title='Superposition Smith Chart - MoM Solveur vs CST',
+        title='Superimposed Smith Chart - MoM Solver vs CST',
         showlegend=True,
-        width=fig_size * 80,  # 12*80=960px
-        height=int((fig_size / Fibonacci) * 80)  # ~742px
+        width=fig_size * 80,
+        height=int((fig_size / Fibonacci) * 80)
     )
 
     fig.show()

@@ -8,44 +8,17 @@ from rwg.rwg2 import DataManager_rwg2
 from rwg.rwg4 import DataManager_rwg4
 from utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
 
-
-'''def compute_observation_points(r, angle, phi):
-    """
-        Calcule les points d'observation sur une sphère de rayon donné.
-
-        Ce calcul est basé sur les coordonnées sphériques (r, angle, phi) pour obtenir les coordonnées cartésiennes (x, y, z).
-
-        Paramètres :
-            * r : Rayon de la sphère (float).
-            * angle : Liste des angles d'élévation (theta) en radians (1D array).
-            * phi : Angle d'azimut constant (float).
-
-        Retourne :
-        np.n-d-array : Tableau Nx3 contenant les coordonnées cartésiennes des points d'observation.
-    """
-    x = r * np.sin(angle) * np.cos(phi)
-    y = r * np.sin(angle) * np.sin(phi)
-    z = r * np.cos(angle)
-    return np.vstack((x, y, z)).T  # Retourne une liste (Nx3) des coordonnées
-
-
-# Points pour deux valeurs d'azimut spécifiques (phi = 0° et phi = 90°)
-phi_0 = 0                # Azimut de 0 radians
-phi_90 = 0.5 * np.pi     # Azimut de 90°'''
-
-import numpy as np
-
 def compute_circle_points(radius, num_points, plane="yz"):
     """
-    Calcule les points d'observation disposés en cercle dans un plan spécifié.
+    Computes observation points arranged in a circle on a specified plane.
 
-    Paramètres :
-        radius : Rayon du cercle
-        num_points : Nombre de points
-        plane : Plan du cercle ("yz", "xy", "xz")
+    Parameters:
+        radius : Radius of the circle
+        num_points : Number of points
+        plane : Plane of the circle ("yz", "xy", "xz")
 
-    Retour :
-        np.ndarray de forme (num_points+1, 3)
+    Returns:
+        np.ndarray of shape (num_points+1, 3)
     """
     angles = np.linspace(0, 2 * np.pi, num_points)
     x = radius * np.cos(angles)
@@ -63,25 +36,25 @@ def compute_circle_points(radius, num_points, plane="yz"):
 
 def compute_polar(observation_point_list_phi, numbers_of_points, eta, complex_k, dipole_moment, dipole_center, total_power):
     """
-    Calcule la répartition de l'intensité du champ (en dB) sur un plan polaire donné.
+    Computes the distribution of the field intensity (in dB) on a given polar plane.
 
-    Paramètres :
-        * observation_point_list_phi : Liste des points d'observation (Nx3 n-d-array).
-        * numbers_of_points : Nombre total de points d'observation (int).
-        * eta : Impédance du milieu (float).
-        * complex_k : Nombre d'onde complexe (1j * k) (complex).
-        * dipole_moment : Moments dipolaires (complex n-d-array).
-        * dipole_center : Centres des dipôles (n-d-array).
-        * total_power : Puissance totale rayonnée par l'antenne (float).
+    Parameters:
+        * observation_point_list_phi : List of observation points (Nx3 n-d-array).
+        * numbers_of_points : Total number of observation points (int).
+        * eta : Medium impedance (float).
+        * complex_k : Complex wave number (1j * k) (complex).
+        * dipole_moment : Dipole moments (complex n-d-array).
+        * dipole_center : Dipole centers (n-d-array).
+        * total_power : Total power radiated by the antenna (float).
 
-    Retourne :
-    np.n-d-array : Diagramme polaire de l'intensité normalisée en dB (1D array).
+    Returns:
+        np.n-d-array : Polar plot of the normalized intensity in dB (1D array).
     """
-    e_field_total = np.zeros((3, numbers_of_points), dtype=complex)  # Champ électrique
-    h_field_total = np.zeros((3, numbers_of_points), dtype=complex)  # Champ magnétique
-    poynting_vector = np.zeros((3, numbers_of_points))  # Vecteur de Poynting
-    w = np.zeros(numbers_of_points)  # Densité d'énergie
-    u = np.zeros(numbers_of_points)  # Densité de puissance
+    e_field_total = np.zeros((3, numbers_of_points), dtype=complex)  # Electric field
+    h_field_total = np.zeros((3, numbers_of_points), dtype=complex)  # Magnetic field
+    poynting_vector = np.zeros((3, numbers_of_points))  # Poynting vector
+    w = np.zeros(numbers_of_points)  # Energy density
+    u = np.zeros(numbers_of_points)  # Power density
 
     index_point = 0
     for angular_phi in observation_point_list_phi:
@@ -97,26 +70,26 @@ def compute_polar(observation_point_list_phi, numbers_of_points, eta, complex_k,
                                                      dipole_center)
         index_point += 1
 
-    polar = 10 * np.log10(4 * np.pi * u / total_power)  # Conversion en dB
+    polar = 10 * np.log10(4 * np.pi * u / total_power)  # Conversion to dB
     return polar
 
-def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load, filename_gain_power_to_load, scattering = False, radiation = False):
+def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load, filename_gain_power_to_load, scattering=False, radiation=False, show=True, save_image=False):
     """
-        Génère le diagramme de directivité d'une antenne dans les plans Phi = 0° et Phi = 90°.
+        Generates the antenna directivity pattern in the Phi = 0° and Phi = 90° planes.
 
-        Cette fonction charge les données nécessaires (maillage, courants, puissance rayonnée),
-        calcule les diagrammes polaires d'intensité, et affiche les résultats.
+        This function loads the necessary data (mesh, currents, radiated power),
+        computes polar intensity plots, and displays the results.
 
-        Paramètres :
-            * filename_mesh2_to_load : Chemin du fichier contenant le maillage de l'antenne.
-            * filename_current_to_load : Chemin du fichier contenant les courants sur l'antenne.
-            * filename_gain_power_to_load : Chemin du fichier contenant les données de gain et de puissance.
+        Parameters:
+            * filename_mesh2_to_load : Path to the file containing the antenna mesh.
+            * filename_current_to_load : Path to the file containing the currents on the antenna.
+            * filename_gain_power_to_load : Path to the file containing gain and power data.
     """
-    # Extraction et modification du nom de base du fichier
+    # Extract and modify the base file name
     base_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0]
     base_name = base_name.replace('_mesh2', '')
 
-    # Chargement des données nécessaires
+    # Load the necessary data
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
 
     if scattering:
@@ -128,39 +101,50 @@ def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load
 
     total_power, *_ = load_gain_power_data(filename_gain_power_to_load)
 
-    # Calcul des paramètres fondamentaux
-    k = omega / light_speed_c    # Nombre d'onde (en rad/m)
-    complex_k = 1j * k           # Composante complexe du nombre d'onde
-    dipole_center, dipole_moment = compute_dipole_center_moment(triangles, edges, current)  # Moments dipolaires
+    # Compute fundamental parameters
+    k = omega / light_speed_c    # Wave number (rad/m)
+    complex_k = 1j * k           # Complex wave number component
+    dipole_center, dipole_moment = compute_dipole_center_moment(triangles, edges, current)  # Dipole moments
 
-    numbers_of_points = 100    # Nombre de points sur chaque plan
-    radius = 100               # Rayon de la sphère d'observation
+    numbers_of_points = 100    # Number of points per plane
+    radius = 100               # Radius of the observation sphere
 
-    # Calcul des points d'observation pour Phi = 0° et Phi = 90°
-    theta = np.linspace(0, 2 * np.pi, numbers_of_points)    # Angles theta (0 à 360°)
-
-    """ observation_point_list_phi0 = compute_observation_points(radius, theta, phi_0)
-    observation_point_list_phi90 = compute_observation_points(radius, theta, phi_90) """
+    # Compute observation points for Phi = 0° and Phi = 90°
+    theta = np.linspace(0, 2 * np.pi, numbers_of_points)    # Theta angles (0 to 360°)
 
     points_yz = compute_circle_points(radius, numbers_of_points, plane="yz")
     points_xy = compute_circle_points(radius, numbers_of_points, plane="xy")
 
 
-    # Calcul des diagrammes polaires d'intensité
+    # Compute polar intensity plots
     polar_0 = compute_polar(points_yz, numbers_of_points, eta, complex_k, dipole_moment, dipole_center, total_power)
     polar_90 = compute_polar(points_xy, numbers_of_points, eta, complex_k, dipole_moment, dipole_center, total_power)
 
-    # Visualisation du diagramme polaire
-    fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
-    ax.plot(theta, polar_0, color='red', label='Phi = 0°')
-    ax.plot(theta, polar_90, color='blue', label='Phi = 90°')
+    if show:
+        # Visualize the polar plot
+        ax = plt.subplot(projection='polar')
+        ax.plot(theta, polar_0, color='red', label='Phi = 0°')
+        ax.plot(theta, polar_90, color='blue', label='Phi = 90°')
 
-    # Configuration des axes et légendes
-    # ax.set_theta_zero_location("N")    # 0° au nord
-    # ax.set_theta_direction(-1)         # Sens horaire pour les angles
-    ax.set_rlabel_position(-30)      # Position des étiquettes radiales
-    ax.text(0, max(polar_0) + 5, "z", ha='center', va='bottom', fontsize=10, color='red')
-    ax.legend()
-    ax.grid(True)
-    ax.set_title(base_name + " E-field pattern in Phi = 0° and 90° plane", va='bottom')
-    plt.show()
+        # Configure axes and legends
+        # ax.set_theta_zero_location("N")    # 0° at north
+        # ax.set_theta_direction(-1)         # Clockwise direction for angles
+        ax.set_rlabel_position(-30)      # Radial label position
+        ax.text(0, max(polar_0) + 5, "z", ha='center', va='bottom', fontsize=10, color='red')
+        ax.legend()
+        ax.grid(True)
+        ax.set_title(base_name + " E-field pattern in Phi = 0° and 90° plane", va='bottom')
+        plt.show()
+
+        if save_image:
+            # Create directory if it does not exist
+            output_dir_fig_image = "data/fig_image/"
+            if not os.path.exists(output_dir_fig_image):
+                os.makedirs(output_dir_fig_image)
+
+            # Save the figure
+            pdf_path = os.path.join(output_dir_fig_image, 'antenna_directivity_pattern' + ".pdf")
+            plt.tight_layout()
+            plt.savefig(pdf_path, format='pdf', bbox_inches='tight')
+            print(f"The figure has been saved in {pdf_path}")
+            plt.close()

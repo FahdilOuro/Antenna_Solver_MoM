@@ -3,8 +3,8 @@ import numpy as np
 
 def calc_frequencies(fC, delta_f, nPoints):
     """
-    Calcule fLow, fHigh et la liste des fréquences centrées sur fC,
-    avec un écart delta_f et nPoints échantillons.
+        Calculates fLow, fHigh and the list of frequencies centered on fC,
+        with a spacing delta_f and nPoints samples.
     """
     fLow = fC - delta_f * (nPoints // 2)
     fHigh = fC + delta_f * ((nPoints - 1) // 2)
@@ -16,7 +16,7 @@ def calculate_nPoints(fLow, fHigh, fC, min_points=27):
     if (fC - fLow) % step == 0:
         return min_points
     else:
-        # Trouve le plus petit nPoints qui inclut fC
+        # Find the smallest nPoints that includes fC
         nPoints = min_points
         while True:
             frequencies = np.linspace(fLow, fHigh, nPoints)
@@ -26,23 +26,23 @@ def calculate_nPoints(fLow, fHigh, fC, min_points=27):
 
 def generate_frequencies(fLow, fHigh, fC, step):
     """
-    Génère une liste de fréquences entre fLow et fHigh avec un pas donné.
-    Vérifie que fC est inclus dans la liste et retourne son index et le nombre de points.
-    
-    Paramètres:
-    - fLow : fréquence basse (en Hz)
-    - fHigh : fréquence haute (en Hz)
-    - fC : fréquence centrale à inclure (en Hz)
-    - step : pas entre les fréquences (en Hz)
-    
-    Retourne:
-    - frequencies : liste des fréquences
-    - fC_included : booléen indiquant si fC est dans la liste
-    - fC_index : index de fC dans la liste (ou None si non inclus)
-    - nPoints : nombre total de fréquences générées
+        Generates a list of frequencies between fLow and fHigh with a given step.
+        Checks that fC is included in the list and returns its index and the number of points.
+
+        Parameters:
+            - fLow: lower frequency (in Hz)
+            - fHigh: upper frequency (in Hz)
+            - fC: central frequency to include (in Hz)
+            - step: frequency step (in Hz)
+
+        Returns:
+            - frequencies: list of frequencies
+            - fC_included: boolean indicating if fC is in the list
+            - fC_index: index of fC in the list (or None if not included)
+            - nPoints: total number of generated frequencies
     """
     if (fC - fLow) % step != 0:
-        raise ValueError("fC ne tombe pas sur un pas de fréquence. Ajuste fLow, fC ou le step.")
+        raise ValueError("fC does not fall on a frequency step. Adjust fLow, fC, or the step.")
 
     nPoints = int((fHigh - fLow) // step) + 1
     frequencies = [fLow + i * step for i in range(nPoints)]

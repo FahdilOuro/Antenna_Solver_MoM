@@ -1,19 +1,19 @@
 """
-    Ce module implémente le calcul des champs électromagnétiques et des propriétés associées
-    à partir de données de triangles, arêtes, et courants pour une antenne.
+    This module implements the computation of electromagnetic fields and associated properties
+    from triangle, edge, and current data for an antenna.
 
-    Fonctionnalités principales :
-        1. Calcul des centres et moments dipolaires associés aux arêtes d'un maillage triangulaire.
-        2. Détermination des champs électriques (E) et magnétiques (H) radiés et dispersés en un point d'observation.
-        3. Calcul de la densité de puissance (vecteur de Poynting), de la densité de radiation et de l'intensité de radiation.
+    Main functionalities:
+        1. Calculation of centers and dipole moments associated with the edges of a triangular mesh.
+        2. Determination of radiated and scattered electric (E) and magnetic (H) fields at an observation point.
+        3. Calculation of power density (Poynting vector), radiation density, and radiation intensity.
 
-    Entrées principales :
-        * triangles_data : Contient les données des triangles, y compris leurs centres et indices liés aux arêtes.
-        * edges_data : Contient les longueurs et le nombre total d'arêtes.
-        * current_data : Tableau des courants électriques associés aux arêtes du maillage.
-        * observation_point : Point dans l'espace, où les champs seront calculés (vecteur 3D).
-        * eta : Impédance caractéristique du milieu.
-        * complex_k : Nombre d'onde complexe du milieu.
+    Main inputs:
+        * triangles_data: Contains triangle data, including their centers and edge-related indices.
+        * edges_data: Contains lengths and the total number of edges.
+        * current_data: Array of electric currents associated with the mesh edges.
+        * observation_point: Point in space where the fields will be computed (3D vector).
+        * eta: Characteristic impedance of the medium.
+        * complex_k: Complex wavenumber of the medium.
 """
 import numpy as np
 
@@ -22,25 +22,25 @@ from utils.point_field import radiated_scattered_field_at_a_point
 
 def compute_dipole_center_moment(triangles_data, edges_data, current_data):
     """
-    Calcule les centres et moments dipolaires associés aux arêtes d'un maillage.
+    Computes the centers and dipole moments associated with the edges of a mesh.
 
-    Paramètres :
-        * triangles_data : Objet avec .triangles_center (3xN), .triangles_plus, .triangles_minus (indices)
-        * edges_data : Objet avec .edges_length (N), .total_number_of_edges (int)
-        * current_data : Tableau complexe 1D de courants sur chaque arête (N,)
+    Parameters:
+        * triangles_data: Object with .triangles_center (3xN), .triangles_plus, .triangles_minus (indices)
+        * edges_data: Object with .edges_length (N), .total_number_of_edges (int)
+        * current_data: 1D complex array of currents on each edge (N,)
 
-    Retourne :
-        * dipole_center : np.ndarray (3 x N), centres des dipôles
-        * dipole_moment : np.ndarray (3 x N), moments dipolaires complexes
+    Returns:
+        * dipole_center: np.ndarray (3 x N), centers of the dipoles
+        * dipole_moment: np.ndarray (3 x N), complex dipole moments
     """
-    # Récupération des centres des triangles plus et moins
+    # Retrieve the centers of the plus and minus triangles
     point_plus_center = triangles_data.triangles_center[:, triangles_data.triangles_plus]
     point_minus_center = triangles_data.triangles_center[:, triangles_data.triangles_minus]
 
-    # Calcul vectorisé des centres des dipôles
+    # Vectorized calculation of dipole centers
     dipole_center = 0.5 * (point_plus_center + point_minus_center)
 
-    # Calcul vectorisé des moments dipolaires
+    # Vectorized calculation of dipole moments
     delta = -point_plus_center + point_minus_center
     scaling = edges_data.edges_length * current_data  # (N,)
     dipole_moment = delta * scaling  # Broadcasting (3,N) * (N,) → (3,N)
@@ -49,41 +49,41 @@ def compute_dipole_center_moment(triangles_data, edges_data, current_data):
 
 def compute_e_h_field(observation_point, eta, complex_k, dipole_moment, dipole_center):
     """
-        Calcule les champs électriques et magnétiques radiés et dispersés au point d'observation,
-        ainsi que des quantités associées comme le vecteur de Poynting et l'intensité de radiation.
+        Computes the radiated and scattered electric and magnetic fields at the observation point,
+        along with associated quantities like the Poynting vector and radiation intensity.
 
-        Paramètres :
-            * observation_point : Coordonnées du point d'observation (vecteur 3D).
-            * eta : Impédance caractéristique du milieu.
-            * complex_k : Nombre d'onde complexe.
-            * dipole_moment : Moments dipolaires associés aux arêtes (matrice 3xN).
-            * dipole_center : Centres des dipôles associés aux arêtes (matrice 3xN).
+        Parameters:
+            * observation_point : Coordinates of the observation point (3D vector).
+            * eta : Characteristic impedance of the medium.
+            * complex_k : Complex wavenumber.
+            * dipole_moment : Dipole moments associated with the edges (3xN matrix).
+            * dipole_center : Dipole centers associated with the edges (3xN matrix).
 
-        Retourne :
-         * e_field_total : Champ électrique total au point d'observation (vecteur 3D).
-         * h_field_total : Champ magnétique total au point d'observation (vecteur 3D).
-         * poynting_vector : Vecteur de Poynting représentant la densité de puissance transportée (vecteur 3D).
-         * w : Densité de radiation (puissance par unité de surface).
-         * u : Intensité de radiation (puissance par unité d'angle solide).
-         * norm_observation_point : Distance entre le point d'observation et l'origine.
+        Returns:
+         * e_field_total : Total electric field at the observation point (3D vector).
+         * h_field_total : Total magnetic field at the observation point (3D vector).
+         * poynting_vector : Poynting vector representing the transported power density (3D vector).
+         * w : Radiation density (power per unit surface).
+         * u : Radiation intensity (power per unit solid angle).
+         * norm_observation_point : Distance between the observation point and the origin.
     """
-    # Calcul des champs E et H au point d'observation à partir des moments dipolaires
+    # Compute E and H fields at the observation point from the dipole moments
     e_field, h_field = radiated_scattered_field_at_a_point(observation_point, eta, complex_k, dipole_moment, dipole_center)
 
-    # Sommation des contributions des dipôles pour obtenir les champs totaux
+    # Sum the contributions of the dipoles to get the total fields
     e_field_total = np.sum(e_field, axis=1)
     h_field_total = np.sum(h_field, axis=1)
 
-    # Calcul du vecteur de Poynting (densité de puissance transportée par les ondes EM)
+    # Compute the Poynting vector (power density carried by the EM waves)
     poynting_vector = np.real(0.5 * (np.cross(e_field_total.flatten(), np.conj(h_field_total).flatten())))
 
-    # Norme de la position du point d'observation
+    # Norm of the observation point position
     norm_observation_point = np.linalg.norm(observation_point)
 
-    # Densité de radiation : norme du vecteur de Poynting
+    # Radiation density: norm of the Poynting vector
     w = np.linalg.norm(poynting_vector)
 
-    # Intensité de radiation : densité de radiation pondérée par le carré de la distance
+    # Radiation intensity: radiation density scaled by the square of the distance
     u = (norm_observation_point ** 2) * w
 
     return e_field_total, h_field_total, poynting_vector, w, u, norm_observation_point

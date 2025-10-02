@@ -4,15 +4,15 @@ import numpy as np
 
 def trace_meander(x, y, Width):
     """
-    Génère le contour épais (meander) autour min_slot'une ligne polygonale donnée.
-    
-    Paramètres :
-        x : array-like, abscisses de la ligne centrale
-        y : array-like, ordonnées de la ligne centrale
-        Width : hauteur totale du contour (centré sur la ligne)
+        Generates the thick contour (meander) around a given polyline.
         
-    Retourne :
-        x_meander, y_meander : coordonnées du contour
+        Parameters:
+            x : array-like, x-coordinates of the center line
+            y : array-like, y-coordinates of the center line
+            Width : total height of the contour (centered on the line)
+            
+        Returns:
+            x_meander, y_meander : coordinates of the contour
     """
     x = np.array(x)
     y = np.array(y)
@@ -21,7 +21,7 @@ def trace_meander(x, y, Width):
     x_meander = np.zeros(2 * n)
     y_meander = np.zeros(2 * n)
 
-    # Premier point
+    # First point
     if x[0] == x[1] and y[0] > y[1]:
         x_meander[0]     = x[0] + Width / 2
         x_meander[2*n-1] = x[0] - Width / 2
@@ -38,7 +38,7 @@ def trace_meander(x, y, Width):
         y_meander[0]     = y[0] + Width / 2
         y_meander[2*n-1] = y[0] - Width / 2
 
-    # Dernier point
+    # Last point
     if y[n-2] == y[n-1]:
         x_meander[n-1] = x[n-1]
         x_meander[n]   = x[n-1]
@@ -47,15 +47,15 @@ def trace_meander(x, y, Width):
     elif x[n-2] == x[n-1] and y[n-2] > y[n-1]:
         x_meander[n-1] = x[n-1] + Width / 2
         x_meander[n]   = x[n-1] - Width / 2
-        y_meander[n-1] = y[n-1] - Width / 2  # modif
-        y_meander[n]   = y[n-1] - Width / 2  # modif
+        y_meander[n-1] = y[n-1] - Width / 2  # modification
+        y_meander[n]   = y[n-1] - Width / 2  # modification
     elif x[n-2] == x[n-1] and y[n-2] < y[n-1]:
         x_meander[n-1] = x[n-1] - Width / 2
         x_meander[n]   = x[n-1] + Width / 2
-        y_meander[n-1] = y[n-1] + Width / 2  # modif
-        y_meander[n]   = y[n-1] + Width / 2  # modif
+        y_meander[n-1] = y[n-1] + Width / 2  # modification
+        y_meander[n]   = y[n-1] + Width / 2  # modification
 
-    # Points intermédiaires
+    # Intermediate points
     j = 2 * n - 2
     for i in range(1, n - 1):
         if y[i-1] == y[i] and x[i] == x[i+1] and y[i] > y[i+1]:
@@ -87,16 +87,16 @@ def trace_meander(x, y, Width):
     return x_meander, y_meander
 
 def ifa_creation(largeur, hauteur, width, distance_meandre):
-    # Initialisation de x0 et y0 --> pour se positionner sur la ligne central de la piste
+    # Initialization of x0 and y0 --> to position on the center line of the track
     x0 = 0
     y0 = hauteur - width / 2
     hauteur_ligne_central = hauteur - width
 
-    # Calcul du nombre de brins verticaux
+    # Calculate the number of vertical branches
     N = math.floor(largeur / (width + distance_meandre))
     # print(f"Number of meanders {N}")
     
-    # Recalculer le nombre de min_slot
+    # Recalculate the number of min_slot
     distance_meandre = (largeur / N) - width
     # print(f"New distance meandres {distance_meandre * 1000} mm")
 
