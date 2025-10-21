@@ -50,3 +50,27 @@ def generate_frequencies(fLow, fHigh, fC, step):
     fC_index = frequencies.index(fC) if fC_included else None
 
     return frequencies, fC_index, nPoints
+
+def generate_frequencies_2(fLow, fHigh, fC, step):
+    """
+        Generates a list of frequencies between fLow and fHigh with a given step.
+        Checks that fC is included in the list and returns its index and the number of points.
+
+        Parameters:
+            - fLow: lower frequency (in Hz)
+            - fHigh: upper frequency (in Hz)
+            - fC: central frequency to include (in Hz)
+            - step: frequency step (in Hz)
+
+        Returns:
+            - frequencies: list of frequencies
+            - fC_included: boolean indicating if fC is in the list
+            - fC_index: index of fC in the list (or None if not included)
+            - nPoints: total number of generated frequencies
+    """
+    nPoints = int((fHigh - fLow) // step) + 1
+    frequencies = [fLow + i * step for i in range(nPoints)]
+    fC_included = fC in frequencies
+    fC_index = frequencies.index(fC) if fC_included else None
+
+    return frequencies, fC_index, nPoints

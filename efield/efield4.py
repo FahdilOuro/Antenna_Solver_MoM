@@ -3,81 +3,114 @@ from matplotlib import pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 
-def plot_smith_chart(impedances, frequencies, fC=None, save_image=False):
+def plot_smith_chart(impedances, frequencies, fC=None, save_image=False, Z0=50):
+    """
+    Plot Smith chart with impedance points
+    
+    Parameters:
+    -----------
+    impedances : list
+        List of complex impedances
+    frequencies : list
+        List of corresponding frequencies
+    Z0 : float, optional
+        Reference impedance for normalization (default: 50 Ohms)
+    fC : float, optional
+        Center frequency to highlight in red
+    save_image : bool, optional
+        Save the figure as PDF
+    """
     fig_size = 15
     Fibonacci = (1 + np.sqrt(5)) / 2
-
     fig = go.Figure()
-
-    Normalized_Z0 = 50  # Normalized impedance reference (Z0)
-
+    
+    # Normalize impedances
     smith_points = []
     for idx, Z in enumerate(impedances):
-        r = Z.real / Normalized_Z0
-        x = Z.imag / Normalized_Z0
+        r = Z.real / Z0
+        x = Z.imag / Z0
         smith_points.append(dict(
             real=r,
             imag=x,
             freq=frequencies[idx],
             label=f'Z = {Z:.3f} at {frequencies[idx]*1e-6:.2f} MHz'
         ))
-
-    if fC is not None and fC in frequencies:
-        idx_fC = frequencies.index(fC)
-        # Plot all points except the highlighted one
+    
+    # Plot all points connected with a line
+    fig.add_trace(go.Scattersmith(
+        real=[pt['real'] for pt in smith_points],
+        imag=[pt['imag'] for pt in smith_points],
+        mode='markers+lines',
+        marker=dict(size=4, color='blue'),
+        line=dict(color='blue'),
+        name=f'Impedance Points (Z0={Z0}Ω)',
+        text=[pt['label'] for pt in smith_points],
+        hoverinfo='text'
+    ))
+    
+    """# Highlight start frequency in green
+    if len(smith_points) > 0:
+        pt_start = smith_points[0]
         fig.add_trace(go.Scattersmith(
-            real=[pt['real'] for i, pt in enumerate(smith_points) if i != idx_fC],
-            imag=[pt['imag'] for i, pt in enumerate(smith_points) if i != idx_fC],
-            mode='markers+lines',
-            marker=dict(size=4, color='blue'),
-            name='Impedance Points',
-            text=[pt['label'] for i, pt in enumerate(smith_points) if i != idx_fC],
+            real=[pt_start['real']],
+            imag=[pt_start['imag']],
+            mode='markers',
+            marker=dict(size=10, color='green', symbol='circle'),
+            name=f"Start: {frequencies[0]*1e-6:.2f} MHz, Z={impedances[0]:.2f}",
+            text=[pt_start['label']],
             hoverinfo='text'
         ))
-        # Highlight the specific frequency in red and show impedance value in legend
+    
+    # Highlight stop frequency in orange
+    if len(smith_points) > 1:
+        pt_stop = smith_points[-1]
+        fig.add_trace(go.Scattersmith(
+            real=[pt_stop['real']],
+            imag=[pt_stop['imag']],
+            mode='markers',
+            marker=dict(size=10, color='orange', symbol='circle'),
+            name=f"Stop: {frequencies[-1]*1e-6:.2f} MHz, Z={impedances[-1]:.2f}",
+            text=[pt_stop['label']],
+            hoverinfo='text'
+        ))
+    
+    # Highlight the specific frequency in red if provided
+    if fC is not None and fC in frequencies:
+        idx_fC = frequencies.index(fC)
         pt = smith_points[idx_fC]
         fig.add_trace(go.Scattersmith(
             real=[pt['real']],
             imag=[pt['imag']],
             mode='markers',
             marker=dict(size=10, color='red', symbol='circle'),
-            name=f"fC={fC*1e-6:.2f} MHz, Z={impedances[idx_fC]:.2f}",
+            name=f"fC: {fC*1e-6:.2f} MHz, Z={impedances[idx_fC]:.2f}",
             text=[f"{pt['label']}"],
             hoverinfo='text'
-        ))
-    else:
-        fig.add_trace(go.Scattersmith(
-            real=[pt['real'] for pt in smith_points],
-            imag=[pt['imag'] for pt in smith_points],
-            mode='markers+lines',
-            marker=dict(size=4, color='blue'),
-            name='Impedance Points',
-            text=[pt['label'] for pt in smith_points],
-            hoverinfo='text'
-        ))
-
+        ))"""
+    
     fig.update_layout(
         title='',
         showlegend=True,
         width=1000,
         height=int(1000 / Fibonacci)
     )
-
+    
     fig.show()
-
+    
     if save_image:
         output_dir_fig_image = "data/fig_image/"
         if not os.path.exists(output_dir_fig_image):
             os.makedirs(output_dir_fig_image)
-            print(f"File created : {output_dir_fig_image}")
-        pdf_path = os.path.join(output_dir_fig_image, "ifa_M_opti3_Smith_chart.pdf")
+            print(f"Directory created: {output_dir_fig_image}")
+        
+        pdf_path = os.path.join(output_dir_fig_image, "ifa_M_opti_Smith_chart_433.pdf")
         fig.update_layout(
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             margin=dict(l=0, r=0, t=10, b=10)
         )
         fig.write_image(pdf_path, format="pdf")
-        print(f"\nImage saved in PDF format (transparent background, minimal margins) : {pdf_path}\n")
+        print(f"\nImage saved in PDF format (transparent background, minimal margins): {pdf_path}\n")
 
 def plot_single_impedance(Z):
     Normalized_Z0 = 50  # Normalized impedance reference (Z0)
@@ -128,6 +161,36 @@ def calculate_Q(frequencies, s11_db, f_resonance):
 
     return Q
 
+def calculate_bandwidth(frequencies, s11_db, threshold=-10):
+    """Calculate and display bandwidth where S11 < threshold (in dB)"""
+    
+    # Convert to numpy arrays
+    frequencies = np.asarray(frequencies, dtype=float)
+    s11_db = np.asarray(s11_db, dtype=float)
+    
+    # Find indices where S11 < threshold
+    idx_bw = np.where(s11_db < threshold)[0]
+    
+    if len(idx_bw) > 0:
+        f_min = frequencies[idx_bw[0]]
+        f_max = frequencies[idx_bw[-1]]
+        bw = (f_max - f_min) / 1e6  # MHz
+        
+        # Display results
+        print("\n" + "=" * 50)
+        print(f"🔹 Bandwidth: {bw:.2f} MHz")
+        print(f"   - f_min = {f_min/1e9:.3f} GHz")
+        print(f"   - f_max = {f_max/1e9:.3f} GHz")
+        print(f"   - Threshold = {threshold} dB")
+        print("=" * 50 + "\n")
+        
+        return bw, f_min, f_max
+    else:
+        print("\n" + "=" * 50)
+        print(f"⚠️  No frequencies found where S11 < {threshold} dB.")
+        print("=" * 50 + "\n")
+        return 0, None, None
+
 def plot_impedance_curve(impedances, fLow, fHigh, f_resonance=None):
     plt.style.use('seaborn-v0_8-talk')
     plt.rcParams['font.family'] = 'Lucida Console'
@@ -160,7 +223,7 @@ def plot_impedance_curve(impedances, fLow, fHigh, f_resonance=None):
     plt.tight_layout()
     plt.show()
 
-def plot_s11_curve(s11_db, fLow, fHigh, fC=None, show_min=False):
+def plot_s11_curve(s11_db, fLow, fHigh, fC=None, show_min=False, s11_reference=None, show_reference=True):
     plt.style.use('seaborn-v0_8-talk')
     plt.rcParams['font.family'] = 'Lucida Console'
     plt.rcParams['font.size'] = 11
@@ -188,6 +251,17 @@ def plot_s11_curve(s11_db, fLow, fHigh, fC=None, show_min=False):
         s11_fc = s11_db[idx_fc]
         plt.axvline(fC_mhz, color='green', linestyle='--', 
                     label=f"fC = {fC_mhz:.2f} MHz (S11={s11_fc:.2f} dB)")
+
+    # Addition of reference line S11
+    if s11_reference is not None and show_reference:
+        plt.axhline(y=s11_reference, color='red', linestyle=':', 
+                   label=f"S11 Reference = {s11_reference} dB", linewidth=2)
+        # Optional: Add intersection points with curve S11
+        # This shows where curve S11 crosses the reference line
+        crossings = np.where(np.diff(np.sign(s11_db - s11_reference)))[0]
+        for cross in crossings:
+            if cross < len(frequencies_mhz) - 1:
+                plt.plot(frequencies_mhz[cross], s11_db[cross], 'rx', markersize=8)
 
     plt.xlabel("Frequency (MHz)")
     plt.ylabel("S11 (dB)")
