@@ -1,6 +1,0 @@
-========== MESHING SUMMARY ==========
-
-Model: strip_gmsh
-Mesh file location: D:\Doctorat_LEAT\Projets_Github\Antenna_Solver_MoM\data\gmsh_files\strip_gmsh.msh
--------------------------------------
-
