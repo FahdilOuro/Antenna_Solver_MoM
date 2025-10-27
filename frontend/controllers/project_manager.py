@@ -137,14 +137,51 @@ class ProjectManager(QObject):
         }
         
         if project_data.get("frequencyType") == "single":
-            freq_config["value"] = project_data.get("frequency")
-            freq_config["unit"] = "GHz"
+            value = project_data.get("frequency")
+            unit = project_data.get("frequencyUnit", "MHz")
+            
+            freq_config["value"] = value
+            freq_config["unit"] = unit
+            freq_config["real_value"] = self._convert_to_hz(value, unit)
         else:
-            freq_config["start"] = project_data.get("startFrequency")
-            freq_config["end"] = project_data.get("endFrequency")
-            freq_config["unit"] = "GHz"
+            start_value = project_data.get("startFrequency")
+            start_unit = project_data.get("startFrequencyUnit", "MHz")
+            end_value = project_data.get("endFrequency")
+            end_unit = project_data.get("endFrequencyUnit", "MHz")
+            
+            freq_config["start"] = {
+                "value": start_value,
+                "unit": start_unit,
+                "real_value": self._convert_to_hz(start_value, start_unit)
+            }
+            freq_config["end"] = {
+                "value": end_value,
+                "unit": end_unit,
+                "real_value": self._convert_to_hz(end_value, end_unit)
+            }
         
         return freq_config
+    
+    def _convert_to_hz(self, value, unit):
+        """
+        Convert frequency value to Hz.
+        
+        Args:
+            value (float): Frequency value
+            unit (str): Frequency unit (Hz, kHz, MHz, GHz, THz)
+        
+        Returns:
+            float: Frequency in Hz
+        """
+        conversions = {
+            "Hz": 1,
+            "kHz": 1e3,
+            "MHz": 1e6,
+            "GHz": 1e9,
+            "THz": 1e12
+        }
+        
+        return value * conversions.get(unit, 1)
     
     @Slot(str, result=bool)
     def loadProject(self, project_path):

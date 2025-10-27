@@ -15,8 +15,11 @@ Item {
     property string antennaName: ""
     property string frequencyType: "single" // "single" or "band"
     property real singleFrequency: 2.4
+    property string singleFrequencyUnit: "GHz"
     property real startFrequency: 2.0
+    property string startFrequencyUnit: "GHz"
     property real endFrequency: 3.0
+    property string endFrequencyUnit: "GHz"
     property string outputPath: ""
     
     ScrollView {
@@ -113,37 +116,49 @@ Item {
                             Label {
                                 text: "Frequency:"
                             }
-                            
-                            SpinBox {
-                                id: singleFreqSpinBox
-                                from: 1
-                                to: 100000
-                                value: 2400
-                                editable: true
-                                
-                                property int decimals: 2
-                                property real realValue: value / 100
-                                
-                                validator: DoubleValidator {
-                                    bottom: Math.min(singleFreqSpinBox.from, singleFreqSpinBox.to)
-                                    top: Math.max(singleFreqSpinBox.from, singleFreqSpinBox.to)
+                            TextField {
+                                id: singleFreqLineEdit
+                                text: singleFrequency.toFixed(2)
+                                inputMethodHints: Qt.ImhFormattedNumbersOnly
+
+                                // --- User starts typing
+                                onTextChanged: {
+                                    // Allow only digits and dot while typing
+                                    if (!/^[0-9]*\.?[0-9]*$/.test(text)) {
+                                        // Remove invalid characters
+                                        text = text.replace(/[^0-9.]/g, "")
+                                    }
+                                    // console.debug("User is typing:", text)
                                 }
-                                
-                                textFromValue: function(value, locale) {
-                                    return Number(value / 100).toLocaleString(locale, 'f', decimals)
-                                }
-                                
-                                valueFromText: function(text, locale) {
-                                    return Number.fromLocaleString(locale, text) * 100
-                                }
-                                
-                                onValueChanged: {
-                                    projectCreationPage.singleFrequency = realValue
+
+                                // --- Validation on completion
+                                onEditingFinished: {
+                                    let newValue = Number(text)
+                                    if (!isNaN(newValue) && newValue >= 1.0 && newValue <= 1000.0) {
+                                        projectCreationPage.singleFrequency = newValue
+                                        // console.log("✅ Frequency validated:", newValue)
+                                        text = newValue.toFixed(2) // format nicely
+                                    } else {
+                                        // console.warn("❌ Invalid input:", text)
+                                        // Reset to previous valid value
+                                        text = projectCreationPage.singleFrequency.toFixed(2)
+                                    }
                                 }
                             }
-                            
-                            Label {
-                                text: "GHz"
+                            ComboBox {
+                                id: singleFreqUnitCombo
+                                model: ["Hz", "kHz", "MHz", "GHz", "THz"]
+                                currentIndex: 2 // Default to GHz
+                                
+                                onCurrentTextChanged: {
+                                    // console.log("Frequency unit changed to:", currentText)
+                                    projectCreationPage.singleFrequencyUnit = currentText
+                                }
+                                
+                                Component.onCompleted: {
+                                    // console.log("ComboBox initialized with:", currentText)
+                                    projectCreationPage.singleFrequencyUnit = currentText
+                                }
                             }
                         }
                         
@@ -161,7 +176,7 @@ Item {
                                     text: "Start:"
                                 }
                                 
-                                SpinBox {
+                                /*SpinBox {
                                     id: startFreqSpinBox
                                     from: 1
                                     to: 100000
@@ -187,10 +202,65 @@ Item {
                                     onValueChanged: {
                                         projectCreationPage.startFrequency = realValue
                                     }
+                                }*/
+                                TextField {
+                                    id: startFreqTextField
+
+                                    // Initial value formatted with 2 decimals
+                                    text: (200 / 100).toFixed(2)
+
+                                    inputMethodHints: Qt.ImhFormattedNumbersOnly // numeric keyboard with decimal point
+
+                                    property int decimals: 2
+                                    property real realValue: Number(text) || 0
+
+                                    // --- Live input: allow only digits and one dot
+                                    onTextChanged: {
+                                        if (!/^[0-9]*\.?[0-9]*$/.test(text)) {
+                                            text = text.replace(/[^0-9.]/g, "")
+                                        }
+                                        // console.debug("User is typing:", text)
+                                    }
+
+                                    // --- Validation on finish (Enter pressed or focus lost)
+                                    onEditingFinished: {
+                                        let newValue = Number(text)
+                                        let minValue = Math.min(1, 100000) / 100
+                                        let maxValue = Math.max(1, 100000) / 100
+
+                                        if (!isNaN(newValue) && newValue >= minValue && newValue <= maxValue) {
+                                            projectCreationPage.startFrequency = newValue
+                                            // console.log("✅ Start frequency validated:", newValue)
+                                            // Format with 2 decimals
+                                            text = newValue.toFixed(decimals)
+                                        } else {
+                                            // console.warn("❌ Invalid input:", text)
+                                            // Reset to previous valid value
+                                            text = projectCreationPage.startFrequency.toFixed(decimals)
+                                        }
+                                    }
+
+                                    // Optional: focus feedback
+                                    onActiveFocusChanged: {
+                                        if (activeFocus) {
+                                            console.debug("User started editing start frequency.")
+                                        } else {
+                                            console.debug("User left start frequency field.")
+                                        }
+                                    }
                                 }
-                                
-                                Label {
-                                    text: "GHz"
+                                ComboBox {
+                                    id: startFreqUnitCombo
+                                    model: ["Hz", "kHz", "MHz", "GHz", "THz"]
+                                    currentIndex: 3 // Default to GHz
+                                    
+                                    onCurrentTextChanged: {
+                                        projectCreationPage.startFrequencyUnit = currentText
+                                    }
+                                    
+                                    Component.onCompleted: {
+                                        projectCreationPage.startFrequencyUnit = currentText
+                                    }
                                 }
                             }
                             
@@ -201,37 +271,64 @@ Item {
                                 Label {
                                     text: "End:"
                                 }
-                                
-                                SpinBox {
-                                    id: endFreqSpinBox
-                                    from: 1
-                                    to: 100000
-                                    value: 300
-                                    editable: true
-                                    
+                                TextField {
+                                    id: endFreqTextField
+
+                                    // Initial value formatted with 2 decimals
+                                    text: (300 / 100).toFixed(2)
+
+                                    inputMethodHints: Qt.ImhFormattedNumbersOnly // numeric keyboard with decimal point
+
                                     property int decimals: 2
-                                    property real realValue: value / 100
-                                    
-                                    validator: DoubleValidator {
-                                        bottom: Math.min(endFreqSpinBox.from, endFreqSpinBox.to)
-                                        top: Math.max(endFreqSpinBox.from, endFreqSpinBox.to)
+                                    property real realValue: Number(text) || 0
+
+                                    // --- Live input: allow only digits and one dot
+                                    onTextChanged: {
+                                        if (!/^[0-9]*\.?[0-9]*$/.test(text)) {
+                                            text = text.replace(/[^0-9.]/g, "")
+                                        }
+                                        // console.debug("User is typing:", text)
                                     }
-                                    
-                                    textFromValue: function(value, locale) {
-                                        return Number(value / 100).toLocaleString(locale, 'f', decimals)
+
+                                    // --- Validation on finish (Enter pressed or focus lost)
+                                    onEditingFinished: {
+                                        let newValue = Number(text)
+                                        let minValue = Math.min(1, 100000) / 100
+                                        let maxValue = Math.max(1, 100000) / 100
+
+                                        if (!isNaN(newValue) && newValue >= minValue && newValue <= maxValue) {
+                                            projectCreationPage.endFrequency = newValue
+                                            // console.log("✅ End frequency validated:", newValue)
+                                            // Format with 2 decimals
+                                            text = newValue.toFixed(decimals)
+                                        } else {
+                                            // console.warn("❌ Invalid input:", text)
+                                            // Reset to previous valid value
+                                            text = projectCreationPage.endFrequency.toFixed(decimals)
+                                        }
                                     }
-                                    
-                                    valueFromText: function(text, locale) {
-                                        return Number.fromLocaleString(locale, text) * 100
-                                    }
-                                    
-                                    onValueChanged: {
-                                        projectCreationPage.endFrequency = realValue
+
+                                    // Optional: focus feedback
+                                    onActiveFocusChanged: {
+                                        if (activeFocus) {
+                                            console.debug("User started editing end frequency.")
+                                        } else {
+                                            console.debug("User left end frequency field.")
+                                        }
                                     }
                                 }
-                                
-                                Label {
-                                    text: "GHz"
+                                ComboBox {
+                                    id: endFreqUnitCombo
+                                    model: ["Hz", "kHz", "MHz", "GHz", "THz"]
+                                    currentIndex: 3 // Default to GHz
+                                    
+                                    onCurrentTextChanged: {
+                                        projectCreationPage.endFrequencyUnit = currentText
+                                    }
+                                    
+                                    Component.onCompleted: {
+                                        projectCreationPage.endFrequencyUnit = currentText
+                                    }
                                 }
                             }
                         }
@@ -304,9 +401,12 @@ Item {
                         
                         if (projectCreationPage.frequencyType === "single") {
                             projectData["frequency"] = projectCreationPage.singleFrequency
+                            projectData["frequencyUnit"] = projectCreationPage.singleFrequencyUnit
                         } else {
                             projectData["startFrequency"] = projectCreationPage.startFrequency
+                            projectData["startFrequencyUnit"] = projectCreationPage.startFrequencyUnit
                             projectData["endFrequency"] = projectCreationPage.endFrequency
+                            projectData["endFrequencyUnit"] = projectCreationPage.endFrequencyUnit
                         }
                         
                         // Call ProjectManager to create project

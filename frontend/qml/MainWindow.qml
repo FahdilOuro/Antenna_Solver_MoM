@@ -6,8 +6,8 @@ import "pages"
 ApplicationWindow {
     id: mainWindow
     visible: true
-    width: 1200
-    height: 800
+    width: 900
+    height: 600
     title: "Method of Moments Solver"
     
     // Property to manage current page

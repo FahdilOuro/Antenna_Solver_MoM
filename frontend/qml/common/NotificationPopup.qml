@@ -22,7 +22,7 @@ Popup {
     // Auto-close timer
     Timer {
         id: autoCloseTimer
-        interval: 3000
+        interval: 4000
         running: false
         repeat: false
         onTriggered: notificationPopup.close()
