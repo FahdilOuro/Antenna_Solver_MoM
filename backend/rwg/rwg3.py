@@ -1,6 +1,6 @@
 import os
 from scipy.io import savemat, loadmat
-from utils.impmet import *
+from backend.utils.impmet import *
 
 def calculate_z_matrice(triangles, edges, barycentric_triangles, vecteurs_rho, frequency):
     """

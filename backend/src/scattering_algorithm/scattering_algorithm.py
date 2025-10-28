@@ -17,11 +17,11 @@
         * Visualization of surface currents on the antenna.
         * Saving intermediate data into different folders for further processing.
 """
-from rwg.rwg1 import *
-from rwg.rwg2 import *
-from rwg.rwg3 import *
-from rwg.rwg4 import *
-from rwg.rwg5 import *
+from backend.rwg.rwg1 import *
+from backend.rwg.rwg2 import *
+from backend.rwg.rwg3 import *
+from backend.rwg.rwg4 import *
+from backend.rwg.rwg5 import *
 
 def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization, load_from_matlab=True, show=True):
     """

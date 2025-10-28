@@ -2,7 +2,8 @@ import os
 import numpy as np
 from scipy.io import savemat
 from scipy.io import loadmat
-from src.radiation_algorithm.radiation_algorithm import radiation_algorithm
+
+from backend.src.radiation_algorithm.radiation_algorithm import radiation_algorithm
 
 
 def generate_freq_step(fLow, fHigh, step=2e6):

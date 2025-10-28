@@ -1,11 +1,12 @@
-from src.radiation_algorithm.radiation_algorithm import radiation_algorithm
-from efield.efield2 import radiation_intensity_distribution_over_sphere_surface, load_gain_power_data
-from efield.efield3 import antenna_directivity_pattern
-from efield.efield4 import *
+from backend.src.radiation_algorithm.radiation_algorithm import radiation_algorithm
+from backend.efield.efield2 import radiation_intensity_distribution_over_sphere_surface, load_gain_power_data
+from backend.efield.efield3 import antenna_directivity_pattern
+from backend.efield.efield4 import *
+
 import matplotlib.pyplot as plt
 import numpy as np
 
-from efield.efield4 import load_cst_data, plot_smith_chart_CST_MoM
+from backend.efield.efield4 import load_cst_data, plot_smith_chart_CST_MoM
 
 def analysis(frequencies, ifa_meander_mat, feed_point):
     Z0 = 50

@@ -4,8 +4,8 @@ import gmsh
 import numpy as np
 import scipy.io as sio
 
-from src.radiation_algorithm.radiation_algorithm import radiation_algorithm
-from utils.refinement_function import *
+from backend.src.radiation_algorithm.radiation_algorithm import radiation_algorithm
+from backend.utils.refinement_function import *
 
 class Mesh:
     def __init__(self):
@@ -33,16 +33,16 @@ def run():
     gmsh.fltk.run()
 
 def write(save_folder_path, file_name="mesh.msh"):
-    # Assure que save_folder_path est un dossier, pas un fichier
+    # be sure save_folder_path is a folder, not a file
     if not os.path.isdir(save_folder_path):
         print(f"The folder '{save_folder_path}' does not exist.")
         os.makedirs(save_folder_path)
         print(f"Folder '{save_folder_path}' was created successfully.")
 
-    # Construction du chemin complet du fichier
+    # construct the full file path
     save_path = os.path.join(save_folder_path, file_name)
 
-    # Écriture du fichier
+    # write the file
     gmsh.write(save_path)
     print(f"The .msh file was successfully saved to: '{save_path}'")
 
@@ -72,6 +72,43 @@ def write(save_folder_path, file_name="new_mesh.msh"):
     # Write the file
     gmsh.write(save_path)
     # print(f"The .msh file was successfully saved to: '{save_path}'")
+
+def write_scaled_geometry(save_folder: str, geometry_name: str, scale_factor: float = 1000.0):
+    """
+    Save the current Gmsh geometry as a STEP file, scaling it by a given factor
+    (typically 1000 to convert from meters to millimeters).
+
+    The mesh (.msh) remains unscaled.
+
+    Parameters
+    ----------
+    save_folder : str
+        Path to the folder where the STEP file will be saved.
+    geometry_name : str
+        Name of the STEP file (e.g., 'bowtie.step').
+    scale_factor : float
+        Factor by which to scale the geometry before export.
+    """
+
+    # Get all existing entities in the CAD model (dim=0..3)
+    entities = []
+    for dim in range(4):
+        for tag in gmsh.model.getEntities(dim):
+            entities.append(tag)
+
+    if not entities:
+        raise RuntimeError("No geometry found to export. Ensure the model is built before calling this function.")
+
+    # Duplicate and scale geometry temporarily
+    gmsh.model.occ.dilate(entities, 0, 0, 0, scale_factor, scale_factor, scale_factor)
+    gmsh.model.occ.synchronize()
+
+    # Build output path
+    output_path = os.path.join(save_folder, geometry_name)
+
+    # Write STEP file
+    gmsh.write(output_path)
+    print(f"[OK] Geometry exported (scaled by ×{scale_factor}) → {output_path}")
 
 def rectangle_surface(x_rect, y_rect):
     point_tags = []

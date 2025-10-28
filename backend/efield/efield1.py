@@ -7,9 +7,9 @@ import os
 
 import numpy as np
 
-from rwg.rwg2 import DataManager_rwg2
-from rwg.rwg4 import DataManager_rwg4
-from utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
+from backend.rwg.rwg2 import DataManager_rwg2
+from backend.rwg.rwg4 import DataManager_rwg4
+from backend.utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
 
 def calculate_electric_magnetic_field_at_point(filename_mesh2_to_load, filename_current_to_load, observation_point, scattering = False, radiation = False):
     """

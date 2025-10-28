@@ -3,8 +3,8 @@ import os
 import numpy as np
 from scipy.io import savemat, loadmat
 
-from rwg.rwg2 import DataManager_rwg2
-from rwg.rwg3 import DataManager_rwg3
+from backend.rwg.rwg2 import DataManager_rwg2
+from backend.rwg.rwg3 import DataManager_rwg3
 
 
 # Definition of the incident field

@@ -11,9 +11,9 @@ import numpy as np
 from scipy.io import loadmat, savemat
 import plotly.figure_factory as ff
 
-from rwg.rwg2 import DataManager_rwg2
-from rwg.rwg4 import DataManager_rwg4
-from utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
+from backend.rwg.rwg2 import DataManager_rwg2
+from backend.rwg.rwg4 import DataManager_rwg4
+from backend.utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
 
 def compute_aspect_ratios(points_data):
     """

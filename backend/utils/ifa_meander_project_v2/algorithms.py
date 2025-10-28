@@ -1,8 +1,8 @@
-from utils.gmsh_function import extract_msh_to_mat
-from utils.ifa_meander_project_v2.geometry import *
-from utils.ifa_meander_project_v2.meshing import *
-from utils.ifa_meander_project_v2.simulation import *
-from utils.ifa_meander_project_v2.meshing import *
+from backend.utils.gmsh_function import extract_msh_to_mat
+from backend.utils.ifa_meander_project_v2.geometry import *
+from backend.utils.ifa_meander_project_v2.meshing import *
+from backend.utils.ifa_meander_project_v2.simulation import *
+from backend.utils.ifa_meander_project_v2.meshing import *
 
 import time
 from matplotlib import pyplot as plt

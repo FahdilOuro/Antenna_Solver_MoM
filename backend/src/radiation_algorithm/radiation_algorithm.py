@@ -1,8 +1,8 @@
-from rwg.rwg1 import *
-from rwg.rwg2 import *
-from rwg.rwg3 import *
-from rwg.rwg4 import *
-from rwg.rwg5 import *
+from backend.rwg.rwg1 import *
+from backend.rwg.rwg2 import *
+from backend.rwg.rwg3 import *
+from backend.rwg.rwg4 import *
+from backend.rwg.rwg5 import *
 
 def format_impedance(imp):
     if np.isscalar(imp):

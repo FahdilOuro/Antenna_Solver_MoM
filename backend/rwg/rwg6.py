@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 
-from rwg.rwg2 import DataManager_rwg2
-from rwg.rwg4 import DataManager_rwg4
+from backend.rwg.rwg2 import DataManager_rwg2
+from backend.rwg.rwg4 import DataManager_rwg4
 
 
 def surface_calculate_current_density(current, triangles, edges, vecteurs_rho):

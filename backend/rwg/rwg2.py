@@ -2,7 +2,7 @@ import os
 import numpy as np
 from scipy.io import savemat, loadmat
 
-from rwg.rwg1 import Points, Triangles, Edges
+from backend.rwg.rwg1 import Points, Triangles, Edges
 
 
 class Barycentric_triangle:

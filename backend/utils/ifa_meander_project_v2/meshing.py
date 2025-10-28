@@ -1,7 +1,7 @@
 import gmsh
-from utils.gmsh_function import *
+from backend.utils.gmsh_function import *
 
-def antenna_ifa_meander(meander_x, meander_y, terminal_x, terminal_y, feed_x, feed_y, save_mesh_folder, mesh_name, mesh_size):
+def antenna_ifa_meander(meander_x, meander_y, terminal_x, terminal_y, feed_x, feed_y, save_mesh_folder, mesh_name, mesh_size, geometry_name="ifa_meander.step"):
     gmsh.initialize()
     model_name  = "IFA_meander"
     gmsh.model.add(model_name)
@@ -29,5 +29,6 @@ def antenna_ifa_meander(meander_x, meander_y, terminal_x, terminal_y, feed_x, fe
     # run()
 
     write(save_mesh_folder, mesh_name)
+    write_scaled_geometry(save_mesh_folder, geometry_name)
 
     gmsh.finalize()

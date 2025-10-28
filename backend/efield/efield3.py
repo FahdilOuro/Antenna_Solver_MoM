@@ -3,10 +3,10 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 
-from efield.efield2 import load_gain_power_data
-from rwg.rwg2 import DataManager_rwg2
-from rwg.rwg4 import DataManager_rwg4
-from utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
+from backend.efield.efield2 import load_gain_power_data
+from backend.rwg.rwg2 import DataManager_rwg2
+from backend.rwg.rwg4 import DataManager_rwg4
+from backend.utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
 
 def compute_circle_points(radius, num_points, plane="yz"):
     """

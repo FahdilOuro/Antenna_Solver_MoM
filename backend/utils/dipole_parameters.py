@@ -17,7 +17,7 @@
 """
 import numpy as np
 
-from utils.point_field import radiated_scattered_field_at_a_point
+from backend.utils.point_field import radiated_scattered_field_at_a_point
 
 
 def compute_dipole_center_moment(triangles_data, edges_data, current_data):

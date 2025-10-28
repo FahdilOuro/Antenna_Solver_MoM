@@ -176,33 +176,6 @@ Item {
                                     text: "Start:"
                                 }
                                 
-                                /*SpinBox {
-                                    id: startFreqSpinBox
-                                    from: 1
-                                    to: 100000
-                                    value: 200
-                                    editable: true
-                                    
-                                    property int decimals: 2
-                                    property real realValue: value / 100
-                                    
-                                    validator: DoubleValidator {
-                                        bottom: Math.min(startFreqSpinBox.from, startFreqSpinBox.to)
-                                        top: Math.max(startFreqSpinBox.from, startFreqSpinBox.to)
-                                    }
-                                    
-                                    textFromValue: function(value, locale) {
-                                        return Number(value / 100).toLocaleString(locale, 'f', decimals)
-                                    }
-                                    
-                                    valueFromText: function(text, locale) {
-                                        return Number.fromLocaleString(locale, text) * 100
-                                    }
-                                    
-                                    onValueChanged: {
-                                        projectCreationPage.startFrequency = realValue
-                                    }
-                                }*/
                                 TextField {
                                     id: startFreqTextField
 

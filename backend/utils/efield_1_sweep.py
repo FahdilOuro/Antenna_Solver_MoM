@@ -4,8 +4,8 @@ from matplotlib import pyplot as plt
 from scipy.io import savemat
 from scipy.io import loadmat
 
-from rwg.rwg2 import DataManager_rwg2
-from utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
+from backend.rwg.rwg2 import DataManager_rwg2
+from backend.utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
 
 
 def compute_electric_magnetic_field_at_point_for_single_frequency(frequency, triangles, edges, current, observation_point, eta, light_speed_c):
