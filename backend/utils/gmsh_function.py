@@ -4,6 +4,8 @@ import gmsh
 import numpy as np
 import scipy.io as sio
 
+from typing import Sequence
+
 from backend.src.radiation_algorithm.radiation_algorithm import radiation_algorithm
 from backend.utils.refinement_function import *
 
@@ -110,22 +112,53 @@ def write_scaled_geometry(save_folder: str, geometry_name: str, scale_factor: fl
     gmsh.write(output_path)
     print(f"[OK] Geometry exported (scaled by ×{scale_factor}) → {output_path}")
 
-def rectangle_surface(x_rect, y_rect):
+def rectangle_surface(x_rect: Sequence[float], y_rect: Sequence[float], z_pos: float = 0.0) -> int:
+    """
+    Create a planar rectangular surface in the XY plane using given X and Y coordinates.
+
+    Parameters
+    ----------
+    x_rect : Sequence[float]
+        X coordinates of the rectangle vertices (ordered).
+    y_rect : Sequence[float]
+        Y coordinates of the rectangle vertices (ordered).
+    z_pos : float, optional
+        Z coordinate for all points (default = 0.0).
+
+    Returns
+    -------
+    int
+        The tag of the created Gmsh surface.
+
+    Raises
+    ------
+    AssertionError
+        If x_rect and y_rect have different lengths or less than 3 points.
+    """
+
+    # --- Safety check ---
+    assert len(x_rect) == len(y_rect) >= 3, \
+        "x_rect and y_rect must define at least 3 points with matching lengths."
+
+    # --- Create points ---
     point_tags = []
     for x_ti, y_ti in zip(x_rect, y_rect):
-        tag = gmsh.model.occ.addPoint(x_ti, y_ti, 0)
+        tag = gmsh.model.occ.addPoint(float(x_ti), float(y_ti), float(z_pos))
         point_tags.append(tag)
 
-    line_tags_terminal = []
+    # --- Create connecting lines ---
+    line_tags = []
     for i in range(len(point_tags) - 1):
-        line = gmsh.model.occ.addLine(point_tags[i], point_tags[i + 1])
-        line_tags_terminal.append(line)
+        line_tags.append(gmsh.model.occ.addLine(point_tags[i], point_tags[i + 1]))
 
-    line_tags_terminal.append(gmsh.model.occ.addLine(point_tags[-1], point_tags[0]))
-    loop_terminal = gmsh.model.occ.addCurveLoop(line_tags_terminal)
-    rect_surface = gmsh.model.occ.addPlaneSurface([loop_terminal])
+    # Close the loop
+    line_tags.append(gmsh.model.occ.addLine(point_tags[-1], point_tags[0]))
 
-    return rect_surface
+    # --- Create surface ---
+    loop = gmsh.model.occ.addCurveLoop(line_tags)
+    surface = gmsh.model.occ.addPlaneSurface([loop])
+
+    return surface
 
 # ------------------------------- TO BE MODIFIED FOR RE-CLOSING --------------------
 

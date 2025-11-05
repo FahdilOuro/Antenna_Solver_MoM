@@ -29,6 +29,37 @@ def antenna_ifa_meander(meander_x, meander_y, terminal_x, terminal_y, feed_x, fe
     # run()
 
     write(save_mesh_folder, mesh_name)
+    # write_scaled_geometry(save_mesh_folder, geometry_name)
+
+    gmsh.finalize()
+
+def antenna_ifa_meander_for_CST(meander_x, meander_y, terminal_x, terminal_y, feed_x, feed_y, save_mesh_folder, mesh_size, geometry_name="ifa_meander_for_CST.step"):
+    gmsh.initialize()
+    model_name  = "IFA_meander_for_CST"
+    gmsh.model.add(model_name)
+
+    ifa_meander = rectangle_surface(meander_x, meander_y)
+    # print("tag of ifa_meander =", ifa_meander)
+
+    ifa_feed = rectangle_surface(feed_x, feed_y)
+    # print("tag of ifa_feed =", ifa_feed)
+
+    # Creation of the terminal
+    terminal = rectangle_surface(terminal_x, terminal_y)
+
+    # Fusion of the terminal and the meander
+    antenna_ifa_meander, _ = gmsh.model.occ.fuse([(2, ifa_meander)], [(2, terminal), (2, ifa_feed)])
+
+    # Synchronization and saving
+    gmsh.model.occ.synchronize()
+    
+    apply_mesh_size(mesh_size)
+
+    # Display the model in Gmsh interface
+    generate_surface_mesh()
+
+    run()
+    
     write_scaled_geometry(save_mesh_folder, geometry_name)
 
     gmsh.finalize()

@@ -48,7 +48,7 @@ def plot_smith_chart(impedances, frequencies, fC=None, save_image=False, Z0=50):
         hoverinfo='text'
     ))
     
-    """# Highlight start frequency in green
+    # Highlight start frequency in green
     if len(smith_points) > 0:
         pt_start = smith_points[0]
         fig.add_trace(go.Scattersmith(
@@ -86,7 +86,7 @@ def plot_smith_chart(impedances, frequencies, fC=None, save_image=False, Z0=50):
             name=f"fC: {fC*1e-6:.2f} MHz, Z={impedances[idx_fC]:.2f}",
             text=[f"{pt['label']}"],
             hoverinfo='text'
-        ))"""
+        ))
     
     fig.update_layout(
         title='',
