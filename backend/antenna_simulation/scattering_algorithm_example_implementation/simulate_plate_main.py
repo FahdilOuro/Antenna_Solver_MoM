@@ -19,9 +19,6 @@ def create_plate_mesh(x_rect, y_rect, mesh_size, model_name, save_mesh_folder, m
 
     write(save_mesh_folder, mesh_name)
 
-    # Optional visualization
-    run()
-
     gmsh.finalize()
 
 def main():
@@ -36,7 +33,7 @@ def main():
     mesh_name = "plate_mesh.msh"
     save_mesh_folder = 'data/gmsh_files/'
     file_msh = save_mesh_folder + mesh_name
-    path_file_mat = 'data/antennas_mesh/JP_meander_ifa_optim_868.mat'
+    path_file_mat = 'data/antennas_mesh/plate_scattering.mat'
     save_mesh_folder = 'data/gmsh_files/'
 
     # --- Step 2: Create rectangular plate using utility function ---
