@@ -75,6 +75,7 @@ Makefile*
 # Data and cache
 # =============================================
 *.mat
+*.msh
 *.npy
 *.npz
 *.h5
