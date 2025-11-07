@@ -1,4 +1,4 @@
-from utils.gmsh_function import *
+from backend.utils.gmsh_function import *
 
 print("This code is written to simulate an antenna with adaptive meshing.")
 

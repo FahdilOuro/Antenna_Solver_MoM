@@ -130,3 +130,20 @@ credentials.json
 secrets.ini
 config.ini
 .local.ini
+
+# =============================================
+# Performance profiling and analysis
+# =============================================
+*.prof
+*.profs
+*.profile
+*.stats
+profiling/
+performance/
+snakeviz/
+cProfile/
+profile_output/
+*.callgrind
+*.cachegrind
+*.pyprof
+*.line_profiler

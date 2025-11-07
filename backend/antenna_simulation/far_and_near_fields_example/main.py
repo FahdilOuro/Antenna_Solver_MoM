@@ -1,8 +1,8 @@
 import numpy as np
 
-from efield.efield1 import calculate_electric_magnetic_field_at_point
-from efield.efield2 import radiation_intensity_distribution_over_sphere_surface
-from efield.efield3 import antenna_directivity_pattern
+from backend.efield.efield1 import calculate_electric_magnetic_field_at_point
+from backend.efield.efield2 import radiation_intensity_distribution_over_sphere_surface
+from backend.efield.efield3 import antenna_directivity_pattern
 
 if __name__ == "__main__":
     """
