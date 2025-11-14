@@ -1,0 +1,94 @@
+================================================================================
+Profile Statistics: function_main_20251107_162146
+================================================================================
+
+         1217438 function calls in 71.959 seconds
+
+   Ordered by: cumulative time
+   List reduced from 248 to 50 due to restriction <50>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.034    0.034   71.959   71.959 D:\PhD_Fahdilou_Leat\Projets_Github\Antenna_Solver_MoM\backend\antenna_simulation\scattering_algorithm_example_implementation\simulate_plate_main.py:24(main)
+        1    0.045    0.045   71.808   71.808 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\src\scattering_algorithm\scattering_algorithm.py:26(scattering_algorithm)
+        1    0.001    0.001   42.572   42.572 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\rwg\rwg3.py:5(calculate_z_matrice)
+        1    8.332    8.332   42.571   42.571 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\utils\impmet.py:24(impedance_matrice_z)
+    11370   20.349    0.002   33.096    0.003 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\utils\impmet.py:80(update)
+        1    0.001    0.001   11.229   11.229 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\rwg\rwg4.py:14(calculate_current_scattering)
+        1   11.043   11.043   11.145   11.145 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\rwg\rwg5.py:7(calculate_current_density)
+        1   10.696   10.696   10.696   10.696 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\linalg\_linalg.py:320(solve)
+    83588    8.169    0.000    8.169    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+    60848    0.145    0.000    7.981    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\_core\fromnumeric.py:2349(sum)
+    60848    0.174    0.000    7.803    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\_core\fromnumeric.py:69(_wrapreduction)
+        5    0.000    0.000    6.359    1.272 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio.py:237(savemat)
+        1    0.000    0.000    6.349    6.349 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\rwg\rwg3.py:184(save_data)
+        5    0.000    0.000    6.242    1.248 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio5.py:857(put_variables)
+       42    0.000    0.000    6.241    0.149 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio5.py:619(write_top)
+       42    0.000    0.000    6.241    0.149 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio5.py:639(write)
+       42    0.000    0.000    6.239    0.149 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio5.py:678(write_numeric)
+      129    0.000    0.000    6.238    0.048 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio5.py:532(write_element)
+      123    0.000    0.000    6.237    0.051 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio5.py:553(write_regular_element)
+      378    0.023    0.000    6.237    0.017 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio5.py:526(write_bytes)
+    17057    0.204    0.000    5.384    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\lib\_shape_base_impl.py:1216(tile)
+      419    5.185    0.012    5.185    0.012 {method 'write' of '_io.BufferedWriter' objects}
+    17057    5.044    0.000    5.044    0.000 {method 'repeat' of 'numpy.ndarray' objects}
+      389    1.030    0.003    1.030    0.003 {method 'tobytes' of 'numpy.ndarray' objects}
+    11370    0.021    0.000    0.578    0.000 {method 'sum' of 'numpy.ndarray' objects}
+    11370    0.012    0.000    0.557    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\_core\_methods.py:51(_sum)
+        5    0.000    0.000    0.523    0.105 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio.py:86(loadmat)
+        5    0.000    0.000    0.521    0.104 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio5.py:293(get_variables)
+       34    0.521    0.015    0.521    0.015 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio5.py:274(read_var_array)
+        1    0.000    0.000    0.518    0.518 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\rwg\rwg3.py:234(load_data)
+        1    0.072    0.072    0.206    0.206 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\rwg\rwg1.py:307(filter_complexes_jonctions)
+        1    0.027    0.027    0.165    0.165 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\rwg\rwg1.py:101(calculate_triangles_area_and_center)
+       25    0.000    0.000    0.118    0.005 {built-in method builtins.next}
+       20    0.000    0.000    0.118    0.006 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio.py:15(_open_file_context)
+    17211    0.062    0.000    0.118    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\linalg\_linalg.py:2624(norm)
+       15    0.000    0.000    0.116    0.008 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio.py:25(_open_file)
+       10    0.000    0.000    0.116    0.012 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\contextlib.py:132(__enter__)
+       10    0.116    0.012    0.116    0.012 {built-in method _io.open}
+     3842    0.042    0.000    0.110    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\_core\numeric.py:1528(cross)
+        1    0.000    0.000    0.101    0.101 D:\PhD_Fahdilou_Leat\Projets_Github\Antenna_Solver_MoM\backend\antenna_simulation\scattering_algorithm_example_implementation\simulate_plate_main.py:4(create_plate_mesh)
+        1    0.000    0.000    0.089    0.089 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\utils\gmsh_function.py:59(generate_surface_mesh)
+        1    0.089    0.089    0.089    0.089 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\gmsh.py:2045(generate)
+    11526    0.020    0.000    0.058    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\_core\numeric.py:1452(moveaxis)
+    47485    0.057    0.000    0.057    0.000 {method 'reshape' of 'numpy.ndarray' objects}
+        1    0.050    0.050    0.054    0.054 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\rwg\rwg1.py:138(get_edges)
+    62541    0.036    0.000    0.036    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\lib\_shape_base_impl.py:1289(<genexpr>)
+    21053    0.034    0.000    0.034    0.000 {method 'dot' of 'numpy.ndarray' objects}
+    11370    0.005    0.000    0.034    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\_core\fromnumeric.py:2611(all)
+    61067    0.033    0.000    0.033    0.000 {built-in method builtins.isinstance}
+    26603    0.030    0.000    0.030    0.000 {method 'squeeze' of 'numpy.ndarray' objects}
+
+
+
+================================================================================
+Top Time-Consuming Functions
+================================================================================
+         1217438 function calls in 71.959 seconds
+
+   Ordered by: internal time
+   List reduced from 248 to 20 due to restriction <20>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    11370   20.349    0.002   33.096    0.003 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\utils\impmet.py:80(update)
+        1   11.043   11.043   11.145   11.145 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\rwg\rwg5.py:7(calculate_current_density)
+        1   10.696   10.696   10.696   10.696 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\linalg\_linalg.py:320(solve)
+        1    8.332    8.332   42.571   42.571 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\utils\impmet.py:24(impedance_matrice_z)
+    83588    8.169    0.000    8.169    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+      419    5.185    0.012    5.185    0.012 {method 'write' of '_io.BufferedWriter' objects}
+    17057    5.044    0.000    5.044    0.000 {method 'repeat' of 'numpy.ndarray' objects}
+      389    1.030    0.003    1.030    0.003 {method 'tobytes' of 'numpy.ndarray' objects}
+       34    0.521    0.015    0.521    0.015 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\scipy\io\matlab\_mio5.py:274(read_var_array)
+    17057    0.204    0.000    5.384    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\lib\_shape_base_impl.py:1216(tile)
+    60848    0.174    0.000    7.803    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\_core\fromnumeric.py:69(_wrapreduction)
+    60848    0.145    0.000    7.981    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\_core\fromnumeric.py:2349(sum)
+       10    0.116    0.012    0.116    0.012 {built-in method _io.open}
+        1    0.089    0.089    0.089    0.089 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\gmsh.py:2045(generate)
+        1    0.072    0.072    0.206    0.206 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\rwg\rwg1.py:307(filter_complexes_jonctions)
+    17211    0.062    0.000    0.118    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\linalg\_linalg.py:2624(norm)
+    47485    0.057    0.000    0.057    0.000 {method 'reshape' of 'numpy.ndarray' objects}
+        1    0.050    0.050    0.054    0.054 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\rwg\rwg1.py:138(get_edges)
+        1    0.045    0.045   71.808   71.808 d:\phd_fahdilou_leat\projets_github\antenna_solver_mom\backend\src\scattering_algorithm\scattering_algorithm.py:26(scattering_algorithm)
+     3842    0.042    0.000    0.110    0.000 C:\Users\foyendou\miniconda3\envs\antenna_solver\Lib\site-packages\numpy\_core\numeric.py:1528(cross)
+
+
