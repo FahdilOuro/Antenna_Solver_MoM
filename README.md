@@ -76,16 +76,16 @@ To properly view them, please use [nbviewer](https://nbviewer.jupyter.org/).
 
 For example, one can copy the link of the plate_2_antenna notebook and add to viewer to open:
 
-https://nbviewer.org/github/FahdilOuro/Antenna_Solver_MoM/blob/main/antenna_simulation/receiving_antenna/plate_2_antenna.ipynb
+https://nbviewer.org/github/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/receiving_antenna/plate_2_antenna.ipynb
 
-<img src="backend/antenna_simulation/plot_figures/plate_2_antenna_receiving_mode.png" width=50% height=50%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/plate_2_antenna_receiving_mode.png" width=50% height=50%>
 
 This is the earliest version of the simulator where one can still find the generation of the antenna mesh, calculation of the RWG basis functions, and the analysis of the antenna performances.
 
-Some result from the simulation of ifa antenna in scattering mode: https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/antenna_simulation/receiving_antenna/ifa_antenna.ipynb
+Some result from the simulation of ifa antenna in scattering mode: https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/receiving_antenna/ifa_antenna.ipynb
 
-<img src="backend/antenna_simulation/plot_figures/ifaCurrent_receive.png" width=30% height=30%> <img src="backend/antenna_simulation/plot_figures/ifaEfield_receive.png" width=35% height=35%> 
-<img src="backend/antenna_simulation/plot_figures/ifaGainDistribution_receive.png" width=25% height=25%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/ifaCurrent_receive.png" width=30% height=30%> <img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/ifaEfield_receive.png" width=35% height=35%> 
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/ifaGainDistribution_receive.png" width=25% height=25%>
 
 ## Tutorial
 
