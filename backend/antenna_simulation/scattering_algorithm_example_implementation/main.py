@@ -1,4 +1,6 @@
-from src.scattering_algorithm.scattering_algorithm import *
+from backend.src.scattering_algorithm.scattering_algorithm import *
+
+import time
 
 def process_antenna(filename):
     base_name = os.path.splitext(os.path.basename(filename))[0]
