@@ -16,7 +16,7 @@ def format_array(arr):
     else:
         return "[" + ", ".join(str(a) for a in np.ravel(arr)) + "]"
 
-def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_from_matlab=True, monopole=False, 
+def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, monopole=False, 
                         simulate_array_antenna=False, show=True, save_image=False,
                         load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None):
     if (not load_lumped_elements and (LoadPoint is not None or LoadValue is not None or LoadDir is not None)) or \
@@ -24,7 +24,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, load_
          raise ValueError("Incoherent parameters: If 'load_lumped_elements' is False, 'LoadPoint', 'LoadValue', and 'LoadDir' must all be None. If 'load_lumped_elements' is True, all three must be provided (not None).")
     
     # Load the mesh file
-    p, t = load_mesh_file(mesh1, load_from_matlab)
+    p, t = load_mesh_file(mesh1)
 
     # Define points and triangles from the mesh
     points = Points(p)

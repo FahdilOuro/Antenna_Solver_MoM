@@ -23,12 +23,12 @@ from backend.rwg.rwg3 import *
 from backend.rwg.rwg4 import *
 from backend.rwg.rwg5 import *
 
-def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization, load_from_matlab=True, show=True):
+def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization, show=True):
     """
         Implements the electromagnetic scattering algorithm for an antenna.
     """
     # Load mesh file
-    p, t = load_mesh_file(mesh,load_from_matlab)
+    p, t = load_mesh_file(mesh)
 
     # Define points and triangles from the mesh
     points = Points(p)
@@ -104,3 +104,5 @@ def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization,
         print(f"\n{antennas_name} view is successfully created at frequency {frequency} Hz")
         fig = visualize_surface_current(points, triangles, surface_current_density, title=antennas_name)
         fig.show()
+
+    return matrice_z, voltage, current, surface_current_density

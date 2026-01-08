@@ -151,13 +151,23 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
     # Visualization with plotly
     aspect_ratios = compute_aspect_ratios(points_data.points)
 
+    deep_blue = "rgb(0, 0, 180)"
+    blue      = "rgb(0, 0, 255)"
+    cyan      = "rgb(0, 255, 255)"
+    green     = "rgb(0, 255, 0)"
+    yellow    = "rgb(255, 255, 0)"
+    orange    = "rgb(255, 140, 0)"
+    red       = "rgb(255, 0, 0)"
+
+    custom_colormap = [deep_blue, blue, cyan, green, yellow, orange, red]
+
     # Create the trisurf figure
     fig = ff.create_trisurf(
         x=x_,
         y=y_,
         z=z_,
         simplices=simplices,
-        colormap="Rainbow",
+        colormap=custom_colormap,
         color_func=surface_current_density,  # Color using surface current density
         show_colorbar=True,
         title='',
