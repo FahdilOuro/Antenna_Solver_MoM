@@ -1,17 +1,20 @@
 import os
 import gmsh
 
+from backend.utils.gmsh_function import setup_performance_config
+
 def plate_gmsh(longueur, hauteur, mesh_name, save_mesh_folder, mesh_size=0.5):
     # Initialize Gmsh
     gmsh.initialize()
     gmsh.model.add("plate_gmsh")
+    setup_performance_config()
 
     # Use Open Cascade to create a rectangle (x, y, z, width, height)
     plate = gmsh.model.occ.addRectangle(0, 0, 0, longueur, hauteur)
     gmsh.model.occ.synchronize()
 
-    Automatic = 2
-    gmsh.option.setNumber("Mesh.Algorithm", Automatic)   # To set The "Automatic" algorithm / Change if necessary
+    Algo = 6
+    gmsh.option.setNumber("Mesh.Algorithm", Algo)   # To set The "Algo" algorithm / Change if necessary
 
     if mesh_size == 0:
         raise ValueError("mesh_size should not be null")
@@ -44,13 +47,14 @@ def plate_2_gmsh(longueur, hauteur, mesh_name, save_mesh_folder, refinement_orde
     # Initialize Gmsh
     gmsh.initialize()
     gmsh.model.add("plate_gmsh")
+    setup_performance_config()
 
     # Use Open Cascade to create a rectangle (x, y, z, width, height)
     plate = gmsh.model.occ.addRectangle(0, 0, 0, longueur, hauteur)
     gmsh.model.occ.synchronize()
 
-    Automatic = 2
-    gmsh.option.setNumber("Mesh.Algorithm", Automatic)   # To set the "Automatic" algorithm / Change if necessary
+    Algo = 6
+    gmsh.option.setNumber("Mesh.Algorithm", Algo)   # To set the "Algo" algorithm / Change if necessary
 
     if longueur >= hauteur:
         gmsh.model.mesh.setSize(gmsh.model.getEntities(0), longueur)
@@ -90,6 +94,7 @@ def slot_gmsh(longueur, hauteur, slot_longueur, slot_largeur, espacement, mesh_n
     # Initialize Gmsh
     gmsh.initialize()
     gmsh.model.add("plate_gmsh")
+    setup_performance_config()
 
     # Use Open Cascade to create a rectangle (x, y, z, width, height)
     plate = gmsh.model.occ.addRectangle(-longueur/2, -hauteur/2, 0, longueur, hauteur)
@@ -104,8 +109,8 @@ def slot_gmsh(longueur, hauteur, slot_longueur, slot_largeur, espacement, mesh_n
     slot, _ = gmsh.model.occ.cut([(2, plate)], [(2, slot_1), (2, slot_2)])
     gmsh.model.occ.synchronize()
 
-    Automatic = 2
-    gmsh.option.setNumber("Mesh.Algorithm", Automatic)   # To set the "Automatic" algorithm / Change if necessary
+    Algo = 6
+    gmsh.option.setNumber("Mesh.Algorithm", Algo)   # To set the "Algo" algorithm / Change if necessary
 
     if mesh_size == 0:
         raise ValueError("mesh_size should not be null")
@@ -138,6 +143,7 @@ def bowtie_gmsh(width, hight, width_finite, mesh_name, save_mesh_folder, mesh_si
     # Initialize Gmsh
     gmsh.initialize()
     gmsh.model.add("bowtie_antenna")
+    setup_performance_config()
 
     # Define points
     p0 = gmsh.model.occ.addPoint(-width/2, -hight/2, 0)
@@ -162,8 +168,8 @@ def bowtie_gmsh(width, hight, width_finite, mesh_name, save_mesh_folder, mesh_si
     surface = gmsh.model.occ.addPlaneSurface([wire])
     gmsh.model.occ.synchronize()
 
-    Automatic = 2
-    gmsh.option.setNumber("Mesh.Algorithm", Automatic)   # To set the "Automatic" algorithm / Change if necessary
+    Algo = 6
+    gmsh.option.setNumber("Mesh.Algorithm", Algo)   # To set the "Algo" algorithm / Change if necessary
 
     if mesh_size == 0:
         raise ValueError("mesh_size should not be null")
@@ -196,6 +202,7 @@ def ifa_gmsh(Lenght, Hight, Small_Lenght, Small_Hight, gap_F, mesh_name, save_me
     # Initialize Gmsh
     gmsh.initialize()
     gmsh.model.add("IFA_antenna")
+    setup_performance_config()
 
     # Create the base rectangle
     base = gmsh.model.occ.addRectangle(0, 0, 0, Lenght, Hight)
@@ -213,8 +220,8 @@ def ifa_gmsh(Lenght, Hight, Small_Lenght, Small_Hight, gap_F, mesh_name, save_me
     antenna, _ = gmsh.model.occ.fuse([(2, base)], [(2, f_vertical_1), (2, f_vertical_2), (2, f_top)])
     gmsh.model.occ.synchronize()
 
-    Automatic = 2
-    gmsh.option.setNumber("Mesh.Algorithm", Automatic)   # To set the "Automatic" algorithm / Change if necessary
+    Algo = 6
+    gmsh.option.setNumber("Mesh.Algorithm", Algo)   # To set the "Algo" algorithm / Change if necessary
 
     gmsh.model.mesh.setSize(gmsh.model.getEntities(0), mesh_size)
 
@@ -240,6 +247,7 @@ def strip_gmsh(Longueur, largeur, mesh_name, save_mesh_folder, mesh_size):
     # Initialize Gmsh
     gmsh.initialize()
     gmsh.model.add("Strip_Antenna")
+    setup_performance_config()
 
     # Create points
     p0 = gmsh.model.occ.addPoint(0, 0, 0)
@@ -258,8 +266,8 @@ def strip_gmsh(Longueur, largeur, mesh_name, save_mesh_folder, mesh_size):
     strip_antenna = gmsh.model.occ.addPlaneSurface([wire])  # Surface
     gmsh.model.occ.synchronize()
 
-    Automatic = 2
-    gmsh.option.setNumber("Mesh.Algorithm", Automatic)   # To set the "Automatic" algorithm / Change if necessary
+    Algo = 6
+    gmsh.option.setNumber("Mesh.Algorithm", Algo)   # To set the "Algo" algorithm / Change if necessary
 
     if mesh_size == 0:
         raise ValueError("mesh_size should not be null")

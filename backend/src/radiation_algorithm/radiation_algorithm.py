@@ -4,21 +4,11 @@ from backend.rwg.rwg3 import *
 from backend.rwg.rwg4 import *
 from backend.rwg.rwg5 import *
 
-def format_impedance(imp):
-    if np.isscalar(imp):
-        return f"{imp.real:.7f} {'+ ' if imp.imag >= 0 else '- '}{abs(imp.imag):.7f}i"
-    else:
-        return "[" + ", ".join(f"{z.real:.7f} {'+ ' if z.imag >= 0 else '- '}{abs(z.imag):.7f}i" for z in np.ravel(imp)) + "]"
-
-def format_array(arr):
-    if np.isscalar(arr):
-        return str(arr)
-    else:
-        return "[" + ", ".join(str(a) for a in np.ravel(arr)) + "]"
 
 def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, monopole=False, 
                         simulate_array_antenna=False, show=True, save_image=False,
                         load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None):
+    
     if (not load_lumped_elements and (LoadPoint is not None or LoadValue is not None or LoadDir is not None)) or \
         (load_lumped_elements and (LoadPoint is None or LoadValue is None or LoadDir is None)):
          raise ValueError("Incoherent parameters: If 'load_lumped_elements' is False, 'LoadPoint', 'LoadValue', and 'LoadDir' must all be None. If 'load_lumped_elements' is True, all three must be provided (not None).")
@@ -68,13 +58,14 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, monop
 
     # Calculation of electromagnetic constants and impedance matrix Z
     if load_lumped_elements:
-        omega, mu, epsilon, light_speed_c, eta, matrice_z, _ = calculate_z_matrice_lumped_elements(points, 
-                                                                                                   triangles, 
-                                                                                                   edges, 
-                                                                                                   barycentric_triangles, 
-                                                                                                   vecteurs_rho, frequency, 
-                                                                                                   LoadPoint, 
-                                                                                                   LoadValue, 
+        omega, mu, epsilon, light_speed_c, eta, matrice_z, _ = calculate_z_matrice_lumped_elements(points,
+                                                                                                   triangles,
+                                                                                                   edges,
+                                                                                                   barycentric_triangles,
+                                                                                                   vecteurs_rho,
+                                                                                                   frequency,
+                                                                                                   LoadPoint,
+                                                                                                   LoadValue,
                                                                                                    LoadDir)
     else:
         omega, mu, epsilon, light_speed_c, eta, matrice_z = calculate_z_matrice(triangles,
@@ -128,4 +119,4 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, monop
             fig.write_image(pdf_path, format="pdf")
             print(f"\nImage saved in PDF format: {pdf_path}\n")
 
-    return impedance, current, gap_current, gap_voltage, feed_power, index_feeding_edges, surface_current_density
+    return matrice_z, voltage, current, surface_current_density

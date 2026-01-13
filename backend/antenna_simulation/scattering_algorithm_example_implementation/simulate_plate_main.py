@@ -7,6 +7,7 @@ def create_plate_mesh(x_rect, y_rect, mesh_size, model_name, save_mesh_folder, m
     """
     gmsh.initialize()
     gmsh.model.add(model_name)
+    setup_performance_config()
 
     surface_tag = rectangle_surface(x_rect, y_rect)
     print(f"Created rectangular surface with tag {surface_tag}")

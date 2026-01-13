@@ -6,14 +6,6 @@ import scipy.io as sio
 
 from typing import Sequence
 
-from backend.src.radiation_algorithm.radiation_algorithm import radiation_algorithm
-
-def open_mesh(file_msh_path):
-    gmsh.initialize()
-    gmsh.merge(file_msh_path)
-    if '-nopopup' not in sys.argv:
-        gmsh.fltk.run()
-    gmsh.finalize()
 
 def run():
     gui = True
@@ -42,9 +34,33 @@ def apply_mesh_size(mesh_size):
     # Synchronisation du modèle
     gmsh.model.occ.synchronize()
     gmsh.model.mesh.setSize(gmsh.model.getEntities(0), size=mesh_size)
-    gmsh.option.setNumber('Mesh.Algorithm', 1)  # 1: MeshAdapt, 2: Automatic, 3: Initial mesh only, 
+    gmsh.option.setNumber('Mesh.Algorithm', 6)  # 1: MeshAdapt, 2: Automatic, 3: Initial mesh only, 
     # 5: Delaunay, 6: Frontal-Delaunay (Default value: 6), 7: BAMG, 8: Frontal-Delaunay for Quads, 
     # 9: Packing of Parallelograms, 11: Quasi-structured Quad
+
+def setup_performance_config(n_threads=None):
+    """
+    Optimizes Gmsh performance for a 16-thread processor.
+    """
+    if n_threads is None:
+        # Use the provided number or fallback to system detection
+        threads = os.cpu_count()
+    else:
+        threads = n_threads
+    
+    # 1. Global threads for mesh generation and internal tasks
+    gmsh.option.setNumber("General.NumThreads", threads)
+    
+    # 2. Select a parallel-friendly 2D algorithm (optional)
+    # Algorithm 8 (Frontal-Delaunay) often scales better with multiple threads
+    # than the default Delaunay (Algorithm 5).
+    gmsh.option.setNumber("Mesh.Algorithm", 6)
+
+    # 3. Enable the HXT algorithm if you ever switch to 3D
+    # HXT is specifically designed for high-thread-count CPUs
+    gmsh.option.setNumber("Mesh.Algorithm3D", 10)
+
+    print(f"[PERFORMANCE] Gmsh configured to utilize {threads} threads.")
 
 def generate_surface_mesh():
     NumberofTreads = 5
@@ -164,8 +180,7 @@ def extract_msh_to_mat(file_msh_path, save_mat_path):
     sio.savemat(save_mat_path, {"p": p, "t": t})
     gmsh.finalize()
 
-def extract_ModelMsh_to_mat(model_name, save_mat_path):
-    # gmsh.model.setCurrent(model_name)
+def extract_ModelMsh_to_mat(save_mat_path):
     # Retrieve all nodes (points)
     node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
     N = len(node_tags)  # Number of points
@@ -199,6 +214,30 @@ def extract_ModelMsh_to_mat(model_name, save_mat_path):
 
     print(f"MATLAB file stored in {save_mat_path} successfully")
 
+def optimize_mesh(dim=2, iterations=2):
+    """
+    Optimizes a mesh while preserving local refinement gradients.
+    This function is suitable for adaptive mesh refinement projects.
+    
+    Parameters:
+    - dim: Dimension of the mesh to optimize (2 for surfaces, 3 for volumes)
+    - iterations: Number of optimization passes
+    """
+    print(f"--- Starting Mesh Optimization (Dim: {dim}) ---")
+    
+    # 1. Relocate nodes: improves element quality (angles/aspect ratio)
+    # without trying to equalize the size of adjacent elements.
+    # This preserves your adaptive refinement density.
+    method_relocate = "Relocate2D" if dim == 2 else "Relocate3D"
+    gmsh.model.mesh.optimize(method_relocate)
+    
+    # 2. General optimization: Uses Gmsh's default heuristic to fix
+    # any remaining topological issues or poor quality elements.
+    for i in range(iterations):
+        gmsh.model.mesh.optimize("")
+
+    print("--- Optimization Complete ---")
+
 def generate_and_save_mesh(geo_filename, msh_filename, initial_mesh_size):
     gmsh.model.occ.synchronize()
     gmsh.write(geo_filename)
@@ -207,6 +246,9 @@ def generate_and_save_mesh(geo_filename, msh_filename, initial_mesh_size):
     gmsh.model.mesh.setSize(gmsh.model.getEntities(0), initial_mesh_size)
 
     gmsh.model.mesh.generate(2)
+
+    optimize_mesh()
+    
     # gmsh.fltk.run()            # Uncomment to have the gmsh view
     gmsh.write(msh_filename)
     print(f"Mesh file saved in {msh_filename} successfully")

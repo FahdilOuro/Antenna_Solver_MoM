@@ -20,6 +20,8 @@ feed_length = 0.005
 # Create the model
 gmsh.model.add(model_name)
 
+setup_performance_config()
+
 # Define points
 p0 = gmsh.model.occ.addPoint(0, 0, 0)
 p1 = gmsh.model.occ.addPoint(0, 0.1, 0)

@@ -28,7 +28,7 @@ def run_refinement_cycle(frequency, wave_incident_direction, polarization, confi
     }
     
     for i in range(config.max_iterations):
-        print(f"\n>>> Starting Iteration {i + 1}/{config.max_iterations}")
+        print(f"\n>>> Starting Iteration {i + 2}/{config.max_iterations}")
 
         # 1. Mesh Analysis & Element Selection
         # Extract centroids from the current mesh to evaluate error location
@@ -73,18 +73,14 @@ def run_refinement_cycle(frequency, wave_incident_direction, polarization, confi
         # 4. Generate Refined Mesh
         gmsh.initialize()
         gmsh.model.add(f"Iteration_{i+1}")
+        setup_performance_config()
 
         # Apply the refinement logic using the specialized grid function
-        define_mesh_by_grid_refined_2(
-            paths.geo, 
-            grid_points_to_refine, 
-            target_size_value, 
-            config.initial_mesh_size
-        )
+        define_mesh_by_grid_refined(paths.geo, grid_points_to_refine, target_size_value, config.initial_mesh_size)
 
         # Save and export the model
         gmsh.write(paths.msh)
-        extract_ModelMsh_to_mat(paths.msh, paths.mat)
+        extract_ModelMsh_to_mat(paths.mat)
         gmsh.finalize()
 
         # 5. Turn the show_image to True if it's the last iteration
@@ -92,13 +88,7 @@ def run_refinement_cycle(frequency, wave_incident_direction, polarization, confi
 
         # 6. Run Physics Solver on the new mesh
         # This updates the surface_current_density for the next iteration's error estimation
-        _, _, _, scd = scattering_algorithm(
-            paths.mat,
-            solver_params['frequency'], 
-            solver_params['direction'], 
-            solver_params['polarization'],
-            show=show_image
-        )
+        _, _, _, scd = scattering_algorithm(paths.mat, solver_params['frequency'], solver_params['direction'], solver_params['polarization'], show=show_image)
         solver_params['surface_current_density'] = scd
 
         # 6. Logging Statistics

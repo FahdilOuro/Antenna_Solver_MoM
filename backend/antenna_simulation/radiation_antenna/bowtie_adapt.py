@@ -20,6 +20,7 @@ model_name  = "bowtie_antenna"
 
 gmsh.initialize()
 gmsh.model.add(model_name)
+setup_performance_config()
 
 # Définition des points
 p0 = gmsh.model.occ.addPoint(-width/2, -hight/2, 0)

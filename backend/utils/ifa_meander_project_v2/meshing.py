@@ -5,6 +5,7 @@ def antenna_ifa_meander(meander_x, meander_y, terminal_x, terminal_y, feed_x, fe
     gmsh.initialize()
     model_name  = "IFA_meander"
     gmsh.model.add(model_name)
+    setup_performance_config()
 
     ifa_meander = rectangle_surface(meander_x, meander_y)
     # print("tag of ifa_meander =", ifa_meander)
@@ -37,6 +38,7 @@ def antenna_ifa_meander_for_CST(meander_x, meander_y, terminal_x, terminal_y, fe
     gmsh.initialize()
     model_name  = "IFA_meander_for_CST"
     gmsh.model.add(model_name)
+    setup_performance_config()
 
     ifa_meander = rectangle_surface(meander_x, meander_y)
     # print("tag of ifa_meander =", ifa_meander)
