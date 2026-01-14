@@ -31,7 +31,7 @@ def Grid(geo_path):
     diagonal = np.sqrt((xmax - xmin)**2 + (ymax - ymin)**2 + (zmax - zmin)**2)
 
     # Set target_spacing to exactly 10%
-    target_spacing = 0.07 * diagonal
+    target_spacing = 0.05 * diagonal
     print(f"Object diagonal: {diagonal:.4f}")
     print(f"Fixed spacing (10%): {target_spacing:.4f}")
 
@@ -168,59 +168,75 @@ def setup_geometry(geo_file_path, grid_coords):
     # 4. Return the surface tag and the new point tags
     return surface_tag, point_tags
 
-def define_mesh_by_grid_refined(geo_file_path, grid_coords, size_to_apply, background_size):
-    surface_tag, point_tags = setup_geometry(geo_file_path, grid_coords)
-
-    # 1. Create a Distance field to measure distance from our grid points
-    field_dist = 1
-    gmsh.model.mesh.field.add("Distance", field_dist)
-    gmsh.model.mesh.field.setNumbers(field_dist, "PointsList", point_tags)
-
-    # 2. Create a Threshold field to define the local refinement zone
-    field_thresh = 2
-    gmsh.model.mesh.field.add("Threshold", field_thresh)
-    gmsh.model.mesh.field.setNumber(field_thresh, "InField", field_dist)
+def define_mesh_by_grid_refined(geo_file_path, grid_coords, sizes_array, background_size):
+    """
+    Refines the mesh ONLY where needed. Points with background_size are ignored
+    to prevent over-constraining the Gmsh Delaunay algorithm.
+    """
+    # 1. Filter: Only keep points that are actually refined
+    # We use a small epsilon (1e-6) to avoid floating point issues
+    refined_mask = sizes_array < (background_size - 1e-6)
     
-    # Mesh size inside the DistMin radius
-    gmsh.model.mesh.field.setNumber(field_thresh, "SizeMin", size_to_apply)
-    # Mesh size outside the DistMax radius
-    gmsh.model.mesh.field.setNumber(field_thresh, "SizeMax", background_size)
-    
-    # Radius of maximum refinement (influence stays concentrated here)
-    gmsh.model.mesh.field.setNumber(field_thresh, "DistMin", 0.2) 
-    # Distance at which we reach the background size
-    gmsh.model.mesh.field.setNumber(field_thresh, "DistMax", 1.0)
-    
-    # CRITICAL: Stop the field influence beyond DistMax 
-    # This prevents the small size from leaking further than intended
-    gmsh.model.mesh.field.setNumber(field_thresh, "StopAtDistMax", 1)
+    if not np.any(refined_mask):
+        # If no points are refined, just mesh with the default size
+        setup_geometry(geo_file_path, []) # No points to embed
+        gmsh.option.setNumber("Mesh.MeshSizeMin", background_size)
+        gmsh.option.setNumber("Mesh.MeshSizeMax", background_size)
+        gmsh.model.mesh.generate(2)
+        return
 
-    # 3. Use the Min field to ensure we respect the background size everywhere
-    # This acts as a safety layer
-    field_min = 3
-    gmsh.model.mesh.field.add("Min", field_min)
-    gmsh.model.mesh.field.setNumbers(field_min, "FieldsList", [field_thresh])
-    
-    # Set the final field as the background mesh
-    gmsh.model.mesh.field.setAsBackgroundMesh(field_min)
+    # Only these points will be sent to Gmsh
+    active_coords = grid_coords[refined_mask]
+    active_sizes = sizes_array[refined_mask]
 
-    # 4. Disable default Gmsh behaviors as suggested by the documentation
-    # This prevents points and boundaries from forcing their own sizes
+    # 2. Setup geometry with ONLY active points
+    surface_tag, point_tags = setup_geometry(geo_file_path, active_coords)
+
+    # 3. Group active points by their unique refinement levels
+    unique_sizes = np.unique(np.round(active_sizes, 8))
+    field_ids = []
+    
+    for i, s_target in enumerate(unique_sizes):
+        indices = np.where(np.round(active_sizes, 8) == s_target)[0]
+        subset_tags = [point_tags[idx] for idx in indices]
+        
+        f_dist = 100 + (i * 2)
+        f_thresh = 101 + (i * 2)
+        
+        gmsh.model.mesh.field.add("Distance", f_dist)
+        gmsh.model.mesh.field.setNumbers(f_dist, "PointsList", subset_tags)
+        
+        gmsh.model.mesh.field.add("Threshold", f_thresh)
+        gmsh.model.mesh.field.setNumber(f_thresh, "InField", f_dist)
+        gmsh.model.mesh.field.setNumber(f_thresh, "SizeMin", s_target)
+        gmsh.model.mesh.field.setNumber(f_thresh, "SizeMax", background_size)
+        
+        # Adaptive transition distance to keep triangles beautiful
+        gmsh.model.mesh.field.setNumber(f_thresh, "DistMin", s_target * 2)
+        gmsh.model.mesh.field.setNumber(f_thresh, "DistMax", s_target * 10)
+        gmsh.model.mesh.field.setNumber(f_thresh, "StopAtDistMax", 1)
+        
+        field_ids.append(f_thresh)
+
+    # 4. Finalizing Mesh Fields
+    f_min = 1000
+    gmsh.model.mesh.field.add("Min", f_min)
+    gmsh.model.mesh.field.setNumbers(f_min, "FieldsList", field_ids)
+    gmsh.model.mesh.field.setAsBackgroundMesh(f_min)
+
+    # 5. Global Options
     gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
     gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
     gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
-
-    # Set hard limits for the mesh size to avoid extreme values
-    gmsh.option.setNumber("Mesh.MeshSizeMin", size_to_apply)
-    gmsh.option.setNumber("Mesh.MeshSizeMax", background_size)
-
-    # Embed points and generate
+    
+    # Crucial: This only embeds the points that actually need a specific size
     gmsh.model.mesh.embed(0, point_tags, 2, surface_tag)
+    
+    gmsh.model.mesh.generate(2)
 
     # Optimise the mesh
     optimize_mesh()
 
-    gmsh.model.mesh.generate(2)
     gmsh.fltk.run()              # Uncomment to show
 
 def get_mesh_centroids(mesh_file_path):

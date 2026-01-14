@@ -21,12 +21,17 @@ def run_refinement_cycle(solver_function, config, sizes, grid_points, r_vicinity
                         For radiation: frequency, feed_point, voltage_amplitude, monopole, etc.
     """
     show_image = True
+
+    # Pre-compute KDTree outside the loop as grid_points are static
+    # This significantly improves performance at each iteration
+    # Map mesh errors to the background grid
+    grid_tree = KDTree(grid_points)
     
     # Initial solver run to get the first surface current density
     _, _, _, surface_current_density = solver_function(paths.mat, show=show_image, **solver_kwargs)
     
     for i in range(config.max_iterations):
-        print(f"\n>>> Starting Iteration {i + 2}/{config.max_iterations}")
+        print(f"\n>>> Starting Iteration {i + 1}/{config.max_iterations}")
 
         # 1. Mesh Analysis & Element Selection
         centroids = get_mesh_centroids(paths.msh)
@@ -38,29 +43,21 @@ def run_refinement_cycle(solver_function, config, sizes, grid_points, r_vicinity
         high_error_indices = np.where(errors > config.threshold_percentage)[0]
         candidates = centroids[high_error_indices]
 
-        # 2. Map mesh errors to the background grid
-        grid_tree = KDTree(grid_points)
         affected_nested = grid_tree.query_ball_point(candidates, r_vicinity)
         
         # Flatten the list and get unique indices of grid points to refine
-        g_selected_idx = np.unique([idx for sublist in affected_nested for idx in sublist])
-        g_selected_idx = g_selected_idx.astype(int)
-
-        # Check if any points were found
+        g_selected_idx = np.unique([idx for sublist in affected_nested for idx in sublist]).astype(int)
         if g_selected_idx.size == 0:
-            raise ValueError(
-                f"Refinement aborted: No grid points were found within the specified "
-                f"radius_vicinity. Check your threshold or input coordinates."
-            )
+            print("Warning: No points selected for refinement. Stopping early.")
+            break
 
-        # 3. Update Sizes
+        # 3. Update Sizes (In-place modification of the sizes array)
         old_sizes = sizes.copy()
         for idx in g_selected_idx:
+            # Each point tracks its own refinement history (no more [0] index)
             sizes[idx] *= config.refinement_factor_gamma
-
-        # Prepare data for Gmsh refinement function
-        grid_points_to_refine = grid_points[g_selected_idx]
-        target_size_value = sizes[g_selected_idx][0] if g_selected_idx.size > 0 else None
+            # Optional: Add a safety floor to prevent infinitesimally small elements
+            sizes[idx] = max(sizes[idx], 0.02)
 
         # 4. Generate Refined Mesh
         gmsh.initialize()
@@ -68,16 +65,17 @@ def run_refinement_cycle(solver_function, config, sizes, grid_points, r_vicinity
         setup_performance_config()
 
         # Apply the refinement logic
-        define_mesh_by_grid_refined(paths.geo, grid_points_to_refine, target_size_value, config.initial_mesh_size)
+        # define_mesh_by_grid_refined(paths.geo, grid_points_to_refine, target_size_value, config.initial_mesh_size)
+        define_mesh_by_grid_refined(paths.geo, grid_points, sizes, config.initial_mesh_size)
 
         # Save and export the model
         gmsh.write(paths.msh)
         extract_ModelMsh_to_mat(paths.mat)
         gmsh.finalize()
 
-        # 5. Show image on last iteration
+        """# 5. Show image on last iteration
         if i == config.max_iterations - 1:
-            show_image = True
+            show_image = True"""
 
         # 6. Run Physics Solver on the new mesh
         _, _, _, surface_current_density = solver_function(paths.mat, show=show_image, **solver_kwargs)
