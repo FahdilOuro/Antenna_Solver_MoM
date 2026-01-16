@@ -30,10 +30,11 @@ def Grid(geo_path):
     xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.getBoundingBox(-1, -1)
     diagonal = np.sqrt((xmax - xmin)**2 + (ymax - ymin)**2 + (zmax - zmin)**2)
 
-    # Set target_spacing to exactly 10%
-    target_spacing = 0.05 * diagonal
+    # Set target_spacing
+    ratio = 0.05
+    target_spacing = ratio * diagonal
     print(f"Object diagonal: {diagonal:.4f}")
-    print(f"Fixed spacing (10%): {target_spacing:.4f}")
+    print(f"Fixed spacing ({ratio*100}%): {target_spacing:.4f}")
 
     # 4. Configure Mesh Options
     gmsh.option.setNumber("Mesh.MeshSizeMin", target_spacing)
@@ -80,13 +81,80 @@ def Grid(geo_path):
 
     return centroids_array
 
+def view_grid_point(file_path, points_grid_coords):
+    """
+    Loads a geometry and embeds specific points into the surface topology.
+    This allows visualizing the points as geometric vertices without generating a full mesh.
+    
+    Args:
+        file_path (str): Path to the .brep file.
+        points_grid_coords (np.array): Numpy array of shape (N, 3) containing coordinates.
+    """
+    
+    # 1. Initialize Gmsh
+    if not gmsh.isInitialized():
+        gmsh.initialize()
+    
+    # 2. Load the Geometry
+    gmsh.merge(file_path)
+    gmsh.model.occ.synchronize()
+
+    # 3. Get the Target Surface
+    # We retrieve all 2D entities (surfaces).
+    entities = gmsh.model.getEntities(2)
+    if not entities:
+        print("No surface found in the file.")
+        gmsh.finalize()
+        return
+    
+    # Assuming we target the first surface found in the file
+    surface_tag = entities[0][1]
+
+    # 4. Create Geometric Points
+    # We iterate through the coordinates and add them as points in the CAD kernel (OpenCASCADE).
+    point_tags = []
+    for pt in points_grid_coords:
+        # addPoint(x, y, z, meshSize, tag)
+        # We perform the check to ensure data is valid floats
+        x, y, z = pt[0], pt[1], pt[2]
+        tag = gmsh.model.occ.addPoint(x, y, z)
+        point_tags.append(tag)
+    
+    # 5. Synchronize
+    # This is crucial: it pushes the new points from the CAD kernel to the Gmsh model.
+    # Without this, the 'point_tags' exist in OCC but not in the Gmsh model for embedding.
+    gmsh.model.occ.synchronize()
+
+    # 6. Embed the Points
+    # This constrains the points to belong to the surface.
+    # 0 = dimension of the entity to embed (0 for points)
+    # point_tags = list of point tags
+    # 2 = dimension of the target entity (2 for surface)
+    # surface_tag = tag of the surface
+    print(f"Embedding {len(point_tags)} points into Surface {surface_tag}...")
+    gmsh.model.mesh.embed(0, point_tags, 2, surface_tag)
+
+    # Note: We do NOT run gmsh.model.mesh.generate(2) here as requested.
+    
+    # 7. Visualization
+    # To see the points clearly, we ensure Geometry Points are visible in the GUI options.
+    gmsh.option.setNumber("Geometry.Points", 1)      # Show geometric points
+    gmsh.option.setNumber("Geometry.PointSize", 5)   # Increase point size for visibility
+    gmsh.option.setColor("Geometry.Points", 255, 0, 0) # Make points Red
+
+    # Run the GUI
+    gmsh.fltk.run()
+    
+    # 8. Clean up
+    gmsh.finalize()
+
 def compute_vicinity_radius(grid_points):
     """
     Computes the vicinity radius r_vicinity for a set of grid points.
     
-    Algorithm:
-    1. For each point, find the distance to its nearest neighbor.
-    2. r_vicinity is the maximum of these minimum distances.
+    This implementation follows Algorithm 1:
+    1. Find the distance to the nearest neighbor (r_n) for each point.
+    2. r_vicinity is the maximum of these distances.
     
     Args:
         grid_points (np.ndarray): Array of shape (N, 3) containing point coordinates.
@@ -94,24 +162,28 @@ def compute_vicinity_radius(grid_points):
     Returns:
         float: The calculated vicinity radius.
     """
+    # Safety check: if there are fewer than 2 points, distance cannot be calculated
     if len(grid_points) < 2:
         return 0.0
 
-    # Step 1: Build a KD-Tree for efficient spatial queries
+    # Step 1: Build a KD-Tree for efficient spatial neighbor search
+    # This optimizes the O(N^2) complexity of a naive search to O(N log N)
     tree = KDTree(grid_points)
 
     # Step 2: Query the two nearest neighbors for each point
-    # k=2 because the 1st neighbor is the point itself (distance 0)
-    distances, indices = tree.query(grid_points, k=2)
+    # k=2 because the first result (index 0) is the point itself (distance = 0)
+    # the second result (index 1) is the actual nearest distinct neighbor
+    distances, _ = tree.query(grid_points, k=2)
 
-    # Step 3: Extract the distance to the 2nd neighbor (the actual nearest neighbor)
-    # distances[:, 1] contains r_n for each point
+    # Step 3: Extract the distances to the nearest neighbor (r_n)
+    # We take the second column which corresponds to the distance to the 2nd neighbor
     nearest_neighbor_distances = distances[:, 1]
 
-    # Step 4: Find the maximum of all these nearest-neighbor distances
+    # Step 4: Compute the final radius as the maximum of all nearest-neighbor distances
+    # Mathematical equivalent: r_vicinity = max(r_n)
     r_vicinity = np.max(nearest_neighbor_distances)
 
-    print(f"\nComputed r_vicinity: {r_vicinity}")
+    print(f"Computed r_vicinity: {r_vicinity:.6f}")
     return r_vicinity
 
 def generate_embedded_grid(geo_path):
@@ -273,7 +345,7 @@ def get_mesh_centroids(mesh_file_path):
 
     return all_centroids
 
-def initialize_refinement_config(grid_points, initial_mesh_size, iterations=3, threshold=0.75, gamma=0.3):
+def initialize_refinement_config(grid_points, initial_mesh_size, iterations=4, threshold=0.75, gamma=0.3):
     """
     Initializes hyperparameters as an object and the mesh size distribution array.
     Using SimpleNamespace allows accessing parameters with dot notation (e.g., config.max_iterations).

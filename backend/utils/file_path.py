@@ -19,15 +19,19 @@ def setup_gmsh_file_paths(name, gmsh_folder_path='data/gmsh_files/', mat_folder_
     geo_name = f"{name}.brep"
     mat_name = f"{name}.mat"
 
-    # 2. Check if the destination folder exists, if not, create it
+    # 2. Check if the destination folders exist, if not, create them
     if not os.path.exists(gmsh_folder_path):
         os.makedirs(gmsh_folder_path)
         print(f"Directory created: {gmsh_folder_path}")
+    if not os.path.exists(mat_folder_path):
+        os.makedirs(mat_folder_path)
+        print(f"Directory created: {mat_folder_path}")
+        
 
     # 3. Construct the absolute or relative paths for the files
     file_msh_path = os.path.join(gmsh_folder_path, mesh_name)
     file_geo_path = os.path.join(gmsh_folder_path, geo_name)
-    file_mat_path = os.path.join(gmsh_folder_path, mat_name)
+    file_mat_path = os.path.join(mat_folder_path, mat_name)
 
     # Store paths in a namespace for dot notation access
     paths = SimpleNamespace(

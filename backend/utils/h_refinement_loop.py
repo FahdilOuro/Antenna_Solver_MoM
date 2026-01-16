@@ -57,7 +57,7 @@ def run_refinement_cycle(solver_function, config, sizes, grid_points, r_vicinity
             # Each point tracks its own refinement history (no more [0] index)
             sizes[idx] *= config.refinement_factor_gamma
             # Optional: Add a safety floor to prevent infinitesimally small elements
-            sizes[idx] = max(sizes[idx], 0.02)
+            # sizes[idx] = max(sizes[idx], 0.02)
 
         # 4. Generate Refined Mesh
         gmsh.initialize()
