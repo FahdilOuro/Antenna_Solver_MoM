@@ -1,6 +1,6 @@
 from backend.src.scattering_algorithm.scattering_algorithm import scattering_algorithm
 from backend.src.radiation_algorithm.radiation_algorithm import radiation_algorithm
-from backend.utils.error_estimator   import *
+from backend.utils.error_estimator   import compute_error_estimation
 from backend.utils.gmsh_function import extract_ModelMsh_to_mat
 from backend.utils.h_refinement_func import *
 
@@ -37,10 +37,17 @@ def run_refinement_cycle(solver_function, config, sizes, grid_points, r_vicinity
         centroids = get_mesh_centroids(paths.msh)
         
         # Estimate errors based on surface current density
-        errors = simple_estimation(surface_current_density)
+        # errors = simple_estimation(surface_current_density)
+
+        errors = compute_error_estimation(paths.mat, surface_current_density)
+
+        # 3. Calculate the threshold using the percentile function
+        # To get the TOP 20%, we need to find the 80th percentile (100 - 20)
+        # This is much faster than sorting the array manually
+        threshold = np.percentile(errors, (1 - config.threshold_percentage) * 100)
         
         # Identify elements exceeding the error threshold
-        high_error_indices = np.where(errors > config.threshold_percentage)[0]
+        high_error_indices = np.where(errors > threshold)[0]
         candidates = centroids[high_error_indices]
 
         affected_nested = grid_tree.query_ball_point(candidates, r_vicinity)
@@ -56,8 +63,6 @@ def run_refinement_cycle(solver_function, config, sizes, grid_points, r_vicinity
         for idx in g_selected_idx:
             # Each point tracks its own refinement history (no more [0] index)
             sizes[idx] *= config.refinement_factor_gamma
-            # Optional: Add a safety floor to prevent infinitesimally small elements
-            # sizes[idx] = max(sizes[idx], 0.02)
 
         # 4. Generate Refined Mesh
         gmsh.initialize()

@@ -345,7 +345,7 @@ def get_mesh_centroids(mesh_file_path):
 
     return all_centroids
 
-def initialize_refinement_config(grid_points, initial_mesh_size, iterations=4, threshold=0.75, gamma=0.3):
+def initialize_refinement_config(grid_points, initial_mesh_size, iterations=3, threshold=0.18, gamma=0.3):
     """
     Initializes hyperparameters as an object and the mesh size distribution array.
     Using SimpleNamespace allows accessing parameters with dot notation (e.g., config.max_iterations).

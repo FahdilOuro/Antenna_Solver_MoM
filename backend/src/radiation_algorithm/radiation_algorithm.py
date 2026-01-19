@@ -5,7 +5,7 @@ from backend.rwg.rwg4 import *
 from backend.rwg.rwg5 import *
 
 
-def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, monopole=False, 
+def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, monopole=False, 
                         simulate_array_antenna=False, show=True, save_image=False,
                         load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None):
     
@@ -14,7 +14,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, monop
          raise ValueError("Incoherent parameters: If 'load_lumped_elements' is False, 'LoadPoint', 'LoadValue', and 'LoadDir' must all be None. If 'load_lumped_elements' is True, all three must be provided (not None).")
     
     # Load the mesh file
-    p, t = load_mesh_file(mesh1)
+    p, t = load_mesh_file(mesh)
 
     # Define points and triangles from the mesh
     points = Points(p)
@@ -25,7 +25,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, monop
     triangles.calculate_triangles_area_and_center(points)
 
     # Display main dimensions of the antenna
-    base_name = os.path.splitext(os.path.basename(mesh1))[0]
+    base_name = os.path.splitext(os.path.basename(mesh))[0]
 
     # Define edges and compute their lengths
     edges = triangles.get_edges()
@@ -36,7 +36,7 @@ def radiation_algorithm(mesh1, frequency, feed_point, voltage_amplitude=1, monop
 
     # Save processed mesh data
     save_folder_name_mesh1 = 'data/antennas_mesh1/'
-    save_file_name_mesh1 = DataManager_rwg1.save_data(mesh1, save_folder_name_mesh1, points, triangles, edges)
+    save_file_name_mesh1 = DataManager_rwg1.save_data(mesh, save_folder_name_mesh1, points, triangles, edges)
 
     # Load saved data
     filename_mesh1_to_load = save_folder_name_mesh1 + save_file_name_mesh1
