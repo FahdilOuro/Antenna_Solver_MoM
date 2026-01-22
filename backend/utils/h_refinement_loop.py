@@ -1,11 +1,11 @@
 from backend.src.scattering_algorithm.scattering_algorithm import scattering_algorithm
 from backend.src.radiation_algorithm.radiation_algorithm import radiation_algorithm
 from backend.utils.error_estimator   import compute_error_estimation
-from backend.utils.gmsh_function import extract_ModelMsh_to_mat
+from backend.utils.gmsh_function import extract_ModelMsh_to_mat, extract_msh_to_mat
 from backend.utils.h_refinement_func import *
 
 
-def run_refinement_cycle(solver_function, config, sizes, grid_points, r_vicinity, paths, **solver_kwargs):
+def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, paths, **solver_kwargs):
     """
     Executes the iterative mesh refinement loop with a flexible solver function.
     
@@ -22,6 +22,11 @@ def run_refinement_cycle(solver_function, config, sizes, grid_points, r_vicinity
     """
     show_image = True
 
+    extract_msh_to_mat(paths.msh, paths.mat)
+
+    # Initialize the mesh size array based on the number of grid points
+    sizes = np.ones(len(grid_points)) * config.initial_mesh_size
+
     # Pre-compute KDTree outside the loop as grid_points are static
     # This significantly improves performance at each iteration
     # Map mesh errors to the background grid
@@ -34,7 +39,10 @@ def run_refinement_cycle(solver_function, config, sizes, grid_points, r_vicinity
         print(f"\n>>> Starting Iteration {i + 1}/{config.max_iterations}")
 
         # 1. Mesh Analysis & Element Selection
-        centroids = get_mesh_centroids(paths.msh)
+        if i == 0:
+            centroids = get_mesh_centroids(paths.msh)
+        else:
+            centroids = get_mesh_centroids(paths.remsh)
         
         # Estimate errors based on surface current density
         # errors = simple_estimation(surface_current_density)
@@ -70,11 +78,10 @@ def run_refinement_cycle(solver_function, config, sizes, grid_points, r_vicinity
         setup_performance_config()
 
         # Apply the refinement logic
-        # define_mesh_by_grid_refined(paths.geo, grid_points_to_refine, target_size_value, config.initial_mesh_size)
         define_mesh_by_grid_refined(paths.geo, grid_points, sizes, config.initial_mesh_size)
 
         # Save and export the model
-        gmsh.write(paths.msh)
+        gmsh.write(paths.remsh)
         extract_ModelMsh_to_mat(paths.mat)
         gmsh.finalize()
 
@@ -93,7 +100,7 @@ def run_refinement_cycle(solver_function, config, sizes, grid_points, r_vicinity
 
     print("\n>>> Refinement process completed.")
 
-def run_scattering_refinement(config, sizes, grid_points, r_vicinity, paths, 
+def run_scattering_refinement(config, grid_points, r_vicinity, paths, 
                                frequency, wave_incident_direction, polarization):
     """
     Wrapper for scattering-based refinement.
@@ -101,7 +108,6 @@ def run_scattering_refinement(config, sizes, grid_points, r_vicinity, paths,
     return run_refinement_cycle(
         solver_function=scattering_algorithm,
         config=config,
-        sizes=sizes,
         grid_points=grid_points,
         r_vicinity=r_vicinity,
         paths=paths,
@@ -112,7 +118,7 @@ def run_scattering_refinement(config, sizes, grid_points, r_vicinity, paths,
 
 
 # Example 2: Using radiation algorithm
-def run_radiation_refinement(config, sizes, grid_points, r_vicinity, paths,
+def run_radiation_refinement(config, grid_points, r_vicinity, paths,
                               frequency, feed_point, voltage_amplitude=1,
                               monopole=False, simulate_array_antenna=False,
                               load_lumped_elements=False, LoadPoint=None,
@@ -123,7 +129,6 @@ def run_radiation_refinement(config, sizes, grid_points, r_vicinity, paths,
     return run_refinement_cycle(
         solver_function=radiation_algorithm,
         config=config,
-        sizes=sizes,
         grid_points=grid_points,
         r_vicinity=r_vicinity,
         paths=paths,

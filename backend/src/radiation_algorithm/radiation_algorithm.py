@@ -20,8 +20,7 @@ def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, monopo
     points = Points(p)
     triangles = Triangles(t)
 
-    # Filter invalid triangles and compute geometric properties (areas, centers)
-    # triangles.filter_triangles()
+    # Compute geometric properties (areas, centers)
     triangles.calculate_triangles_area_and_center(points)
 
     # Display main dimensions of the antenna

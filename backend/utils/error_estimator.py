@@ -30,6 +30,23 @@ def simple_estimation(surface_current_density):
 
     return normalized_error
 
+def compute_simple_estimation(current_density, areas):
+    """
+    Fast Vectorized Simple Estimation (SE).
+    Measures current importance based on magnitude and element area.
+    """
+    # Magnitude of J for each triangle
+    j_magnitude = np.linalg.norm(current_density, axis=0)
+    
+    # SE is proportional to current intensity and the size of the element
+    se_error = j_magnitude * areas
+    
+    # Normalize by max value
+    if np.max(se_error) > 0:
+        se_error /= np.max(se_error)
+        
+    return se_error
+
 def get_simplified_mesh_properties(points_obj, triangles_obj):
     """
     Simplifies property extraction by using attributes already present 
@@ -98,7 +115,7 @@ def compute_curl_estimation(surface_current_density, neighbors):
     # Final normalization as per Haipl's formula
     return ce_error / (3 * max_J)
 
-def compute_error_estimation(mesh_file, current_density_vector, alpha=0.5):
+def compute_error_estimation(mesh_file, surface_current_density, alpha=0.9):
     """
     Main execution flow using rwg1.py objects.
     """
@@ -108,23 +125,26 @@ def compute_error_estimation(mesh_file, current_density_vector, alpha=0.5):
     # 2. Define points and triangles from the mesh
     points_obj = Points(p)
     triangles_obj = Triangles(t)
+
+    # 3. Compute geometric properties (areas, centers) of triangle object
+    triangles_obj.calculate_triangles_area_and_center(points_obj)
     
-    # 3. Get connectivity and tangents
+    # 4. Get connectivity and tangents
     neighbors = get_simplified_mesh_properties(points_obj, triangles_obj)
 
     # print(f"neighbord = \n{neighbors}")
     
-    # 4. Compute Curl Estimation (CE)
+    # 5. Compute Curl Estimation (CE)
     # We pass the raw current density and pre-computed properties
-    ce_vals = compute_curl_estimation(current_density_vector, neighbors)
-
+    ce_vals = compute_curl_estimation(surface_current_density, neighbors)
+    
     return ce_vals
     
-    # 5. Compute Simple Estimation (SE) 
+    '''# 6. Compute Simple Estimation (SE) 
     # Directly use triangles_obj.triangles_area instead of recalculating
-    se_vals = compute_simple_estimation(current_density_vector, triangles_obj.triangles_area)
+    se_vals = compute_simple_estimation(surface_current_density, triangles_obj.triangles_area)
     
-    # 6. Hybrid Result
+    # 7. Hybrid Result
     hybrid_error = (alpha * ce_vals) + ((1 - alpha) * se_vals)
     
-    return hybrid_error
+    return hybrid_error'''

@@ -56,9 +56,16 @@ def setup_performance_config(n_threads=None):
     # than the default Delaunay (Algorithm 5).
     gmsh.option.setNumber("Mesh.Algorithm", 6)
 
-    # 3. Enable the HXT algorithm if you ever switch to 3D
+    # 3. Enable optimization to further smooth the mesh
+    # "Mesh.Smoothing" sets the number of smoothing steps (Netgen algorithm)
+    gmsh.option.setNumber("Mesh.Smoothing", 10)
+
+    # 4. Enable the HXT algorithm if you ever switch to 3D
     # HXT is specifically designed for high-thread-count CPUs
     gmsh.option.setNumber("Mesh.Algorithm3D", 10)
+
+    # 5. Remove points very close to each other
+    gmsh.option.setNumber("Geometry.Tolerance", 1e-6)
 
     print(f"[PERFORMANCE] Gmsh configured to utilize {threads} threads.")
 
@@ -214,7 +221,7 @@ def extract_ModelMsh_to_mat(save_mat_path):
 
     print(f"MATLAB file stored in {save_mat_path} successfully")
 
-def optimize_mesh(dim=2, iterations=2):
+def optimize_mesh(dim=2, iterations=3):
     """
     Optimizes a mesh while preserving local refinement gradients.
     This function is suitable for adaptive mesh refinement projects.

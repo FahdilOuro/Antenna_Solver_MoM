@@ -5,7 +5,7 @@ from scipy.spatial import KDTree
 
 from backend.utils.gmsh_function import optimize_mesh, setup_performance_config
 
-def Grid(geo_path):
+def Grid(geo_path, spacing_ratio):
     """
     Loads a BREP file and generates centroids using a spacing 
     fixed at 10% of the object's diagonal size.
@@ -31,10 +31,9 @@ def Grid(geo_path):
     diagonal = np.sqrt((xmax - xmin)**2 + (ymax - ymin)**2 + (zmax - zmin)**2)
 
     # Set target_spacing
-    ratio = 0.05
-    target_spacing = ratio * diagonal
+    target_spacing = spacing_ratio * diagonal
     print(f"Object diagonal: {diagonal:.4f}")
-    print(f"Fixed spacing ({ratio*100}%): {target_spacing:.4f}")
+    print(f"Fixed spacing ({spacing_ratio*100}%): {target_spacing:.4f}")
 
     # 4. Configure Mesh Options
     gmsh.option.setNumber("Mesh.MeshSizeMin", target_spacing)
@@ -186,7 +185,7 @@ def compute_vicinity_radius(grid_points):
     print(f"Computed r_vicinity: {r_vicinity:.6f}")
     return r_vicinity
 
-def generate_embedded_grid(geo_path):
+def generate_embedded_grid(geo_path, spacing_ratio=0.1):
     """
     Generates a grid of points embedded within the geometry and 
     computes the vicinity radius for those points.
@@ -201,7 +200,7 @@ def generate_embedded_grid(geo_path):
     
     # 1. Initialize the Grid object using the geometry file and spacing
     # This step maps the points inside the defined plate geometry
-    grid_points = Grid(geo_path)
+    grid_points = Grid(geo_path, spacing_ratio)
     
     # 2. Compute the vicinity radius
     # This identifies the influence area or connectivity for the grid points
@@ -212,7 +211,6 @@ def generate_embedded_grid(geo_path):
     
     return grid_points, r_vicinity
 
-# --- 3. Helper Functions ---
 def setup_geometry(geo_file_path, grid_coords):
     """
     General function: Loads ANY geometry and syncs grid points.
@@ -254,6 +252,8 @@ def define_mesh_by_grid_refined(geo_file_path, grid_coords, sizes_array, backgro
         setup_geometry(geo_file_path, []) # No points to embed
         gmsh.option.setNumber("Mesh.MeshSizeMin", background_size)
         gmsh.option.setNumber("Mesh.MeshSizeMax", background_size)
+        gmsh.model.occ.removeAllDuplicates()
+        gmsh.model.occ.synchronize()
         gmsh.model.mesh.generate(2)
         return
 
@@ -286,7 +286,7 @@ def define_mesh_by_grid_refined(geo_file_path, grid_coords, sizes_array, backgro
         # Adaptive transition distance to keep triangles beautiful
         gmsh.model.mesh.field.setNumber(f_thresh, "DistMin", s_target * 2)
         gmsh.model.mesh.field.setNumber(f_thresh, "DistMax", s_target * 10)
-        gmsh.model.mesh.field.setNumber(f_thresh, "StopAtDistMax", 1)
+        # gmsh.model.mesh.field.setNumber(f_thresh, "StopAtDistMax", 1)
         
         field_ids.append(f_thresh)
 
@@ -303,6 +303,10 @@ def define_mesh_by_grid_refined(geo_file_path, grid_coords, sizes_array, backgro
     
     # Crucial: This only embeds the points that actually need a specific size
     gmsh.model.mesh.embed(0, point_tags, 2, surface_tag)
+
+    gmsh.model.occ.removeAllDuplicates()
+
+    gmsh.model.occ.synchronize()
     
     gmsh.model.mesh.generate(2)
 
@@ -345,7 +349,7 @@ def get_mesh_centroids(mesh_file_path):
 
     return all_centroids
 
-def initialize_refinement_config(grid_points, initial_mesh_size, iterations=3, threshold=0.18, gamma=0.3):
+def initialize_refinement_config(initial_mesh_size, iterations=3, threshold=0.1, gamma=0.25):
     """
     Initializes hyperparameters as an object and the mesh size distribution array.
     Using SimpleNamespace allows accessing parameters with dot notation (e.g., config.max_iterations).
@@ -360,11 +364,8 @@ def initialize_refinement_config(grid_points, initial_mesh_size, iterations=3, t
         initial_mesh_size=initial_mesh_size
     )
     
-    # 2. Initialize the mesh size array based on the number of grid points
-    current_sizes = np.ones(len(grid_points)) * initial_mesh_size
-    
     # 3. Log initialization details
     print(f"Configuration initialized. Max iterations: {config.max_iterations}")
     print(f"Mesh size array initialized with uniform size: {initial_mesh_size}")
 
-    return config, current_sizes
+    return config
