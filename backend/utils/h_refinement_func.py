@@ -240,80 +240,103 @@ def setup_geometry(geo_file_path, grid_coords):
 
 def define_mesh_by_grid_refined(geo_file_path, grid_coords, sizes_array, background_size):
     """
-    Refines the mesh ONLY where needed. Points with background_size are ignored
-    to prevent over-constraining the Gmsh Delaunay algorithm.
+    Refines the mesh on 3D geometries using mesh fields.
+    Ensures points are correctly embedded in their respective surfaces.
     """
-    # 1. Filter: Only keep points that are actually refined
-    # We use a small epsilon (1e-6) to avoid floating point issues
-    refined_mask = sizes_array < (background_size - 1e-6)
-    
-    if not np.any(refined_mask):
-        # If no points are refined, just mesh with the default size
-        setup_geometry(geo_file_path, []) # No points to embed
-        gmsh.option.setNumber("Mesh.MeshSizeMin", background_size)
-        gmsh.option.setNumber("Mesh.MeshSizeMax", background_size)
-        gmsh.model.occ.removeAllDuplicates()
-        gmsh.model.occ.synchronize()
-        gmsh.model.mesh.generate(2)
-        return
+    # 2. Load Geometry using OpenCASCADE kernel
+    gmsh.model.occ.importShapes(geo_file_path)
+    gmsh.model.occ.synchronize()
 
-    # Only these points will be sent to Gmsh
+    # 3. Setup Global Mesh Options
+    # Disable MeshSizeFromPoints to let Fields take full control of the gradient
+    gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0) 
+    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+
+    # 4. Filter refined points
+    refined_mask = sizes_array < (background_size - 1e-6)
     active_coords = grid_coords[refined_mask]
     active_sizes = sizes_array[refined_mask]
 
-    # 2. Setup geometry with ONLY active points
-    surface_tag, point_tags = setup_geometry(geo_file_path, active_coords)
+    if len(active_coords) == 0:
+        gmsh.option.setNumber("Mesh.MeshSizeMin", background_size)
+        gmsh.option.setNumber("Mesh.MeshSizeMax", background_size)
+        gmsh.model.mesh.generate(2)
+        # gmsh.fltk.run()  # Uncomment to see
+        return
 
-    # 3. Group active points by their unique refinement levels
-    unique_sizes = np.unique(np.round(active_sizes, 8))
-    field_ids = []
+    # 5. Get all available surfaces
+    surfaces = gmsh.model.getEntities(2)
     
+    # 6. Create Points and Associate them with Surfaces
+    point_tags = []
+    for coord in active_coords:
+        # Create point in the OCC kernel
+        p_tag = gmsh.model.occ.addPoint(coord[0], coord[1], coord[2])
+        point_tags.append(p_tag)
+        
+    gmsh.model.occ.synchronize()
+
+    # Smart Embedding: prevent ghost lines by only embedding points on their parent surfaces
+    for p_tag, coord in zip(point_tags, active_coords):
+        for _, s_tag in surfaces:
+            # Check proximity to surface
+            closest_pt, _ = gmsh.model.getClosestPoint(2, s_tag, coord)
+            dist = np.linalg.norm(coord - np.array(closest_pt))
+            
+            if dist < 1e-4: # Tolerance for numerical precision
+                # Embed the 0D point into the 2D surface
+                gmsh.model.mesh.embed(0, [p_tag], 2, s_tag)
+
+    # 7. Define Mesh Fields for Gradients
+    active_sizes_rounded = np.round(active_sizes, 8)
+    unique_sizes = np.unique(active_sizes_rounded)
+    field_ids = []
+
     for i, s_target in enumerate(unique_sizes):
-        indices = np.where(np.round(active_sizes, 8) == s_target)[0]
+        # Identify points belonging to this specific refinement level
+        indices = np.where(active_sizes_rounded == s_target)[0]
         subset_tags = [point_tags[idx] for idx in indices]
         
+        if not subset_tags: continue
+
+        # Distance Field: computes distance to the subset of points
         f_dist = 100 + (i * 2)
-        f_thresh = 101 + (i * 2)
-        
         gmsh.model.mesh.field.add("Distance", f_dist)
         gmsh.model.mesh.field.setNumbers(f_dist, "PointsList", subset_tags)
         
+        # Threshold Field: defines the size evolution around these points
+        f_thresh = 101 + (i * 2)
         gmsh.model.mesh.field.add("Threshold", f_thresh)
         gmsh.model.mesh.field.setNumber(f_thresh, "InField", f_dist)
         gmsh.model.mesh.field.setNumber(f_thresh, "SizeMin", s_target)
         gmsh.model.mesh.field.setNumber(f_thresh, "SizeMax", background_size)
         
-        # Adaptive transition distance to keep triangles beautiful
+        # Smooth transition settings
         gmsh.model.mesh.field.setNumber(f_thresh, "DistMin", s_target * 2)
-        gmsh.model.mesh.field.setNumber(f_thresh, "DistMax", s_target * 10)
-        # gmsh.model.mesh.field.setNumber(f_thresh, "StopAtDistMax", 1)
+        gmsh.model.mesh.field.setNumber(f_thresh, "DistMax", s_target * 4)
         
         field_ids.append(f_thresh)
 
-    # 4. Finalizing Mesh Fields
-    f_min = 1000
-    gmsh.model.mesh.field.add("Min", f_min)
-    gmsh.model.mesh.field.setNumbers(f_min, "FieldsList", field_ids)
-    gmsh.model.mesh.field.setAsBackgroundMesh(f_min)
+    # Final Field: Combine all thresholds to keep the smallest size at any location
+    if field_ids:
+        f_min = 1000
+        gmsh.model.mesh.field.add("Min", f_min)
+        gmsh.model.mesh.field.setNumbers(f_min, "FieldsList", field_ids)
+        gmsh.model.mesh.field.setAsBackgroundMesh(f_min)
 
-    # 5. Global Options
-    gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
-    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
-    gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
-    
-    # Crucial: This only embeds the points that actually need a specific size
-    gmsh.model.mesh.embed(0, point_tags, 2, surface_tag)
-
+    # 8. Clean up Geometry and Generate Mesh
     gmsh.model.occ.removeAllDuplicates()
-
     gmsh.model.occ.synchronize()
     
+    # Generate 2D mesh on the 3D surfaces
     gmsh.model.mesh.generate(2)
-
-    # Optimise the mesh
+    
+    # 9. Mesh Optimization
     optimize_mesh()
 
-    gmsh.fltk.run()              # Uncomment to show
+    # Final display for verification
+    gmsh.fltk.run()      # Uncomment to see
 
 def get_mesh_centroids(mesh_file_path):
     """
