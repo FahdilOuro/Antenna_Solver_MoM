@@ -241,19 +241,13 @@ def setup_geometry(geo_file_path, grid_coords):
 def define_mesh_by_grid_refined(geo_file_path, grid_coords, sizes_array, background_size):
     """
     Refines the mesh on 3D geometries using mesh fields.
-    Ensures points are correctly embedded in their respective surfaces.
+    Uses the GEO kernel for point constraints to avoid ghost lines and projection errors.
     """
-    # 2. Load Geometry using OpenCASCADE kernel
+    # 1. Load the CAD geometry (OCC)
     gmsh.model.occ.importShapes(geo_file_path)
     gmsh.model.occ.synchronize()
 
-    # 3. Setup Global Mesh Options
-    # Disable MeshSizeFromPoints to let Fields take full control of the gradient
-    gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0) 
-    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
-    gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
-
-    # 4. Filter refined points
+    # 2. Filter refined points
     refined_mask = sizes_array < (background_size - 1e-6)
     active_coords = grid_coords[refined_mask]
     active_sizes = sizes_array[refined_mask]
@@ -262,81 +256,66 @@ def define_mesh_by_grid_refined(geo_file_path, grid_coords, sizes_array, backgro
         gmsh.option.setNumber("Mesh.MeshSizeMin", background_size)
         gmsh.option.setNumber("Mesh.MeshSizeMax", background_size)
         gmsh.model.mesh.generate(2)
-        # gmsh.fltk.run()  # Uncomment to see
         return
 
-    # 5. Get all available surfaces
-    surfaces = gmsh.model.getEntities(2)
-    
-    # 6. Create Points and Associate them with Surfaces
+    # 3. Create Points using GEO kernel (Internal Mesh Constraints)
+    # Using 'geo' instead of 'occ' prevents Gmsh from creating structural lines
     point_tags = []
     for coord in active_coords:
-        # Create point in the OCC kernel
-        p_tag = gmsh.model.occ.addPoint(coord[0], coord[1], coord[2])
+        # Syntax: addPoint(x, y, z, meshSize, tag)
+        p_tag = gmsh.model.geo.addPoint(coord[0], coord[1], coord[2])
         point_tags.append(p_tag)
-        
-    gmsh.model.occ.synchronize()
+    
+    # Synchronize the GEO kernel
+    gmsh.model.geo.synchronize()
 
-    # Smart Embedding: prevent ghost lines by only embedding points on their parent surfaces
-    for p_tag, coord in zip(point_tags, active_coords):
-        for _, s_tag in surfaces:
-            # Check proximity to surface
-            closest_pt, _ = gmsh.model.getClosestPoint(2, s_tag, coord)
-            dist = np.linalg.norm(coord - np.array(closest_pt))
-            
-            if dist < 1e-4: # Tolerance for numerical precision
-                # Embed the 0D point into the 2D surface
-                gmsh.model.mesh.embed(0, [p_tag], 2, s_tag)
-
-    # 7. Define Mesh Fields for Gradients
+    # 4. Define Mesh Fields (Preserving your gradient logic)
     active_sizes_rounded = np.round(active_sizes, 8)
     unique_sizes = np.unique(active_sizes_rounded)
     field_ids = []
 
     for i, s_target in enumerate(unique_sizes):
-        # Identify points belonging to this specific refinement level
         indices = np.where(active_sizes_rounded == s_target)[0]
         subset_tags = [point_tags[idx] for idx in indices]
         
         if not subset_tags: continue
 
-        # Distance Field: computes distance to the subset of points
         f_dist = 100 + (i * 2)
         gmsh.model.mesh.field.add("Distance", f_dist)
         gmsh.model.mesh.field.setNumbers(f_dist, "PointsList", subset_tags)
         
-        # Threshold Field: defines the size evolution around these points
         f_thresh = 101 + (i * 2)
         gmsh.model.mesh.field.add("Threshold", f_thresh)
         gmsh.model.mesh.field.setNumber(f_thresh, "InField", f_dist)
         gmsh.model.mesh.field.setNumber(f_thresh, "SizeMin", s_target)
         gmsh.model.mesh.field.setNumber(f_thresh, "SizeMax", background_size)
-        
-        # Smooth transition settings
         gmsh.model.mesh.field.setNumber(f_thresh, "DistMin", s_target * 2)
         gmsh.model.mesh.field.setNumber(f_thresh, "DistMax", s_target * 4)
-        
         field_ids.append(f_thresh)
 
-    # Final Field: Combine all thresholds to keep the smallest size at any location
     if field_ids:
         f_min = 1000
         gmsh.model.mesh.field.add("Min", f_min)
         gmsh.model.mesh.field.setNumbers(f_min, "FieldsList", field_ids)
         gmsh.model.mesh.field.setAsBackgroundMesh(f_min)
 
-    # 8. Clean up Geometry and Generate Mesh
-    gmsh.model.occ.removeAllDuplicates()
+    # 5. Global Mesh Options
+    gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 1)
+    gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+    gmsh.option.setNumber("Mesh.Algorithm", 6) # Frontal-Delaunay
+
+    # 6. Final Clean-up and Mesh Generation
+    # We do NOT use embed() here. Fields handle the sizing.
+    # We synchronize OCC once more to ensure CAD integrity
     gmsh.model.occ.synchronize()
     
-    # Generate 2D mesh on the 3D surfaces
     gmsh.model.mesh.generate(2)
     
-    # 9. Mesh Optimization
+    # 7. Optimize quality
     optimize_mesh()
 
-    # Final display for verification
-    gmsh.fltk.run()      # Uncomment to see
+    gmsh.fltk.run()
 
 def get_mesh_centroids(mesh_file_path):
     """

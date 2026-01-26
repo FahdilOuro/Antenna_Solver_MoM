@@ -67,9 +67,8 @@ def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, paths
             break
 
         # 3. Update Sizes (In-place modification of the sizes array)
-        old_sizes = sizes.copy()
         for idx in g_selected_idx:
-            # Each point tracks its own refinement history (no more [0] index)
+            # Each point tracks its own refinement history
             sizes[idx] *= config.refinement_factor_gamma
 
         # 4. Generate Refined Mesh
@@ -93,6 +92,7 @@ def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, paths
         _, _, _, surface_current_density = solver_function(paths.mat, show=show_image, **solver_kwargs)
 
         # 7. Logging Statistics
+        old_sizes = sizes.copy()
         sizes_changed = np.sum(sizes != old_sizes)
         print(f"Points refined in this step: {len(g_selected_idx)}")
         print(f"Total modified points in grid: {sizes_changed}")
