@@ -104,10 +104,31 @@ def find_feed_edges(points, edges, feed_point, monopole=False):
 
     # --- Select feeding edges ---
     if monopole:
-        index_feeding_edges = np.argsort(dist_squared, axis=0)[:2, :]  # (2, N)
-        index_feeding_edges = index_feeding_edges.flatten(order='F')   # (2*N,)
+        # print("Number of edges elements:", edges.total_number_of_edges)
+        selected_points_for_feeding = 2  # Number of edges to select per feed point for monopole
+        index_feeding_edges = np.argsort(dist_squared, axis=0)[:selected_points_for_feeding, :]  # (selected_points_for_feeding, N)
+        index_feeding_edges = index_feeding_edges.flatten(order='F')   # (selected_points_for_feeding*N)
+        print("index_feeding_edges (monopole):", index_feeding_edges)
     else:
         index_feeding_edges = np.argmin(dist_squared, axis=0)          # (N,)
+
+    '''
+    # Add by the author to debug and verify feeding edges
+    # print the selected feeding edges and the 2 points coordinates corresponding to that edge(s) for verification
+    for i, feed in enumerate(Feed.T):
+        if monopole:
+            edges_indices = index_feeding_edges[selected_points_for_feeding*i:selected_points_for_feeding*i+selected_points_for_feeding]
+            print(f"Feed Point {i+1} at {feed} -> Feeding Edges Indices: {edges_indices}")
+            for edge_index in edges_indices:
+                p1_index = edges.first_points[edge_index]
+                p2_index = edges.second_points[edge_index]
+                print(f"  Edge {edge_index}: Point 1 at {points.points[:, p1_index]}, Point 2 at {points.points[:, p2_index]}")
+        else:
+            edge_index = index_feeding_edges[i]
+            print(f"Feed Point {i+1} at {feed} -> Feeding Edge Index: {edge_index}")
+            p1_index = edges.first_points[edge_index]
+            p2_index = edges.second_points[edge_index]
+            print(f"  Edge {edge_index}: Point 1 at {points.points[:, p1_index]}, Point 2 at {points.points[:, p2_index]}")'''
     
     return index_feeding_edges
 
