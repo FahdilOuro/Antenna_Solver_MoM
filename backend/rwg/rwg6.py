@@ -31,7 +31,14 @@ def surface_calculate_current_density(current, triangles, edges, vecteurs_rho):
 
 
 def plot_surface_current_distribution(filename_mesh_2, filename_current, scattering=False, radiation=False):
-    points, triangles, _, _, edges, _, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh_2)
+    # if scattering and radiation are both False, raise an error
+    if not scattering and not radiation:
+        raise ValueError("At least one of scattering or radiation must be True.")
+    # if both are True, raise an error
+    if scattering and radiation:
+        raise ValueError("Only one of scattering or radiation can be True at a time.")
+    
+    points, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh_2)
     
     if scattering:
         *_, current = DataManager_rwg4.load_data(filename_current, scattering=scattering)
@@ -44,7 +51,7 @@ def plot_surface_current_distribution(filename_mesh_2, filename_current, scatter
     surface_current_density = surface_calculate_current_density(current, triangles, edges, vecteurs_rho)
 
     # Define sampling limits
-    K = 20
+    K = 69
     y0, y1 = np.min(points.points[1, :]), np.max(points.points[1, :])
 
     # Compute current densities at sampled points
@@ -70,9 +77,15 @@ def plot_surface_current_distribution(filename_mesh_2, filename_current, scatter
     Xi = interp_X(yi)
     Yi = interp_Y(yi)
 
+    # fix the plot style
+    plt.figure(figsize=(15, 9))
+    plt.rcParams['font.family'] = 'monospace'
+    plt.rcParams['font.size'] = 12
+    plt.rcParams['axes.linewidth'] = 1.2
+
     # Plot the curves
     plt.plot(yi, Xi, label='|Jx|')
-    plt.plot(yi, Yi, '*', label='|Jy|')
+    plt.plot(yi, Yi, '-', label='|Jy|')
     plt.xlabel('Dipole length, m')
     plt.ylabel('Surface current density, A/m')
     plt.grid(True)

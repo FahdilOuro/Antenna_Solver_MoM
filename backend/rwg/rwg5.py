@@ -69,6 +69,7 @@ def calculate_current_density(current, triangles, edges, vecteurs_rho):
 
     # Maximum surface current density
     j_max_surface_current_abs_norm = max(surface_current_density_abs_norm)
+    print(f"Maximum Surface Current Density : {j_max_surface_current_abs_norm} (A/m)")
 
     # Find the maximum value and its index
     j_max_index = np.argmax(surface_current_density_norm)

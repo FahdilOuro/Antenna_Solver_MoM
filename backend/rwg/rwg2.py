@@ -119,11 +119,9 @@ class Vecteurs_Rho:
 
         # --- Vectorized processing for “plus” triangles ---
         triangles_plus_sommets = triangles[:, triangles_plus]  # (3, N_edges)
-        edges_fp = edges_first_points
-        edges_sp = edges_second_points
 
         # Detection of the opposite vertex
-        mask_plus = (triangles_plus_sommets != edges_fp) & (triangles_plus_sommets != edges_sp)  # (3, N_edges)
+        mask_plus = (triangles_plus_sommets != edges_first_points) & (triangles_plus_sommets != edges_second_points)  # (3, N_edges)
         # For each edge, find the index of the opposite vertex
         indices_opposes_plus = np.argmax(mask_plus, axis=0)  # (N_edges,)
         index_point_vecteur_plus = triangles_plus_sommets[indices_opposes_plus, np.arange(total_number_of_edges)]  # (N_edges,)
@@ -136,7 +134,7 @@ class Vecteurs_Rho:
         # --- Vectorized processing for “minus” triangles ---
         triangles_minus_sommets = triangles[:, triangles_minus]  # (3, N_edges)
 
-        mask_minus = (triangles_minus_sommets != edges_fp) & (triangles_minus_sommets != edges_sp)
+        mask_minus = (triangles_minus_sommets != edges_first_points) & (triangles_minus_sommets != edges_second_points)
         indices_opposes_minus = np.argmax(mask_minus, axis=0)
         index_point_vecteur_minus = triangles_minus_sommets[indices_opposes_minus, np.arange(total_number_of_edges)]
         point_vecteurs_minus = points[:, index_point_vecteur_minus]

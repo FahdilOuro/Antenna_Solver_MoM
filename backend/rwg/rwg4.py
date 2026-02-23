@@ -5,6 +5,7 @@ from scipy.io import savemat, loadmat
 
 from backend.rwg.rwg2 import DataManager_rwg2
 from backend.rwg.rwg3 import DataManager_rwg3
+from backend.utils.gap_source import *
 
 
 # Definition of the incident field
@@ -112,7 +113,7 @@ def find_feed_edges(points, edges, feed_point, monopole=False):
     else:
         index_feeding_edges = np.argmin(dist_squared, axis=0)          # (N,)
 
-    '''
+    
     # Add by the author to debug and verify feeding edges
     # print the selected feeding edges and the 2 points coordinates corresponding to that edge(s) for verification
     for i, feed in enumerate(Feed.T):
@@ -128,11 +129,30 @@ def find_feed_edges(points, edges, feed_point, monopole=False):
             print(f"Feed Point {i+1} at {feed} -> Feeding Edge Index: {edge_index}")
             p1_index = edges.first_points[edge_index]
             p2_index = edges.second_points[edge_index]
-            print(f"  Edge {edge_index}: Point 1 at {points.points[:, p1_index]}, Point 2 at {points.points[:, p2_index]}")'''
+            print(f"  Edge {edge_index}: Point 1 at {points.points[:, p1_index]}, Point 2 at {points.points[:, p2_index]}")
     
     return index_feeding_edges
 
-def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point, voltage_amplitude, monopole=False, simulate_array_antenna=False):
+def print_matrix_as_table(matrix, row_labels=None, col_labels=None):
+    # Determine column widths
+    col_widths = [max(len(str(item)) for item in col) for col in zip(*matrix)]
+    
+    # Print column labels
+    if col_labels:
+        header = " | ".join(f"{label:^{col_widths[i]}}" for i, label in enumerate(col_labels))
+        print(header)
+        print("-" * len(header))
+    
+    # Print rows with row labels
+    for i, row in enumerate(matrix):
+        row_str = " | ".join(f"{str(item):^{col_widths[j]}}" for j, item in enumerate(row))
+        if row_labels:
+            print(f"{row_labels[i]:<10} | {row_str}")
+        else:
+            print(row_str)
+
+# def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point, voltage_amplitude, port_type=None, monopole=False, simulate_array_antenna=False):
+def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point, voltage_amplitude, excitation_unit_vector=None):
     """
         Calculates the currents, input impedance, and radiated power of an antenna.
 
@@ -172,13 +192,22 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
             * The linear system solution relies on a correctly formed impedance matrix.
     """
     # Load meshed and impedance data
-    points, _, edges, *_ = DataManager_rwg2.load_data(filename_mesh_2)
+    points, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh_2)
     frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z = DataManager_rwg3.load_data(filename_impedance)
 
     # Initialize the voltage vector
     voltage = np.zeros(edges.total_number_of_edges, dtype=complex)
+    
+    """if port_type == 'unique_point':
+        index_feeding_edges = rf_port(points, triangles, edges, feed_point)
+        
+    elif port_type == 'Old_feed_port':
+        index_feeding_edges = find_feed_edges(points, edges, feed_point, monopole)"""
 
-    index_feeding_edges = find_feed_edges(points, edges, feed_point, monopole)
+    '''# print the length and indices of feeding edges found
+    print(f"Number of feeding edges found: {len(index_feeding_edges)}")
+    print(f"Feeding edges indices: {index_feeding_edges}")
+    print(f"Feeding edges lengths: {edges.edges_length[index_feeding_edges]}")
 
     # --- Apply voltage with progressive phase if simulating array ---
     if simulate_array_antenna:
@@ -187,13 +216,33 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
         phase_shift = np.exp(1j * phase * np.arange(N))
         voltage[index_feeding_edges] = voltage_amplitude * edges.edges_length[index_feeding_edges] * phase_shift
     else:
-        voltage[index_feeding_edges] = voltage_amplitude * edges.edges_length[index_feeding_edges]
+        # voltage = single_gap_source(edges, index_feeding_edges, voltage_amplitude)
+        # voltage = multiple_gap_sources(triangles, edges, vecteurs_rho, index_feeding_edges, voltage_amplitude, excitation_unit_vector='y')
+        voltage = multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, excitation_unit_vector='y')'''
+
+    voltage = multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, excitation_unit_vector)
+
+    # return
+
+    # print the shape of Z and V :
+    print(f"Shape of impedance matrix Z: {matrice_z.shape}")
+    print(f"Shape of voltage vector V: {voltage.shape}")
+
+    # Visulaizatiion of Z and V as tables (for small matrices)
+    if matrice_z.shape[0] <= 10:  # Only print if the matrix is small
+        print("\nImpedance Matrix Z:")
+        print_matrix_as_table(matrice_z, row_labels=[f"Edge {i}" for i in range(matrice_z.shape[0])], col_labels=[f"Edge {j}" for j in range(matrice_z.shape[1])])
+        
+        print("\nVoltage Vector V:")
+        print_matrix_as_table(voltage.reshape(-1, 1), row_labels=[f"Edge {i}" for i in range(voltage.shape[0])], col_labels=["Voltage"])
 
     # --- Solve the linear system (Z * I = V) ---
     current = np.linalg.solve(matrice_z, voltage)
 
+    # To REDO
+
     # --- Impedance / power ---
-    if simulate_array_antenna:
+    """if simulate_array_antenna:
         edge_lengths = edges.edges_length[index_feeding_edges]
         current_vals = current[index_feeding_edges]
         voltage_vals = voltage[index_feeding_edges]
@@ -206,9 +255,9 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
         gap_current = np.sum(current[index_feeding_edges] * edges.edges_length[index_feeding_edges])
         gap_voltage = np.mean(voltage[index_feeding_edges] / edges.edges_length[index_feeding_edges])
         impedance = gap_voltage / gap_current
-        feed_power = 0.5 * np.real(gap_current * np.conj(gap_voltage))
+        feed_power = 0.5 * np.real(gap_current * np.conj(gap_voltage))"""
 
-    return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, gap_voltage, impedance, feed_power, index_feeding_edges
+    return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, # gap_current, gap_voltage, impedance, feed_power, index_feeding_edges
 
 
 class DataManager_rwg4:
