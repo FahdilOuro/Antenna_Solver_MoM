@@ -1,38 +1,22 @@
 import numpy as np
 
 
-def single_gap_source(edges, index_feeding_edges, voltage_amplitude):
-    edges_length = edges.edges_length
-    total_number_of_edges = edges.total_number_of_edges
-    voltage = np.zeros(total_number_of_edges, dtype=complex)
-
-    voltage[index_feeding_edges] = voltage_amplitude * edges_length[index_feeding_edges]
-
-    return voltage
-
-def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, excitation_unit_vector, gap_width=0.08):
+def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, excitation_unit_vector, gap_width=0.5):
     """
-    Implements the Enhanced Gap Source model centered at a specific feed_point.
+    Implements the Enhanced Gap Source model based on Equation (7).
     
-    Parameters:
-    - feed_point: np.array([x, y, z]) location of the excitation.
-    - gap_width: The width W of the gap source.
-    - excitation_unit_vector: Direction of the E-field ('x', 'y', or 'z').
+    This function computes the excitation vector for RWG basis functions
+    by evaluating the field distribution within a finite gap width.
     """
     
-    # 1. Map the excitation direction to the correct coordinate index
+    # 1. Map excitation axis to coordinate index
     axis_map = {'x': 0, 'y': 1, 'z': 2}
     if excitation_unit_vector not in axis_map:
         raise ValueError("excitation_unit_vector must be 'x', 'y', or 'z'.")
     ax_idx = axis_map[excitation_unit_vector]
-    # print(f"ax_idx = {ax_idx}")
-
-    # 2. Determine the center of the gap on the relevant axis
-    # If we excite along 'z', we only care about the z-coordinate of the feed_point
     gap_center = feed_point[ax_idx]
-    # print(f"Gap_center = {gap_center}")
 
-    # 3. Extract geometry data
+    # 2. Extract necessary geometric properties
     l_m = edges.edges_length
     tri_plus_idx = triangles.triangles_plus
     tri_minus_idx = triangles.triangles_minus  
@@ -41,59 +25,31 @@ def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed
     rho_p = vecteurs_rho.vecteur_rho_plus   
     rho_n = vecteurs_rho.vecteur_rho_minus  
 
-    # 4. Define the Centered Window function
-    # Math: [u(z - z_feed + W/2) - u(z - z_feed - W/2)]
-    # This checks if the centroid coordinate is within distance W/2 of the gap_center
-    def window_function(coord):
-        # Calculate absolute distance from the feed point coordinate
-        distance = np.abs(coord - gap_center)
-        # Return 1.0 if inside the gap width, 0.0 otherwise
-        return np.where(distance <= gap_width / 2, 1.0, 0.0)
-    
-    # print(f"gap_width : {gap_width}")
-
-    # 5. Evaluate the window function at the centroids of T+ and T-
-    # We only look at the coordinates along the excitation axis (ax_idx)
+    # 3. Extract coordinates along the excitation axis for centroids
     coord_cp = centroids[ax_idx, tri_plus_idx]
-    # print(f"coord_cp : {coord_cp}")
-
     coord_cn = centroids[ax_idx, tri_minus_idx]
-    # print(f"coord_cn : {coord_cn}")
 
-    # Check the minimum distance found in your mesh
-    min_dist_p = np.min(np.abs(coord_cp - gap_center))
-    min_dist_n = np.min(np.abs(coord_cn - gap_center))
+    # 4. Mesh density validation
+    # Ensure at least one triangle centroid falls within the gap threshold
+    min_dist = min(np.min(np.abs(coord_cp - gap_center)), np.min(np.abs(coord_cn - gap_center)))
     threshold = gap_width / 2
 
-    # print(f"--- Debug Gap ---")
-    # print(f"Threshold (gap_width/2): {threshold}")
-    # print(f"Closest T+ centroid distance: {min_dist_p}")
-    # print(f"Closest T- centroid distance: {min_dist_n}")
+    if min_dist > threshold:
+        raise ValueError(f"Coarse mesh error: No centroids found within {gap_width} units of the feed point.")
 
-    if min_dist_p > threshold:
-        raise ValueError("Warning: No T+ centroids are within the gap! The mesh is too coarse.")
-    
-    window_p = window_function(coord_cp)
-    # print(f"window_p : {window_p}")
-    window_n = window_function(coord_cn)
-    # print(f"window_n : {window_p}")
+    # 5. Compute the Window Function [u(z + W/2) - u(z - W/2)]
+    # Evaluates to 1.0 if the centroid is inside the gap, 0.0 otherwise
+    window_p = np.where(np.abs(coord_cp - gap_center) <= threshold, 1.0, 0.0)
+    window_n = np.where(np.abs(coord_cn - gap_center) <= threshold, 1.0, 0.0)
 
-    # 6. Apply Equation (7) components
-    # Extract the component of rho vectors along the excitation axis
-    rho_p_component = rho_p[ax_idx, :]
-    rho_n_component = rho_n[ax_idx, :]
+    # 6. Apply the Enhanced Gap Source formula (Eq. 7)
+    # The term involves the dot product of rho and the unit excitation vector
+    rho_p_ax_idx = rho_p[ax_idx, :]
+    rho_n_ax_idx = rho_n[ax_idx, :]
 
-    # Calculate the common factor: (lm * V) / (2 * W)
+    # Calculation of the voltage contribution for each edge
     common_factor = (l_m * voltage_amplitude) / (2 * gap_width)
-    # print(f"Common factor : {common_factor}")
+    term_plus = common_factor * window_p * rho_p_ax_idx
+    term_minus = common_factor * window_n * rho_n_ax_idx
 
-    # Term 1 for T+ and Term 2 for T-
-    term_plus = common_factor * window_p * rho_p_component
-    # print(f"term_plus : {term_plus}")
-    
-    term_minus = common_factor * window_n * rho_n_component
-
-    # Final excitation vector Vm
-    voltage_vector = term_plus + term_minus
-
-    return voltage_vector
+    return term_plus + term_minus
