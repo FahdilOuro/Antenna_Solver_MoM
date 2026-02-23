@@ -86,7 +86,7 @@ def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incid
 
     return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current
 
-def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point, voltage_amplitude, excitation_unit_vector=None):
+def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point, voltage_amplitude, excitation_unit_vector=None, gap_width=0.05):
     """
         Calculates the currents, input impedance, and radiated power of an antenna.
 
@@ -130,7 +130,7 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
     frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z = DataManager_rwg3.load_data(filename_impedance)
 
     # Initialize the voltage vector with the gap source model
-    voltage = multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, excitation_unit_vector)
+    voltage = multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, excitation_unit_vector, gap_width)
 
     # --- Solve the linear system (Z * I = V) ---
     current = np.linalg.solve(matrice_z, voltage)

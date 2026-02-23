@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
+from scipy.spatial import cKDTree
 
 from backend.rwg.rwg2 import DataManager_rwg2
 from backend.rwg.rwg4 import DataManager_rwg4
@@ -29,65 +30,69 @@ def surface_calculate_current_density(current, triangles, edges, vecteurs_rho):
 
     return surface_current_density
 
-
-def plot_surface_current_distribution(filename_mesh_2, filename_current, scattering=False, radiation=False):
-    # if scattering and radiation are both False, raise an error
-    if not scattering and not radiation:
-        raise ValueError("At least one of scattering or radiation must be True.")
-    # if both are True, raise an error
-    if scattering and radiation:
-        raise ValueError("Only one of scattering or radiation can be True at a time.")
+def plot_surface_current_distribution(filename_mesh, filename_current, mode='scattering'):
+    """
+    Plots the surface current distribution along the dipole length.
     
-    points, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh_2)
+    Parameters:
+    - mode: 'scattering' or 'radiation'
+    """
+    # 1. Parameter validation
+    if mode not in ['scattering', 'radiation']:
+        raise ValueError("mode must be either 'scattering' or 'radiation'.")
+
+    # 2. Load geometry and current data
+    # Note: Adapting to your existing DataManager structure
+    points, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh)
     
-    if scattering:
-        *_, current = DataManager_rwg4.load_data(filename_current, scattering=scattering)
-    elif radiation:
-        *_, current, _, _, _, _ = DataManager_rwg4.load_data(filename_current, radiation=radiation)
+    if mode == 'scattering':
+        # Unpacking specifically for scattering format
+        *_, current = DataManager_rwg4.load_data(filename_current, scattering=True)
+    else:
+        # Unpacking specifically for radiation format
+        *_, current, _, _, _, _ = DataManager_rwg4.load_data(filename_current, radiation=True)
 
-    total_of_triangles = triangles.total_of_triangles
-
-    # Compute surface current density
+    # 3. Compute surface current density (J)
+    # This assumes J is a vector (Jx, Jy, Jz) for each triangle
     surface_current_density = surface_calculate_current_density(current, triangles, edges, vecteurs_rho)
+    
+    # 4. Spatial sampling along the Y-axis
+    K = 100 # Number of sampling points
+    y_min, y_max = np.min(points.points[1, :]), np.max(points.points[1, :])
+    y_samples = np.linspace(y_min, y_max, K)
+    
+    # Create the coordinates for sampling (assumed centered at X=0, Z=0)
+    # Shape (K, 3)
+    sampling_points = np.zeros((K, 3))
+    sampling_points[:, 1] = y_samples 
 
-    # Define sampling limits
-    K = 69
-    y0, y1 = np.min(points.points[1, :]), np.max(points.points[1, :])
+    # 5. Efficient Nearest Neighbor Search using KDTree
+    # Instead of a manual loop, KDTree finds the closest triangle center for all points at once
+    tree = cKDTree(triangles.triangles_center.T)
+    _, indices = tree.query(sampling_points)
+    
+    # Extract Jx and Jy at the found indices
+    X_samples = np.abs(surface_current_density[0, indices])
+    Y_samples = np.abs(surface_current_density[1, indices])
 
-    # Compute current densities at sampled points
-    y = np.linspace(y0, y1, K + 1)
-    X = np.zeros(K + 1)
-    Y = np.zeros(K + 1)
+    # 6. Smooth Interpolation
+    y_fine = np.linspace(y_min, y_max, 300)
+    jx_interp = interp1d(y_samples, X_samples, kind='cubic')(y_fine)
+    jy_interp = interp1d(y_samples, Y_samples, kind='cubic')(y_fine)
 
-    for n in range(K + 1):
-        y_n = y[n]
-        Dist = np.linalg.norm(
-            np.vstack([np.zeros(total_of_triangles), np.full(total_of_triangles, y_n), np.zeros(total_of_triangles)]).T
-            - triangles.triangles_center.T, axis=1
-        )
-        Index = np.argmin(Dist)
-        X[n] = surface_current_density[0, Index]
-        Y[n] = surface_current_density[1, Index]
-
-    # Cubic interpolation
-    yi = np.linspace(y0, y1, 100)
-    interp_X = interp1d(y, X, kind='cubic')
-    interp_Y = interp1d(y, Y, kind='cubic')
-
-    Xi = interp_X(yi)
-    Yi = interp_Y(yi)
-
-    # fix the plot style
-    plt.figure(figsize=(15, 9))
-    plt.rcParams['font.family'] = 'monospace'
-    plt.rcParams['font.size'] = 12
-    plt.rcParams['axes.linewidth'] = 1.2
-
-    # Plot the curves
-    plt.plot(yi, Xi, label='|Jx|')
-    plt.plot(yi, Yi, '-', label='|Jy|')
-    plt.xlabel('Dipole length, m')
-    plt.ylabel('Surface current density, A/m')
-    plt.grid(True)
-    plt.legend()
+    # 7. Professional Plotting
+    plt.style.use('seaborn-v0_8-whitegrid') # Modern clean style
+    fig, ax = plt.subplots(figsize=(14, 8))
+    
+    ax.plot(y_fine, jx_interp, label=r'$|J_x|$', linewidth=2)
+    ax.plot(y_fine, jy_interp, '--', label=r'$|J_y|$', linewidth=2)
+    
+    ax.set_title(f'Surface Current Distribution ({mode.capitalize()})', fontsize=14)
+    ax.set_xlabel('Dipole length (m)', fontsize=12)
+    ax.set_ylabel('Current Density (A/m)', fontsize=12)
+    
+    ax.legend(frameon=True)
+    ax.spines[['top', 'right']].set_visible(False) # Remove unnecessary borders
+    
+    plt.tight_layout()
     plt.show()

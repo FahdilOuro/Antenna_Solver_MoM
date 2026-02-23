@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, excitation_unit_vector, gap_width=0.5):
+def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, excitation_unit_vector, gap_width):
     """
     Implements the Enhanced Gap Source model based on Equation (7).
     
