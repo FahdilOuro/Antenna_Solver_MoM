@@ -5,7 +5,7 @@ from backend.utils.gmsh_function import extract_ModelMsh_to_mat, extract_msh_to_
 from backend.utils.h_refinement_func import *
 
 
-def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, paths, **solver_kwargs):
+def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, paths, excitation_unit_vector='x', gap_width=0.001, **solver_kwargs):
     """
     Executes the iterative mesh refinement loop with a flexible solver function.
     
@@ -33,7 +33,7 @@ def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, paths
     grid_tree = KDTree(grid_points)
     
     # Initial solver run to get the first surface current density
-    _, _, _, surface_current_density = solver_function(paths.mat, show=show_image, **solver_kwargs)
+    _, _, _, surface_current_density = solver_function(paths.mat, show=show_image, excitation_unit_vector=excitation_unit_vector, gap_width=gap_width, **solver_kwargs)
     
     for i in range(config.max_iterations):
         print(f"\n>>> Starting Iteration {i + 1}/{config.max_iterations}")
@@ -89,7 +89,7 @@ def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, paths
             show_image = True"""
 
         # 6. Run Physics Solver on the new mesh
-        _, _, _, surface_current_density = solver_function(paths.mat, show=show_image, **solver_kwargs)
+        _, _, _, surface_current_density = solver_function(paths.mat, show=show_image, excitation_unit_vector=excitation_unit_vector, gap_width=gap_width, **solver_kwargs)
 
         # 7. Logging Statistics
         old_sizes = sizes.copy()
@@ -119,8 +119,7 @@ def run_scattering_refinement(config, grid_points, r_vicinity, paths,
 
 # Example 2: Using radiation algorithm
 def run_radiation_refinement(config, grid_points, r_vicinity, paths,
-                              frequency, feed_point, voltage_amplitude=1,
-                              monopole=False, simulate_array_antenna=False,
+                              frequency, feed_point, voltage_amplitude=1, excitation_unit_vector='x', gap_width=0.001,
                               load_lumped_elements=False, LoadPoint=None,
                               LoadValue=None, LoadDir=None):
     """
@@ -135,8 +134,8 @@ def run_radiation_refinement(config, grid_points, r_vicinity, paths,
         frequency=frequency,
         feed_point=feed_point,
         voltage_amplitude=voltage_amplitude,
-        monopole=monopole,
-        simulate_array_antenna=simulate_array_antenna,
+        excitation_unit_vector=excitation_unit_vector,
+        gap_width=gap_width,
         load_lumped_elements=load_lumped_elements,
         LoadPoint=LoadPoint,
         LoadValue=LoadValue,
