@@ -138,7 +138,8 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
     # --- Impedance / power ---
     # Identify the edge closest to the feed point
     # the edges object has attributre first_points and second_points which are the indices of the first and second points of each edge
-    if feed_point.shape[0] == 1:
+    # verify that feed_point is 1D make the calculation of the distance to the edge midpoints accordingly
+    if feed_point.ndim == 1:
         edge_midpoints = (points.points[:, edges.first_points] + points.points[:, edges.second_points]) / 2  # (3, N_edges)
         distances_to_feed = np.linalg.norm(edge_midpoints - feed_point[:, None], axis=0)  # (N_edges,)
         feed_edge_index = np.argmin(distances_to_feed)

@@ -113,54 +113,76 @@ def compute_aspect_ratios(points):
 
 def visualize_surface_current(points_data, triangles_data, surface_current_density, feed_point=None, title="Antennas Surface Current"):
     """
-        Visualizes the surface current density on a triangulated 3D surface using Plotly.
+    Visualizes the surface current density on a triangulated 3D surface using Plotly.
 
-        Parameters:
-        * points_data : object containing the surface point coordinates, as a 2D array (3, n_points),
-                        where rows correspond to X, Y, and Z coordinates.
-        * triangles_data : object containing the indices of the surface triangles, as a 2D array (3, n_triangles),
-                           where each column corresponds to a triangle defined by three vertex indices.
-        * surface_current_density : n-d-array, normalized or raw surface current density associated with each triangle.
-        * title : str, title of the visualization (default "Antennas Surface Current").
+    This function renders a 3D mesh (trisurf) where each triangle's color represents 
+    its surface current density. It automatically handles cases with uniform data 
+    (to prevent Plotly errors) and adjusts the scene's aspect ratio for 
+    accurate physical proportions.
 
-        Returns:
-        fig : Plotly figure object representing the 3D plot.
+    Parameters
+    ----------
+    points_data : object
+        An object or dataclass containing the mesh vertices. 
+        Must have a `.points` attribute with shape (3, N) or (N, 3).
+    triangles_data : object
+        An object or dataclass containing the connectivity matrix. 
+        Must have a `.triangles` attribute where the first 3 rows contain 
+        the vertex indices for each triangle.
+    surface_current_density : array-like
+        A 1D array of shape (n_triangles,) containing the magnitude of the 
+        surface current density for each face.
+    feed_point : array-like, optional
+        Coordinates of the excitation point(s). Can be a single point (3,) 
+        or multiple points (N, 3). If provided, they are rendered as red markers.
+    title : str, optional
+        The title of the generated Plotly figure. Defaults to "Antennas Surface Current".
 
-        Functionality:
-            1. Extracts X, Y, Z coordinates from 'points_data'.
-            2. Prepares triangle indices from `triangles_data` for Plotly compatibility.
-            3. Computes aspect ratios for coherent visualization using 'compute_aspect_ratios'.
-            4. Creates a "trisurf" figure with Plotly, colored according to current density.
-            5. Displays a color bar indicating current density levels.
-            6. Returns the figure object for display or saving.
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        A Plotly Figure object containing the 3D trisurf plot and optional markers.
 
-        Example:
-        This function helps visualize the distribution of surface current on a triangulated surface,
-        useful for analyzing antenna or conductor models.
+    Notes
+    -----
+    - The function includes a safety check for `vmin >= vmax`. If the current 
+      density is uniform (e.g., all zeros), a micro-epsilon (1e-15) is added 
+      to the data range to prevent a PlotlyError.
+    - Aspect ratios are calculated based on the bounding box of the mesh to 
+      ensure the antenna geometry is not distorted visually.
 
-        Notes:
-            * The surface current density (surface_current_density) should be one value per triangle, corresponding
-              to 'triangles_data'.
-            * Ensure the `plotly` library is installed and `ff.create_trisurf` is available.
+    Example
+    -------
+    >>> fig = visualize_surface_current(mesh_pts, mesh_tris, j_density, feed_pt=[0, 0, 0])
+    >>> fig.show()
     """
-    # Extract vertex coordinates
-    x_, y_, z_ = points_data.points  # X, Y, Z coordinates of points
+    # 1. Extract vertex coordinates
+    x_, y_, z_ = points_data.points  
 
-    # Create simplices for plotly (vertex indices of each triangle)
-    simplices = triangles_data.triangles[:3, :].T  # Transpose from [3, n_triangles] to [n_triangles, 3]
+    # 2. Create simplices for plotly
+    simplices = triangles_data.triangles[:3, :].T  
 
-    # Visualization with plotly
+    # --- CORRECTION POUR PLOTLY ERROR (vmin >= vmax) ---
+    # We ensure surface_current_density is a numpy array
+    scd = np.array(surface_current_density)
+    
+    v_min = np.min(scd)
+    v_max = np.max(scd)
+
+    # If all values are identical (e.g., all zeros), Plotly's trisurf fails.
+    # We add a tiny epsilon to the max value to create a valid range.
+    if v_min >= v_max:
+        scd = scd.astype(float) # Ensure float type
+        scd[0] += 1e-15
+    # --------------------------------------------------
+
+    # 3. Visualization logic
     aspect_ratios = compute_aspect_ratios(points_data.points)
 
-    deep_blue = "rgb(0, 0, 180)"
-    blue      = "rgb(0, 0, 255)"
-    cyan      = "rgb(0, 255, 255)"
-    green     = "rgb(0, 255, 0)"
-    yellow    = "rgb(255, 255, 0)"
-    orange    = "rgb(255, 140, 0)"
-    red       = "rgb(255, 0, 0)"
-
-    custom_colormap = [deep_blue, blue, cyan, green, yellow, orange, red]
+    custom_colormap = [
+        "rgb(0, 0, 180)", "rgb(0, 0, 255)", "rgb(0, 255, 255)", 
+        "rgb(0, 255, 0)", "rgb(255, 255, 0)", "rgb(255, 140, 0)", "rgb(255, 0, 0)"
+    ]
 
     # Create the trisurf figure
     fig = ff.create_trisurf(
@@ -169,14 +191,15 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
         z=z_,
         simplices=simplices,
         colormap=custom_colormap,
-        color_func=surface_current_density,  # Color using surface current density
+        color_func=scd,  # Use the sanitized data
         show_colorbar=True,
-        title='',
+        title=title,
         aspectratio=aspect_ratios,
     )
-    # Highlight feed point(s) in red if feed_point is provided
+
+    # 4. Highlight feed point(s)
     if feed_point is not None:
-        feed_point = np.atleast_2d(feed_point)  # Ensure shape (n, 3)
+        feed_point = np.atleast_2d(feed_point)
         fig.add_trace(go.Scatter3d(
             x=feed_point[:, 0],
             y=feed_point[:, 1],
@@ -185,47 +208,19 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
             marker=dict(size=6, color='red', symbol='circle'),
             name='Feed Point(s)'
         ))
-    # Configure the legend
+
+    # 5. Layout configuration
     fig.update_layout(
         scene=dict(
-            camera=dict(
-                eye=dict(x=0.65, y=0.65, z=0.65)  # Larger values = zoom out
-            )
+            camera=dict(eye=dict(x=0.65, y=0.65, z=0.65))
         ),
         legend=dict(
-            x=0.2,  # Horizontal position (0=left, 1=right)
-            y=0.9,  # Vertical position (0=bottom, 1=top)
-            xanchor='left',  # Horizontal anchor ('auto', 'left', 'center', 'right')
-            yanchor='top',   # Vertical anchor ('auto', 'top', 'middle', 'bottom')
-            bgcolor='rgba(255,255,255,0.7)',  # Semi-transparent background
+            x=0.2, y=0.9,
+            xanchor='left', yanchor='top',
+            bgcolor='rgba(255,255,255,0.7)',
             bordercolor='lightgray',
             borderwidth=1
         )
     )
 
     return fig
-
-def calculate_threshold_surface_current_density(surface_current_density):
-    """
-        Calculates a threshold for the surface current density and identifies triangles below this threshold.
-
-        Parameters:
-        * surface_current_density : n-d-array, surface current density for each triangle.
-
-        Returns:
-        * indices_below_threshold : n-d-array, indices of triangles where the surface current density is below 70% of the maximum value.
-
-        Functionality:
-            1. Computes the maximum value of the surface current density.
-            2. Defines a threshold as 70% of this maximum.
-            3. Finds the indices of triangles whose density is below the threshold.
-    """
-
-    # Maximum value of the surface current density
-    max_value = np.max(surface_current_density)
-    threshold = 0.7 * max_value
-    
-    # Identify indices of elements below the threshold
-    indices_below_threshold = np.where(surface_current_density < threshold)[0]
-
-    return indices_below_threshold
