@@ -40,6 +40,8 @@ def plot_surface_current_distribution(filename_mesh, filename_current, mode='sca
     # 1. Parameter validation
     if mode not in ['scattering', 'radiation']:
         raise ValueError("mode must be either 'scattering' or 'radiation'.")
+    
+    print(f"MODE SELECTED: {mode}")
 
     # 2. Load geometry and current data
     # Note: Adapting to your existing DataManager structure

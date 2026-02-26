@@ -73,7 +73,7 @@ def compute_polar(observation_point_list_phi, numbers_of_points, eta, complex_k,
     polar = 10 * np.log10(4 * np.pi * u / total_power)  # Conversion to dB
     return polar
 
-def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load, filename_gain_power_to_load, scattering=False, radiation=False, show=True, save_image=False):
+def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load, filename_gain_power_to_load, mode='radiation', show=True, save_image=False):
     """
         Generates the antenna directivity pattern in the Phi = 0° and Phi = 90° planes.
         This function loads the necessary data (mesh, currents, radiated power),
@@ -89,12 +89,16 @@ def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load
     
     # Load the necessary data
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
+    
+    radiation = (mode == 'radiation')
+    scattering = (mode == 'scattering')
+    
     if scattering:
         _, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)
     elif radiation:
         _, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=radiation)
-    elif (radiation is False and scattering is False) or (radiation is True and scattering is True):
-        raise ValueError("Either radiation or scattering must be True, but not both or neither.")
+    else:
+        raise ValueError("Mode must be 'radiation' or 'scattering'.")
     
     total_power, *_ = load_gain_power_data(filename_gain_power_to_load)
     

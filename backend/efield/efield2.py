@@ -188,7 +188,7 @@ def load_gain_power_data(filename_to_load):
         print(f"An unexpected error occurred: {e}")
 
 def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load, filename_current_to_load, filename_sphere_to_load, 
-                                                         scattering = False, radiation = False, voltage_amplitude=0.5, show=True, save_image=False):
+                                                         mode='radiation', voltage_amplitude=0.5, show=True, save_image=False):
     """
         Calculate and visualize the radiation intensity and gain distribution on the surface of a sphere surrounding an antenna.
 
@@ -224,15 +224,17 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
 
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
 
-    if scattering:
-        frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)
-    elif radiation:
-        frequency, omega, _, _, light_speed_c, eta, _, current, _, gap_current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=radiation)
-    elif (radiation is False and scattering is False) or (radiation is True and scattering is True):
-        raise ValueError("Either radiation or scattering must be True, but not both or neither.")
+    print(f"MODE SELECTED: {mode}")
+
+    if mode == 'scattering':
+        frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=True)
+    elif mode == 'radiation':
+        frequency, omega, _, _, light_speed_c, eta, _, current, _, gap_current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=True)
+    else:
+        raise ValueError("Mode must be either 'radiation' or 'scattering'.")
 
     # Load sphere data
-    sphere_points = data_sphere['p'] * 100    # Sphere coordinates are scaled by 100 (radius of 100 m).
+    sphere_points = data_sphere['p'] * 300    # Sphere coordinates are scaled by 100 (radius of 100 m).
     sphere_triangles = data_sphere['t'] - 1   # Convert MATLAB indices (1-based) to Python indices (0-based).
 
     # Compute wave number k and its complex component
@@ -297,7 +299,7 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     print(f"Total Power : {total_power : 4f}")
     print(f"Gain Linear : {gain_linear_max : 4f}")
     print(f"Gain Logarithmic (Max) : {gain_logarithmic_max : 4f} dBi")
-    if radiation:
+    if mode == 'radiation':
         print(f"\ngap_current = {gap_current}")
         # If gap_current is an array, take the norm or absolute value of the first element
         if isinstance(gap_current, np.ndarray):
@@ -308,15 +310,22 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
                 gap_current_val = np.linalg.norm(gap_current_abs)
         else:
             gap_current_val = abs(gap_current)
-        radiation_resistance = 2 * total_power / gap_current_val**2
+        if gap_current_val != 0:
+            radiation_resistance = 2 * total_power / gap_current_val**2
+        else:
+            radiation_resistance = 0
+            print("Warning: gap_current is zero, radiation_resistance set to 0")
         print(f"Radiation Resistance : {radiation_resistance : 4f} Ohms")
 
         V_gap = voltage_amplitude  # Supply voltage in volts
         P_in = 0.5 * V_gap * gap_current_val
         print(f"Input Power (P_in) : {P_in:.4f} W")
-
-        efficiency_total = total_power / P_in
-        print(f"Total Efficiency : {efficiency_total:.4f}")
+        if P_in != 0:
+            efficiency_total = total_power / P_in
+            print(f"Total Efficiency : {efficiency_total:.4f}")
+        else:
+            efficiency_total = 0
+            print("Warning: Input Power (P_in) is zero, efficiency_total set to 0")
 
         if efficiency_total > 1:
             print("Warning: Total Efficiency is greater than 1, which is physically impossible. Please check the calculations.")

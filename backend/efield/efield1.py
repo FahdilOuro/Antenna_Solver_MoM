@@ -11,7 +11,7 @@ from backend.rwg.rwg2 import DataManager_rwg2
 from backend.rwg.rwg4 import DataManager_rwg4
 from backend.utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
 
-def calculate_electric_magnetic_field_at_point(filename_mesh2_to_load, filename_current_to_load, observation_point, scattering = False, radiation = False):
+def calculate_electric_magnetic_field_at_point(filename_mesh2_to_load, filename_current_to_load, observation_point, mode='radiation'):
     """
         Calculate and display electric fields, magnetic fields, Poynting vector, energy, and Radar Cross Section (RCS)
         at a specified observation point, using mesh data and currents loaded from .mat files.
@@ -48,12 +48,12 @@ def calculate_electric_magnetic_field_at_point(filename_mesh2_to_load, filename_
     # 2. Load mesh and current data from MAT files
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
 
-    if scattering:
-        frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)
-    elif radiation:
-        frequency, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=radiation)
-    elif (radiation is False and scattering is False) or (radiation is True and scattering is True):
-        raise ValueError("Either radiation or scattering must be True, but not both or neither.")
+    if mode == 'scattering':
+        frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=True)
+    elif mode == 'radiation':
+        frequency, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=True)
+    else:
+        raise ValueError("mode must be either 'radiation' or 'scattering'")
 
     # 3. Compute wave number k and its complex component
     k = omega / light_speed_c    # Wave number (rad/m)
@@ -105,7 +105,7 @@ def calculate_electric_magnetic_field_at_point(filename_mesh2_to_load, filename_
     # It is mainly used in radar applications to describe the apparent scale of the object in radar scattering terms.
     # 10. Compute Radar Cross Section (RCS)
     e_field_dot_conj = np.sum(np.real(e_field_total * np.conj(e_field_total)))
-    if scattering:
+    if mode == 'scattering':
         rcs = 4 * np.pi * (norm_observation_point ** 2) * e_field_dot_conj
 
         print('')
