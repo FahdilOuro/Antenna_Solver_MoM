@@ -9,7 +9,8 @@ from backend.rwg.rwg6 import plot_surface_current_distribution
 '''def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, port_type=0, monopole=False, 
                         simulate_array_antenna=False, show=True, save_image=False,
                         load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None):'''
-def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, excitation_unit_vector=None, gap_width=0.05, show=True, save_image=False,
+def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, excitation_unit_vector=None, gap_width=0.05, voltage_phase=None,
+                        show=True, save_image=False,
                         load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None):
     
     if (not load_lumped_elements and (LoadPoint is not None or LoadValue is not None or LoadDir is not None)) or \
@@ -84,7 +85,7 @@ def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, excita
     filename_impedance = save_folder_name_impedance + save_file_name_impedance
     
     frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, source_voltage, impedance, feed_power = \
-    calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude, excitation_unit_vector, gap_width)
+    calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude, excitation_unit_vector, gap_width, voltage_phase)
 
     # Save current data
     save_folder_name_current = 'data/antennas_current/'

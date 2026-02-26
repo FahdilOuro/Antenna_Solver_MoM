@@ -86,7 +86,7 @@ def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incid
 
     return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current
 
-def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point, voltage_amplitude, excitation_unit_vector=None, gap_width=0.05):
+def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point, voltage_amplitude, excitation_unit_vector=None, gap_width=0.05, voltage_phase=None):
     """
         Calculates the currents, input impedance, and radiated power of an antenna.
 
@@ -130,7 +130,7 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
     frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z = DataManager_rwg3.load_data(filename_impedance)
 
     # Initialize the voltage vector with the gap source model
-    voltage = multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, excitation_unit_vector, gap_width)
+    voltage = multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, excitation_unit_vector, gap_width, voltage_phase)
 
     # --- Solve the linear system (Z * I = V) ---
     current = np.linalg.solve(matrice_z, voltage)
@@ -138,16 +138,22 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
     # --- Impedance / power ---
     # Identify the edge closest to the feed point
     # the edges object has attributre first_points and second_points which are the indices of the first and second points of each edge
-    edge_midpoints = (points.points[:, edges.first_points] + points.points[:, edges.second_points]) / 2  # (3, N_edges)
-    distances_to_feed = np.linalg.norm(edge_midpoints - feed_point[:, None], axis=0)  # (N_edges,)
-    feed_edge_index = np.argmin(distances_to_feed)
-    # print current at the feed edge and its length
-    print(f"Current at feed edge (index {feed_edge_index}): {current[feed_edge_index]:.4e} A")
-    print(f"Length of feed edge: {edges.edges_length[feed_edge_index]:.4e} m")
-    gap_current = current[feed_edge_index] * edges.edges_length[feed_edge_index]
-    source_voltage = voltage_amplitude
-    impedance = source_voltage / gap_current if gap_current != 0 else np.inf
-    feed_power = 0.5 * np.real(gap_current * np.conj(source_voltage)) if gap_current != 0 else 0.0
+    if feed_point.shape[0] == 1:
+        edge_midpoints = (points.points[:, edges.first_points] + points.points[:, edges.second_points]) / 2  # (3, N_edges)
+        distances_to_feed = np.linalg.norm(edge_midpoints - feed_point[:, None], axis=0)  # (N_edges,)
+        feed_edge_index = np.argmin(distances_to_feed)
+        # print current at the feed edge and its length
+        print(f"Current at feed edge (index {feed_edge_index}): {current[feed_edge_index]:.4e} A")
+        print(f"Length of feed edge: {edges.edges_length[feed_edge_index]:.4e} m")
+        gap_current = current[feed_edge_index] * edges.edges_length[feed_edge_index]
+        source_voltage = voltage_amplitude
+        impedance = source_voltage / gap_current if gap_current != 0 else np.inf
+        feed_power = 0.5 * np.real(gap_current * np.conj(source_voltage)) if gap_current != 0 else 0.0
+    else:
+        gap_current = 0.0
+        source_voltage = voltage_amplitude
+        impedance = source_voltage / gap_current if gap_current != 0 else np.inf
+        feed_power = 0.0
     # print the calculated parameters
     print(f"Calculated Gap Current: {gap_current:.4e} A | {gap_current*1000:.4e} mA")
     print(f"Calculated Input Impedance at the feed point: {impedance:.4e} Ohms")
