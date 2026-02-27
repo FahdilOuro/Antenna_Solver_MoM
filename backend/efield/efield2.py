@@ -14,6 +14,7 @@ import plotly.figure_factory as ff
 from backend.rwg.rwg2 import DataManager_rwg2
 from backend.rwg.rwg4 import DataManager_rwg4
 from backend.utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
+from backend.utils.gmsh_function import create_hollow_sphere, extract_msh_to_mat
 
 def compute_aspect_ratios(points_data):
     """
@@ -187,7 +188,7 @@ def load_gain_power_data(filename_to_load):
         # Handle unexpected errors
         print(f"An unexpected error occurred: {e}")
 
-def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load, filename_current_to_load, filename_sphere_to_load, 
+def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load, filename_current_to_load, 
                                                          mode='radiation', voltage_amplitude=0.5, show=True, save_image=False):
     """
         Calculate and visualize the radiation intensity and gain distribution on the surface of a sphere surrounding an antenna.
@@ -215,16 +216,26 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
             5. Visualize the results as a gain distribution over the sphere.
     """
 
+    print(f"MODE SELECTED: {mode}")
     # Extract the base file name without extension and modify the name
     base_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0]
     base_name = base_name.replace('_mesh2', '')
+    
+    # create hollow sphere data
+    hollow_sphere_msh_path = 'data/gmsh_files/hollow_sphere.msh'
+    hollow_sphere_mat_path = 'data/antennas_mesh/hollow_sphere.mat'
+    # verify if the .mat file already exists to avoid unnecessary regeneration
+    if not os.path.isfile(hollow_sphere_mat_path):
+        print("Creating hollow sphere mesh and extracting data to .mat file...")
+        # verify if the .msh file already exists to avoid unnecessary regeneration
+        if not os.path.isfile(hollow_sphere_msh_path):
+            print("Creating hollow sphere mesh...")
+            create_hollow_sphere()
+        extract_msh_to_mat(hollow_sphere_msh_path, hollow_sphere_mat_path)
 
-    # Load files containing mesh, current, and sphere data
-    data_sphere = loadmat(filename_sphere_to_load)
+    data_sphere = loadmat(hollow_sphere_mat_path)
 
     _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
-
-    print(f"MODE SELECTED: {mode}")
 
     if mode == 'scattering':
         frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=True)
@@ -242,7 +253,6 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     complex_k = 1j * k           # Complex component.
 
     # Display frequency and wavelength
-    print('')
     print(f"Frequency = {frequency} Hz")
     print(f"Wavelength lambda = {light_speed_c / frequency} m")
 

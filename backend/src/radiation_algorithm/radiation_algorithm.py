@@ -3,7 +3,6 @@ from backend.rwg.rwg2 import *
 from backend.rwg.rwg3 import *
 from backend.rwg.rwg4 import *
 from backend.rwg.rwg5 import *
-from backend.rwg.rwg6 import plot_surface_current_distribution
 
 
 '''def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, port_type=0, monopole=False, 

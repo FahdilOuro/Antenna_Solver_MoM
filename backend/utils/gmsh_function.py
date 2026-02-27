@@ -259,3 +259,46 @@ def generate_and_save_mesh(geo_filename, msh_filename, initial_mesh_size):
     # gmsh.fltk.run()            # Uncomment to have the gmsh view
     gmsh.write(msh_filename)
     print(f"Mesh file saved in {msh_filename} successfully")
+
+def create_hollow_sphere(radius=1.0, mesh_size=0.055, save_msh_file='data/gmsh_files/hollow_sphere.msh'):
+    """
+    Creates the geometry of a hollow sphere (surface only) using the Gmsh OpenCASCADE kernel.
+    
+    Args:
+        radius (float): The radius of the sphere.
+        mesh_size (float): The target size of the mesh elements.
+    """
+    # Initialize gmsh
+    gmsh.initialize()
+    gmsh.model.add("HollowSphere")
+
+    # Create a sphere. By default, this creates a volume.
+    # The function returns the tag of the entity.
+    sphere_tag = gmsh.model.occ.addSphere(0, 0, 0, radius)
+    
+    # Synchronize to propagate changes to the model
+    gmsh.model.occ.synchronize()
+
+    # To keep ONLY the surface, we can remove the volume but keep the boundary.
+    # In Gmsh, a sphere volume is usually composed of one or more surfaces.
+    # For a simple shell, we retrieve the boundaries of the volume (3D).
+    # Dim 3 = Volume, Dim 2 = Surface.
+    sphere_volume = [(3, sphere_tag)]
+    boundaries = gmsh.model.getBoundary(sphere_volume, combined=False)
+    
+    # We remove the volume (dim 3) to ensure we only mesh the shell (dim 2)
+    gmsh.model.removeEntities(sphere_volume)
+
+    # Set mesh size field (optional but recommended for control)
+    gmsh.model.mesh.setSize(gmsh.model.getEntities(0), mesh_size)
+
+    # Generate 2D mesh (surface)
+    gmsh.model.mesh.generate(2)
+
+    # Save the mesh
+    gmsh.write(save_msh_file)
+
+    # Launch the GUI to visualize
+    gmsh.fltk.run()
+
+    gmsh.finalize()
