@@ -182,12 +182,12 @@ class DataManager_rwg3:
     """
 
     @staticmethod
-    def save_data(filename_mesh2, save_folder_name, frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z):
+    def save_data(path, frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z):
         """
             Saves the computed data into a .mat file.
 
             Parameters:
-                * filename_mesh2 : str, name of the source file containing the base meshed data.
+                * path (Path) : Path object containing the file path information.
                 * save_folder_name : str, folder where the data should be saved.
                 * frequency : float, frequency used for electromagnetic computation (Hz).
                 * omega : float, angular frequency (rad/s).
@@ -215,21 +215,9 @@ class DataManager_rwg3:
             'eta': eta,
             'matrice_z': matrice_z,
         }
-
-        # Build the save file name
-        base_name = os.path.splitext(os.path.basename(filename_mesh2))[0]
-        base_name = base_name.replace('_mesh2', '')         # Remove previous '_mesh2' suffix
-        save_file_name = base_name + '_impedance.mat'       # Add new '_impedance' suffix
-        full_save_path = os.path.join(save_folder_name, save_file_name)
-
-        # Check and create folder if needed
-        if not os.path.exists(save_folder_name):
-            os.makedirs(save_folder_name)
-
+        
         # Save data to .mat file
-        savemat(full_save_path, data)
-
-        return save_file_name
+        savemat(path.mat_impedance, data)
 
     @staticmethod
     def load_data(filename):

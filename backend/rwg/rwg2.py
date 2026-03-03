@@ -168,13 +168,12 @@ class DataManager_rwg2:
             * Load data from an existing MAT file.
     """
     @staticmethod
-    def save_data(filename_mesh1, save_folder_name, barycentric_triangle_data, vecteurs_rho_data):
+    def save_data(path, barycentric_triangle_data, vecteurs_rho_data):
         """
             Saves the data into a MAT file after enriching it.
 
             Parameters:
-                * filename_mesh1 (str) : Path to the initial MAT file containing mesh data.
-                * save_folder_name (str) : Name of the folder where the enriched file will be saved.
+                * path (Path) : Path object containing the file path information.
                 * barycentric_triangle_data (Barycentric_triangle) : Barycentric triangle data.
                 * vecteurs_rho_data (Vecteurs_Rho) : Rho vectors data.
 
@@ -182,7 +181,7 @@ class DataManager_rwg2:
                 save_file_name (str) : Name of the saved MAT file.
         """
         # Load the initial data
-        data = loadmat(filename_mesh1)
+        data = loadmat(path.mat_mesh1)
 
         # Add the new data
         new_data = {
@@ -194,19 +193,8 @@ class DataManager_rwg2:
         }
         data.update(new_data)
 
-        # Generate the save file name
-        base_name = os.path.splitext(os.path.basename(filename_mesh1))[0]
-        base_name = base_name.replace('_mesh1', '')  # Remove '_mesh1'
-        save_file_name = base_name + '_mesh2.mat'    # Add '_mesh2'
-        full_save_path = os.path.join(save_folder_name, save_file_name)
-
-        # Create folder if needed
-        if not os.path.exists(save_folder_name):
-            os.makedirs(save_folder_name)
-
         # Save the data into the MAT file
-        savemat(full_save_path, data)
-        return save_file_name
+        savemat(path.mat_mesh2, data)
 
     @staticmethod
     def load_data(filename):

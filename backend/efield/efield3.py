@@ -73,7 +73,7 @@ def compute_polar(observation_point_list_phi, numbers_of_points, eta, complex_k,
     polar = 10 * np.log10(4 * np.pi * u / total_power)  # Conversion to dB
     return polar
 
-def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load, filename_gain_power_to_load, mode='radiation', show=True, save_image=False):
+def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=False):
     """
         Generates the antenna directivity pattern in the Phi = 0° and Phi = 90° planes.
         This function loads the necessary data (mesh, currents, radiated power),
@@ -83,24 +83,20 @@ def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load
             * filename_current_to_load : Path to the file containing the currents on the antenna.
             * filename_gain_power_to_load : Path to the file containing gain and power data.
     """
-    # Extract and modify the base file name
-    base_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0]
-    base_name = base_name.replace('_mesh2', '')
-    
     # Load the necessary data
-    _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
+    _, triangles, edges, *_ = DataManager_rwg2.load_data(path.mat_mesh2)
     
     radiation = (mode == 'radiation')
     scattering = (mode == 'scattering')
     
     if scattering:
-        _, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=scattering)
+        _, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(path.mat_current, scattering=scattering)
     elif radiation:
-        _, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=radiation)
+        _, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(path.mat_current, radiation=radiation)
     else:
         raise ValueError("Mode must be 'radiation' or 'scattering'.")
     
-    total_power, *_ = load_gain_power_data(filename_gain_power_to_load)
+    total_power, *_ = load_gain_power_data(path.mat_gain_power)
     
     # Compute fundamental parameters
     k = omega / light_speed_c    # Wave number (rad/m)
@@ -132,7 +128,7 @@ def antenna_directivity_pattern(filename_mesh2_to_load, filename_current_to_load
         ax.text(0, max(polar_0) + 5, "z", ha='center', va='bottom', fontsize=10, color='red')
         ax.legend()
         ax.grid(True)
-        ax.set_title(base_name + " E-field pattern in Phi = 0° and 90° plane", va='bottom')
+        ax.set_title(path.name + " E-field pattern in Phi = 0° and 90° plane", va='bottom')
         
         # IMPORTANT: Save BEFORE showing
         if save_image:

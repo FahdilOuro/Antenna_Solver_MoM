@@ -86,7 +86,7 @@ def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incid
 
     return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current
 
-def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point, voltage_amplitude, excitation_unit_vector=None, gap_width=0.05, voltage_phase=None):
+def calculate_current_radiation(path, feed_point, voltage_amplitude, excitation_unit_vector=None, gap_width=0.05, voltage_phase=None):
     """
         Calculates the currents, input impedance, and radiated power of an antenna.
 
@@ -126,42 +126,103 @@ def calculate_current_radiation(filename_mesh_2, filename_impedance, feed_point,
             * The linear system solution relies on a correctly formed impedance matrix.
     """
     # Load meshed and impedance data
-    points, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh_2)
-    frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z = DataManager_rwg3.load_data(filename_impedance)
+    points, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(path.mat_mesh2)
+    frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z = DataManager_rwg3.load_data(path.mat_impedance)
 
-    # Initialize the voltage vector with the gap source model
-    voltage = multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, excitation_unit_vector, gap_width, voltage_phase)
+    # 1. Initialize the voltage vector and retrieve feeding indices for each port
+    voltage, all_feeding_indices = multiple_gap_sources(
+        triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, 
+        excitation_unit_vector, gap_width, voltage_phase
+    )
 
-    # --- Solve the linear system (Z * I = V) ---
+    # 2. Solve the linear system (Z * I = V)
     current = np.linalg.solve(matrice_z, voltage)
 
-    # --- Impedance / power ---
-    # Identify the edge closest to the feed point
-    # the edges object has attributre first_points and second_points which are the indices of the first and second points of each edge
-    # verify that feed_point is 1D make the calculation of the distance to the edge midpoints accordingly
-    if feed_point.ndim == 1:
-        edge_midpoints = (points.points[:, edges.first_points] + points.points[:, edges.second_points]) / 2  # (3, N_edges)
-        distances_to_feed = np.linalg.norm(edge_midpoints - feed_point[:, None], axis=0)  # (N_edges,)
-        feed_edge_index = np.argmin(distances_to_feed)
-        # print current at the feed edge and its length
-        print(f"Current at feed edge (index {feed_edge_index}): {current[feed_edge_index]:.4e} A")
-        print(f"Length of feed edge: {edges.edges_length[feed_edge_index]:.4e} m")
-        gap_current = current[feed_edge_index] * edges.edges_length[feed_edge_index]
-        source_voltage = voltage_amplitude
-        impedance = source_voltage / gap_current if gap_current != 0 else np.inf
-        feed_power = 0.5 * np.real(gap_current * np.conj(source_voltage)) if gap_current != 0 else 0.0
-    else:
-        gap_current = 0.0
-        source_voltage = voltage_amplitude
-        impedance = source_voltage / gap_current if gap_current != 0 else np.inf
-        feed_power = 0.0
-    # print the calculated parameters
-    print(f"Calculated Gap Current: {gap_current:.4e} A | {gap_current*1000:.4e} mA")
-    print(f"Calculated Input Impedance at the feed point: {impedance:.4e} Ohms")
-    print(f"Calculated Active Power delivered to the antenna: {feed_power:.4e} W")
+    # 3. Process each port to calculate Impedance and Power
+    feed_points_2d = np.atleast_2d(feed_point)
+    num_ports = len(all_feeding_indices)
 
+    # Prepare results storage
+    port_results = []
+
+    print(f"\n--- Analysis of {num_ports} Feed Port(s) ---")
+
+    for i in range(num_ports):
+        indices = all_feeding_indices[i]
+
+        print(f"Shape of all_feeding_indices[{i}]: {indices.shape}")
+        print(f"Feeding edge indices for port {i}: {indices}")
+
+        if indices.size == 0:
+            print(f"Port {i} at {feed_points_2d[i]}: No feeding edges found. Skipping.")
+            continue
+
+        # Extract current coefficients and lengths
+        current_coefficients = current[indices]
+        edge_lengths = edges.edges_length[indices]
+        
+        # Calculate Is = Im * lm for each edge in the gap
+        is_values = current_coefficients * edge_lengths
+
+        # Print details for debug
+        for idx, edge_idx in enumerate(indices):
+            print(f"  Edge {edge_idx}: Coeff = {current_coefficients[idx]:.4e}, Length = {edge_lengths[idx]:.4e} m, Is = {is_values[idx]:.4e} A")
+
+        # --- RECTIFICATION OF GAP CURRENT ---
+        # Calculate the mean magnitude to avoid cancellation from flipped RWG edges
+        gap_current_mag = np.mean(np.abs(is_values))
+        
+        # Determine the initial phase from the sum of complex currents
+        is_sum = np.sum(is_values)
+        dominant_phase = np.exp(1j * np.angle(is_sum))
+        
+        # First estimate of the gap current
+        temp_gap_current = gap_current_mag * dominant_phase
+        
+        # Determine source voltage for this port
+        amp = voltage_amplitude[i] if not np.isscalar(voltage_amplitude) else voltage_amplitude
+        if voltage_phase is None:
+            phi = 0
+        else:
+            phi = voltage_phase[i] if not np.isscalar(voltage_phase) else voltage_phase
+        source_voltage = amp * np.exp(1j * phi)
+
+        # --- PHYSICAL CONSISTENCY CHECK ---
+        # In a passive antenna, Re(Z) must be positive. 
+        # If Re(Vs / Is) < 0, the mathematical orientation of the edges is 
+        # opposite to the physical excitation axis.
+        if temp_gap_current != 0:
+            z_test = source_voltage / temp_gap_current
+            if z_test.real < 0:
+                gap_current = -temp_gap_current  # Flip current to match physical direction
+            else:
+                gap_current = temp_gap_current
+        else:
+            gap_current = 0j
+
+        # 4. Calculate Final Input Impedance: Z = Vs / Is
+        impedance = source_voltage / gap_current if gap_current != 0 else np.inf
+        
+        # 5. Calculate Active Power: P = 0.5 * Re(Vs * conj(Is))
+        feed_power = 0.5 * np.real(source_voltage * np.conj(gap_current))
+
+        # Store result
+        port_results.append({
+            'current': gap_current,
+            'impedance': impedance,
+            'power': feed_power,
+            'source_voltage': source_voltage
+        })
+
+        print(f"Port {i} (Location: {feed_points_2d[i]}):")
+        print(f"  > Corrected Mean Feeding Current (Is): {gap_current:.4e} A")
+        # Formatting: uses :+.2f to ensure the sign is always present for the imaginary part
+        print(f"  > Input Impedance (Zin):     {impedance.real:.2f}{impedance.imag:+.2f}j Ohms")
+        print(f"  > Active Power (P):          {feed_power:.4e} W")
+        print("-" * 100)
+
+    # Return values for the last port (or first port if only one)
     return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, source_voltage, impedance, feed_power
-
 
 class DataManager_rwg4:
     """
@@ -227,8 +288,7 @@ class DataManager_rwg4:
         return save_file_name
 
     @staticmethod
-    def save_data_for_radiation(filename_mesh2, save_folder_name, frequency, omega,
-                                mu, epsilon, light_speed_c, eta,
+    def save_data_for_radiation(path, frequency, omega, mu, epsilon, light_speed_c, eta,
                                 voltage, current, gap_current, gap_voltage, impedance, feed_power):
         """
             Saves data related to electromagnetic wave radiation into a MATLAB file.
@@ -241,7 +301,7 @@ class DataManager_rwg4:
             Returns:
             save_file_name (str) : Name of the generated save file.
         """
-        # Construct file name
+        '''# Construct file name
         base_name = os.path.splitext(os.path.basename(filename_mesh2))[0]
         base_name = base_name.replace('_mesh2', '')  # Remove '_mesh2' part
         save_file_name = base_name + '_current.mat'  # Add '_current' suffix
@@ -249,7 +309,7 @@ class DataManager_rwg4:
 
         # Check and create directory if needed
         if not os.path.exists(save_folder_name):
-            os.makedirs(save_folder_name)
+            os.makedirs(save_folder_name)'''
 
         # Save data including currents, impedance, and feed power
         data = {
@@ -268,9 +328,7 @@ class DataManager_rwg4:
         }
 
         # Save the data
-        savemat(full_save_path, data)
-
-        return save_file_name
+        savemat(path.mat_current, data)
 
     @staticmethod
     def load_data(filename, radiation=False, scattering=False):

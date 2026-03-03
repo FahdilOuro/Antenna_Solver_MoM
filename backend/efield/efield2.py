@@ -92,7 +92,7 @@ def visualize_surface_current(points_data, triangles_data, radiation_intensity, 
     # Return the created Plotly figure
     return fig
 
-def save_gain_power_data(save_folder_name, save_file_name, total_power, gain_linear, gain_logarithmic, efficiency_total):
+def save_gain_power_data(path_mat_gain_power, total_power, gain_linear, gain_logarithmic, efficiency_total):
     """
     Save total power and gain data into a .mat file.
 
@@ -100,8 +100,7 @@ def save_gain_power_data(save_folder_name, save_file_name, total_power, gain_lin
     into a MATLAB (MAT) file for later use or further analysis.
 
     Parameters:
-        * save_folder_name : str, name of the folder where the file will be saved. If the folder does not exist, it will be created.
-        * save_file_name : str, name of the file to save (must include the .mat extension).
+        * path_mat_gain_power : str, full path of the .mat file to save.
         * total_power : float or n-d-array, calculated total power value.
         * gain_linear : float or n-d-array, calculated linear gain (expressed as a multiplicative factor).
         * gain_logarithmic : float or n-d-array, calculated logarithmic gain (expressed in dB).
@@ -110,14 +109,6 @@ def save_gain_power_data(save_folder_name, save_file_name, total_power, gain_lin
         * Creates the specified folder if it does not exist.
         * Saves a .mat file containing power and gain data at the specified location.
     """
-    # Build the full path for the file to save
-    full_save_path = os.path.join(save_folder_name, save_file_name)
-
-    # Check if the folder exists and create it if necessary
-    if not os.path.exists(save_folder_name):  # Check and create folder if needed
-        os.makedirs(save_folder_name)
-        print(f"Directory '{save_folder_name}' created.")
-
     # Prepare the data to save in a dictionary
     data_gain_power = {
         'totalPower': total_power,
@@ -127,8 +118,8 @@ def save_gain_power_data(save_folder_name, save_file_name, total_power, gain_lin
     }
 
     # Save the data into the .mat file
-    savemat(full_save_path, data_gain_power)
-    print(f"Data saved successfully to {full_save_path}")
+    savemat(path_mat_gain_power, data_gain_power)
+    print(f"Data saved successfully to {path_mat_gain_power}")
 
 def load_gain_power_data(filename_to_load):
     """
@@ -188,7 +179,7 @@ def load_gain_power_data(filename_to_load):
         # Handle unexpected errors
         print(f"An unexpected error occurred: {e}")
 
-def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load, filename_current_to_load, 
+def radiation_intensity_distribution_over_sphere_surface(path, filename_current_to_load,
                                                          mode='radiation', voltage_amplitude=0.5, show=True, save_image=False):
     """
         Calculate and visualize the radiation intensity and gain distribution on the surface of a sphere surrounding an antenna.
@@ -198,8 +189,8 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
         The results are then saved and visualized.
 
         Parameters:
-            * filename_mesh2_to_load : str
-                Path to the file containing the antenna mesh data (triangles, points, etc.).
+            * path.mat_mesh2 : str
+                Path to the .mat_mesh2 file containing the processed mesh data of the antenna.
             * filename_current_to_load : str
                 Path to the file containing the current data on the antenna.
             * filename_sphere_to_load : str
@@ -217,10 +208,6 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     """
 
     print(f"MODE SELECTED: {mode}")
-    # Extract the base file name without extension and modify the name
-    base_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0]
-    base_name = base_name.replace('_mesh2', '')
-    
     # create hollow sphere data
     hollow_sphere_msh_path = 'data/gmsh_files/hollow_sphere.msh'
     hollow_sphere_mat_path = 'data/antennas_mesh/hollow_sphere.mat'
@@ -235,7 +222,7 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
 
     data_sphere = loadmat(hollow_sphere_mat_path)
 
-    _, triangles, edges, *_ = DataManager_rwg2.load_data(filename_mesh2_to_load)
+    _, triangles, edges, *_ = DataManager_rwg2.load_data(path.mat_mesh2)
 
     if mode == 'scattering':
         frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=True)
@@ -294,8 +281,6 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
         # Contribution of each triangle to the total power
         total_power += w[triangle_in_sphere] * sphere_triangle_area[triangle_in_sphere]
 
-    print('')
-
     # Calculation of the antenna directivity: it is a measure of how focused an antenna's radiation pattern is in a specific direction 
     # compared to an idealized isotropic antenna that radiates equally in all directions.
     # It quantifies the antenna's ability to concentrate radiated power in a particular direction.
@@ -306,7 +291,7 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
     gain_linear_max = 4 * np.pi * np.max(u) / total_power
     gain_logarithmic_max = 10 * np.log10(gain_linear_max)
 
-    print(f"Total Power : {total_power : 4f}")
+    print(f"\nTotal Power : {total_power : 4f}")
     print(f"Gain Linear : {gain_linear_max : 4f}")
     print(f"Gain Logarithmic (Max) : {gain_logarithmic_max : 4f} dBi")
     if mode == 'radiation':
@@ -341,13 +326,11 @@ def radiation_intensity_distribution_over_sphere_surface(filename_mesh2_to_load,
             print("Warning: Total Efficiency is greater than 1, which is physically impossible. Please check the calculations.")
             efficiency_total = 1.0  # Limit total efficiency to 1
 
-    # Save the calculated results
-    save_gain_power_folder_name = 'data/antennas_gain_power/'
-    save_gain_power_file_name = base_name + '_gain_power.mat'
-    save_gain_power_data(save_gain_power_folder_name, save_gain_power_file_name, total_power, gain_linear_max, gain_logarithmic_max, efficiency_total)
+    # Save the calculated results into a .mat file
+    save_gain_power_data(path.mat_gain_power, total_power, gain_linear_max, gain_logarithmic_max, efficiency_total)
 
     # Visualization of the results
-    plot_name_gain = base_name + ' gain distribution over a large sphere surface'
+    plot_name_gain = path.name + ' gain distribution over a large sphere surface'
     sphere_total_of_points = sphere_points.shape[1]
     poynting_vector_point = np.zeros((3, sphere_total_of_points))
     norm_observation_point = np.zeros(sphere_total_of_points)

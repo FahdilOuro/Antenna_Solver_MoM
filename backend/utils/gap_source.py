@@ -1,11 +1,10 @@
 import numpy as np
 
-
 def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_points, 
                          excitation_unit_vector, gap_width, phases=None):
     """
-    Implements the Enhanced Gap Source model with independent location, amplitude, 
-    phase, and excitation axis for each feed point.
+    Implements the Enhanced Gap Source model for multiple feed points.
+    Returns the global voltage vector and a list of indices for each port.
     """
     
     # 1. Standardize feed_points to (N, 3)
@@ -27,7 +26,6 @@ def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed
         phases = np.asarray(phases)
 
     # 4. Handle vector/scalar for excitation_unit_vector
-    # If a single string is provided, use it for all feeds
     if isinstance(excitation_unit_vector, str):
         unit_vectors = [excitation_unit_vector] * num_feeds
     else:
@@ -36,7 +34,6 @@ def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed
     if len(unit_vectors) != num_feeds:
         raise ValueError("The number of excitation vectors must match the number of feed points.")
 
-    # Pre-calculate complex coefficients
     complex_amplitudes = amplitudes * np.exp(1j * phases)
 
     # 5. Extract fixed geometry data
@@ -44,15 +41,18 @@ def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed
     l_m = edges.edges_length
     tri_plus_idx = triangles.triangles_plus
     tri_minus_idx = triangles.triangles_minus  
-    centroids = triangles.triangles_center 
+    centroids = triangles.triangles_center
     
     total_voltage_vector = np.zeros(num_edges, dtype=complex)
+    
+    # This list will store the indices of feeding edges for each port
+    all_feeding_indices = []
+    
     threshold = gap_width / 2
     axis_map = {'x': 0, 'y': 1, 'z': 2}
 
     # 6. Accumulate contributions
     for i in range(num_feeds):
-        # Determine the axis for this specific feed
         axis_str = unit_vectors[i]
         ax_idx = axis_map[axis_str]
         
@@ -69,17 +69,24 @@ def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed
         dist_p = np.abs(coord_cp - gap_center)
         dist_n = np.abs(coord_cn - gap_center)
 
-        # Safety check for mesh density at this port
+        # Mesh density check
         if np.min(dist_p) > threshold and np.min(dist_n) > threshold:
-            print(f"Warning: Feed point {i} at {feed_points[i]} has no nearby centroids. Check gap_width or mesh.")
+            print(f"Warning: Port {i} has no nearby centroids. Storing empty indices.")
+            all_feeding_indices.append(np.array([], dtype=int))
             continue
 
-        # Windowing and scaling (Equation 7)
+        # Windowing (Equation 7)
+        # Note: An edge is part of the gap if either triangle T+ or T- is within the window
         window_p = np.where(dist_p <= threshold, 1.0, 0.0)
         window_n = np.where(dist_n <= threshold, 1.0, 0.0)
-        common_factor = (l_m * v_complex) / (2 * gap_width)
         
-        # Cumulative sum
+        # Save indices for this specific port
+        # We find indices where at least one window function is active (non-zero)
+        port_indices = np.where((window_p > 0) | (window_n > 0))[0]
+        all_feeding_indices.append(port_indices)
+
+        # Apply Equation (7) and add to global vector
+        common_factor = (l_m * v_complex) / (2 * gap_width)
         total_voltage_vector += common_factor * (window_p * rho_p_ax + window_n * rho_n_ax)
 
-    return total_voltage_vector
+    return total_voltage_vector, all_feeding_indices

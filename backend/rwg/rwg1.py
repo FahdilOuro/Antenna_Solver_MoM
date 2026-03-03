@@ -364,7 +364,7 @@ def filter_complexes_jonctions(point_data, triangle_data, edge_data):
 
 class DataManager_rwg1:
     @staticmethod
-    def save_data(filename, save_folder_name, points_data, triangles_data, edges_data):
+    def save_data(path, points_data, triangles_data, edges_data):
         """
         Saves mesh data (points, triangles, edges, etc.) into a MAT file.
 
@@ -381,8 +381,6 @@ class DataManager_rwg1:
         Returns:
             str: The name of the saved file.
         """
-        mesh = loadmat(filename)  # Load the MAT file
-
         # Create a dictionary containing all data to save
         data = {
             'points' : points_data.points,
@@ -396,20 +394,8 @@ class DataManager_rwg1:
             'triangles_center' : triangles_data.triangles_center
         }
 
-        # Generate the save file name based on the original file name
-        base_name = os.path.splitext(os.path.basename(filename))[0]  # Remove original file extension
-        save_file_name = base_name + '_mesh1.mat'
-        full_save_path = os.path.join(save_folder_name, save_file_name)  # Full path to save
-
-        # Check if the folder exists, otherwise create it
-        if not os.path.exists(save_folder_name):
-            os.makedirs(save_folder_name)
-
         # Save data to MAT file
-        savemat(full_save_path, data)
-
-        # Return the name of the saved file
-        return save_file_name
+        savemat(path.mat_mesh1, data)
 
     @staticmethod
     def load_data(filename):

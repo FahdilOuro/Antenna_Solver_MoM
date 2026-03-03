@@ -4,20 +4,22 @@ from backend.rwg.rwg3 import *
 from backend.rwg.rwg4 import *
 from backend.rwg.rwg5 import *
 
+from backend.utils.gmsh_function import *
 
-'''def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, port_type=0, monopole=False, 
-                        simulate_array_antenna=False, show=True, save_image=False,
-                        load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None):'''
-def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, excitation_unit_vector=None, gap_width=0.05, voltage_phase=None,
+
+def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excitation_unit_vector=None, gap_width=0.05, voltage_phase=None,
                         show=True, save_image=False,
                         load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None):
     
     if (not load_lumped_elements and (LoadPoint is not None or LoadValue is not None or LoadDir is not None)) or \
         (load_lumped_elements and (LoadPoint is None or LoadValue is None or LoadDir is None)):
-         raise ValueError("Incoherent parameters: If 'load_lumped_elements' is False, 'LoadPoint', 'LoadValue', and 'LoadDir' must all be None. If 'load_lumped_elements' is True, all three must be provided (not None).")
+         raise ValueError("Incoherent parameters: If 'load_lumped_elements' is False, " \
+         "'LoadPoint', 'LoadValue', and 'LoadDir' must all be None. If 'load_lumped_elements' is True, all three must be provided (not None).")
+    
+    extract_msh_to_mat(path.msh, path.mat)
     
     # Load the mesh file
-    p, t = load_mesh_file(mesh)
+    p, t = load_mesh_file(path.mat)
 
     # Define points and triangles from the mesh
     points = Points(p)
@@ -25,9 +27,6 @@ def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, excita
 
     # Compute geometric properties (areas, centers)
     triangles.calculate_triangles_area_and_center(points)
-
-    # Display main dimensions of the antenna
-    base_name = os.path.splitext(os.path.basename(mesh))[0]
 
     # Define edges and compute their lengths
     edges = triangles.get_edges()
@@ -37,11 +36,7 @@ def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, excita
     edges.compute_edges_length(points)
 
     # Save processed mesh data
-    save_folder_name_mesh1 = 'data/antennas_mesh1/'
-    save_file_name_mesh1 = DataManager_rwg1.save_data(mesh, save_folder_name_mesh1, points, triangles, edges)
-
-    # Load saved data
-    filename_mesh1_to_load = save_folder_name_mesh1 + save_file_name_mesh1
+    DataManager_rwg1.save_data(path, points, triangles, edges)
 
     # Definition and calculation of barycentric triangles
     barycentric_triangles = Barycentric_triangle()
@@ -52,11 +47,7 @@ def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, excita
     vecteurs_rho.calculate_vecteurs_rho(points, triangles, edges, barycentric_triangles)
 
     # Save barycentric triangles and RHO vectors data
-    save_folder_name_mesh2 = 'data/antennas_mesh2/'
-    save_file_name_mesh2 = DataManager_rwg2.save_data(filename_mesh1_to_load, save_folder_name_mesh2, barycentric_triangles, vecteurs_rho)
-
-    # Load data for the processed mesh
-    filename_mesh2_to_load = save_folder_name_mesh2 + save_file_name_mesh2
+    DataManager_rwg2.save_data(path, barycentric_triangles, vecteurs_rho)
 
     # Calculation of electromagnetic constants and impedance matrix Z
     if load_lumped_elements:
@@ -77,28 +68,20 @@ def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, excita
                                                                                 frequency)
 
     # Save impedance data
-    save_folder_name_impedance = 'data/antennas_impedance/'
-    save_file_name_impedance = DataManager_rwg3.save_data(filename_mesh2_to_load, save_folder_name_impedance, frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z)
-
-    # Load impedance data
-    filename_impedance = save_folder_name_impedance + save_file_name_impedance
+    DataManager_rwg3.save_data(path, frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z)
     
     frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, source_voltage, impedance, feed_power = \
-    calculate_current_radiation(filename_mesh2_to_load, filename_impedance, feed_point, voltage_amplitude, excitation_unit_vector, gap_width, voltage_phase)
+    calculate_current_radiation(path, feed_point, voltage_amplitude, excitation_unit_vector, gap_width, voltage_phase)
 
     # Save current data
-    save_folder_name_current = 'data/antennas_current/'
-    save_file_name_current = DataManager_rwg4.save_data_for_radiation(
-        filename_mesh2_to_load, save_folder_name_current, frequency, omega, mu, 
-        epsilon, light_speed_c, eta, voltage, current, gap_current, source_voltage, impedance, feed_power)
+    DataManager_rwg4.save_data_for_radiation(path, frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, source_voltage, impedance, feed_power)
 
     # Compute surface currents from the total current
     surface_current_density = calculate_current_density(current, triangles, edges, vecteurs_rho)
 
     # Visualization of surface currents
     if show:
-        antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in radiation mode')
-        fig = visualize_surface_current(points, triangles, surface_current_density, feed_point, antennas_name)
+        fig = visualize_surface_current(points, triangles, surface_current_density, feed_point, path.name)
         fig.show()
 
         if save_image:
@@ -110,6 +93,7 @@ def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, excita
                 os.makedirs(output_dir_fig_image)
             
             # Name of the PDF file to save
+            antennas_name = path.name + ' antenna surface current in radiation mode'
             pdf_path = os.path.join(output_dir_fig_image, antennas_name.replace(" ", "_") + ".pdf")
             
             # Set transparent background and remove white margins
@@ -123,4 +107,4 @@ def radiation_algorithm(mesh, frequency, feed_point, voltage_amplitude=1, excita
             fig.write_image(pdf_path, format="pdf")
             print(f"\nImage saved in PDF format: {pdf_path}\n")
 
-    return matrice_z, voltage, current, surface_current_density
+    return matrice_z, voltage, current, surface_current_density, gap_current, source_voltage, impedance, feed_power
