@@ -88,48 +88,35 @@ def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incid
 
 def calculate_current_radiation(path, feed_point, voltage_amplitude, excitation_unit_vector=None, gap_width=0.05, voltage_phase=None):
     """
-        Calculates the currents, input impedance, and radiated power of an antenna.
+    Calculates the currents, input impedance, and radiated power for one or multiple antenna ports.
 
-        This function uses meshed data and impedance data to solve the Method of Moments (MoM) equations.
-        It simulates the effect of a feed point on the antenna and deduces its operating parameters.
+    This function solves the Method of Moments (MoM) system, rectifies the current flow 
+    based on physical consistency (Re(Z) > 0), and returns detailed metrics for each feed.
 
-        Parameters:
-            * filename_mesh_2 : str, path to the file containing meshed data (_mesh2).
-            * filename_impedance : str, path to the file containing impedance data (_impedance).
-            * feed_point : n-d-array (3,), coordinates of the feed point on the antenna.
-            * voltage_amplitude : float, amplitude of the signal applied at the feed point.
+    Parameters:
+        path : object, contains attributes path.mat_mesh2 and path.mat_impedance.
+        feed_point : n-d-array, coordinates of the feed point(s). Can be (3,) or (N, 3).
+        voltage_amplitude : float or list, amplitude of the excitation signal.
+        excitation_unit_vector : str or n-d-array, direction of the gap excitation.
+        gap_width : float, physical width of the gap source.
+        voltage_phase : float or list, phase of the excitation in radians.
 
-        Returns:
-            * frequency : float, operating frequency (Hz).
-            * omega : float, associated angular frequency (rad/s).
-            * mu : float, vacuum magnetic permeability (H/m).
-            * epsilon : float, vacuum permittivity (F/m).
-            * light_speed_c : float, speed of light in vacuum (m/s).
-            * eta : float, characteristic impedance of free space (Ω).
-            * voltage : n-d-array, voltage vector applied to edges.
-            * current : n-d-array, current vector resulting from solving the MoM equations.
-            * impedance : complex, input impedance at the feed point (Ω).
-            * feed_power : float, active power delivered to the antenna (W).
-
-        Behavior:
-            1. Loads the necessary meshed and impedance data for the calculation.
-            2. Identifies the edge closest to the feed point (feed_point).
-            3. Sets the voltage vector with excitation applied to the fed edge.
-            4. Solves the MoM equations to obtain currents flowing in the network.
-            5. Calculates the electrical parameters of the antenna, including:
-               * Input impedance at the feed point.
-               * Active power delivered to the antenna.
-
-        Notes:
-            * The feed point (feed_point) should be located near one of the mesh edges.
-            * Impedance and mesh data must correspond to ensure consistent calculations.
-            * The linear system solution relies on a correctly formed impedance matrix.
+    Returns:
+        frequency : float, operating frequency (Hz).
+        omega : float, angular frequency (rad/s).
+        mu, epsilon : float, vacuum constants.
+        light_speed_c : float, speed of light (m/s).
+        eta : float, free space impedance (Ohm).
+        voltage_vector : n-d-array, the global excitation vector.
+        current_vector : n-d-array, solved currents for all edges.
+        port_results : list, list of dicts containing 'current', 'impedance', 'power', 
+                       and 'source_voltage' for each individual port.
     """
     # Load meshed and impedance data
-    points, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(path.mat_mesh2)
-    frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z = DataManager_rwg3.load_data(path.mat_impedance)
+    _, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(path.mat_mesh2)
+    frequency, _, _, _, _, _, matrice_z = DataManager_rwg3.load_data(path.mat_impedance)
 
-    # 1. Initialize the voltage vector and retrieve feeding indices for each port
+    # 1. Initialize the global voltage vector and retrieve feeding indices per port
     voltage, all_feeding_indices = multiple_gap_sources(
         triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, 
         excitation_unit_vector, gap_width, voltage_phase
@@ -138,91 +125,65 @@ def calculate_current_radiation(path, feed_point, voltage_amplitude, excitation_
     # 2. Solve the linear system (Z * I = V)
     current = np.linalg.solve(matrice_z, voltage)
 
-    # 3. Process each port to calculate Impedance and Power
+    # 3. Process each port to calculate specific metrics
     feed_points_2d = np.atleast_2d(feed_point)
     num_ports = len(all_feeding_indices)
-
-    # Prepare results storage
     port_results = []
-
-    print(f"\n--- Analysis of {num_ports} Feed Port(s) ---")
 
     for i in range(num_ports):
         indices = all_feeding_indices[i]
 
-        print(f"Shape of all_feeding_indices[{i}]: {indices.shape}")
-        print(f"Feeding edge indices for port {i}: {indices}")
-
         if indices.size == 0:
-            print(f"Port {i} at {feed_points_2d[i]}: No feeding edges found. Skipping.")
+            print(f"Warning: Port {i} at {feed_points_2d[i]} has no feeding edges.")
             continue
 
-        # Extract current coefficients and lengths
-        current_coefficients = current[indices]
+        # Extract local current coefficients and edge lengths for the gap
+        local_coeffs = current[indices]
         edge_lengths = edges.edges_length[indices]
-        
-        # Calculate Is = Im * lm for each edge in the gap
-        is_values = current_coefficients * edge_lengths
-
-        # Print details for debug
-        for idx, edge_idx in enumerate(indices):
-            print(f"  Edge {edge_idx}: Coeff = {current_coefficients[idx]:.4e}, Length = {edge_lengths[idx]:.4e} m, Is = {is_values[idx]:.4e} A")
+        is_values = local_coeffs * edge_lengths
 
         # --- RECTIFICATION OF GAP CURRENT ---
-        # Calculate the mean magnitude to avoid cancellation from flipped RWG edges
+        # Calculate mean magnitude to avoid cancellation from arbitrary RWG edge orientations
         gap_current_mag = np.mean(np.abs(is_values))
         
-        # Determine the initial phase from the sum of complex currents
+        # Determine the initial complex phase from the sum of currents
         is_sum = np.sum(is_values)
         dominant_phase = np.exp(1j * np.angle(is_sum))
         
-        # First estimate of the gap current
+        # Estimate the complex gap current
         temp_gap_current = gap_current_mag * dominant_phase
         
-        # Determine source voltage for this port
+        # Determine specific source voltage for this port
         amp = voltage_amplitude[i] if not np.isscalar(voltage_amplitude) else voltage_amplitude
-        if voltage_phase is None:
-            phi = 0
-        else:
-            phi = voltage_phase[i] if not np.isscalar(voltage_phase) else voltage_phase
+        phi = 0 if voltage_phase is None else (voltage_phase[i] if not np.isscalar(voltage_phase) else voltage_phase)
         source_voltage = amp * np.exp(1j * phi)
 
         # --- PHYSICAL CONSISTENCY CHECK ---
-        # In a passive antenna, Re(Z) must be positive. 
-        # If Re(Vs / Is) < 0, the mathematical orientation of the edges is 
-        # opposite to the physical excitation axis.
+        # Ensure Re(Z) > 0 for passive antennas by flipping phase if necessary
         if temp_gap_current != 0:
             z_test = source_voltage / temp_gap_current
-            if z_test.real < 0:
-                gap_current = -temp_gap_current  # Flip current to match physical direction
-            else:
-                gap_current = temp_gap_current
+            final_gap_current = -temp_gap_current if z_test.real < 0 else temp_gap_current
         else:
-            gap_current = 0j
+            final_gap_current = 0j
 
-        # 4. Calculate Final Input Impedance: Z = Vs / Is
-        impedance = source_voltage / gap_current if gap_current != 0 else np.inf
-        
-        # 5. Calculate Active Power: P = 0.5 * Re(Vs * conj(Is))
-        feed_power = 0.5 * np.real(source_voltage * np.conj(gap_current))
+        # 4. Calculate final port metrics
+        impedance = source_voltage / final_gap_current if final_gap_current != 0 else np.inf
+        active_power = 0.5 * np.real(source_voltage * np.conj(final_gap_current))
 
-        # Store result
+        # Store detailed results for this port
         port_results.append({
-            'current': gap_current,
+            'port_index': i,
+            'location': feed_points_2d[i],
+            'gap_current': final_gap_current,
             'impedance': impedance,
-            'power': feed_power,
+            'power': active_power,
             'source_voltage': source_voltage
         })
 
-        print(f"Port {i} (Location: {feed_points_2d[i]}):")
-        print(f"  > Corrected Mean Feeding Current (Is): {gap_current:.4e} A")
-        # Formatting: uses :+.2f to ensure the sign is always present for the imaginary part
-        print(f"  > Input Impedance (Zin):     {impedance.real:.2f}{impedance.imag:+.2f}j Ohms")
-        print(f"  > Active Power (P):          {feed_power:.4e} W")
-        print("-" * 100)
+        # print(f"Port_result : {port_results}")
 
-    # Return values for the last port (or first port if only one)
-    return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, source_voltage, impedance, feed_power
+    # Returns the environmental constants, global vectors, and the list of port-specific data
+    return frequency, voltage, current, port_results
 
 class DataManager_rwg4:
     """
@@ -289,29 +250,23 @@ class DataManager_rwg4:
 
     @staticmethod
     def save_data_for_radiation(path, frequency, omega, mu, epsilon, light_speed_c, eta,
-                                voltage, current, gap_current, gap_voltage, impedance, feed_power):
+                                voltage, current, gap_currents, gap_voltages, impedances, feed_powers):
         """
-            Saves data related to electromagnetic wave radiation into a MATLAB file.
+        Saves electromagnetic radiation data for one or multiple ports into a MATLAB file.
 
-            Parameters:
-                (Same as 'save_data_for_scattering', with additionally:)
-                * impedance (np.n-d-array) : Measured impedance.
-                * feed_power (np.n-d-array) : Feed power.
+        Parameters:
+            path : object, contains path.mat_current attribute.
+            frequency, omega, mu, epsilon, light_speed_c, eta : float, physical constants and frequency.
+            voltage : np.ndarray, global excitation vector (Z-matrix RHS).
+            current : np.ndarray, global solved current vector.
+            gap_currents : np.ndarray, array of complex currents for each port.
+            gap_voltages : np.ndarray, array of complex voltages for each port.
+            impedances : np.ndarray, array of complex input impedances for each port.
+            feed_powers : np.ndarray, array of active power values for each port.
 
-            Returns:
-            save_file_name (str) : Name of the generated save file.
+        Returns:
+            None
         """
-        '''# Construct file name
-        base_name = os.path.splitext(os.path.basename(filename_mesh2))[0]
-        base_name = base_name.replace('_mesh2', '')  # Remove '_mesh2' part
-        save_file_name = base_name + '_current.mat'  # Add '_current' suffix
-        full_save_path = os.path.join(save_folder_name, save_file_name)
-
-        # Check and create directory if needed
-        if not os.path.exists(save_folder_name):
-            os.makedirs(save_folder_name)'''
-
-        # Save data including currents, impedance, and feed power
         data = {
             'frequency': frequency,
             'omega': omega,
@@ -321,38 +276,35 @@ class DataManager_rwg4:
             'eta': eta,
             'voltage': voltage,
             'current': current,
-            'gap_current': gap_current,
-            'gap_voltage': gap_voltage,
-            'impedance': impedance,
-            'feed_power': feed_power
+            'gap_currents': gap_currents,
+            'gap_voltages': gap_voltages,
+            'impedances': impedances,
+            'feed_powers': feed_powers
         }
 
-        # Save the data
         savemat(path.mat_current, data)
 
     @staticmethod
     def load_data(filename, radiation=False, scattering=False):
         """
-            Loads data from a MATLAB file.
+        Loads data from a MATLAB file, handling either radiation or scattering results.
 
-            Parameters:
+        Parameters:
             filename (str) : Full path to the file to load.
+            radiation (bool) : If True, expects and returns antenna feed port data.
+            scattering (bool) : If True, expects and returns incident wave data.
 
-            Returns:
-            tuple : Contents of the loaded data, depending on the keys present in the file.
-
-            Handled exceptions:
-                * FileNotFoundError : If the specified file does not exist.
-                * KeyError : If expected keys are missing from the file.
-                * ValueError : If the data is malformed.
+        Returns:
+            tuple : Extracted data in the order defined by the saving process.
         """
         try:
-            # Check if the file exists
             if not os.path.isfile(filename):
                 raise FileNotFoundError(f"File '{filename}' does not exist.")
 
-            # Extract main data
+            # Load the raw .mat data
             data = loadmat(filename)
+            
+            # 1. Common global parameters extraction
             frequency = data['frequency'].squeeze()
             omega = data['omega'].squeeze()
             mu = data['mu'].squeeze()
@@ -362,27 +314,40 @@ class DataManager_rwg4:
             voltage = data['voltage'].squeeze()
             current = data['current'].squeeze()
 
-            # Extract specific fields
-            if 'wave_incident_direction' in data and 'polarization' in data and scattering:
-                wave_incident_direction = data['wave_incident_direction'].squeeze()
-                polarization = data['polarization'].squeeze()
-                return frequency, omega, mu, epsilon, light_speed_c, eta, wave_incident_direction, polarization, voltage, current
+            # 2. Scattering-specific logic
+            if scattering:
+                if 'wave_incident_direction' in data and 'polarization' in data:
+                    wave_incident_direction = data['wave_incident_direction'].squeeze()
+                    polarization = data['polarization'].squeeze()
+                    return (frequency, omega, mu, epsilon, light_speed_c, eta, 
+                            wave_incident_direction, polarization, voltage, current)
+                else:
+                    raise KeyError("Missing scattering keys in file.")
 
-            if 'feed_power' in data and 'impedance' in data and 'gap_voltage' in data and 'gap_current' in data and radiation:
-                impedance = data['voltage'].squeeze()
-                feed_power = data['current'].squeeze()
-                gap_voltage = data['gap_voltage'].squeeze()
-                gap_current = data['gap_current'].squeeze()
-                return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_voltage, gap_current, impedance, feed_power
+            # 3. Radiation-specific logic (Updated for multi-port support)
+            if radiation:
+                # Check for the updated plural keys
+                required_keys = ['gap_currents', 'gap_voltages', 'impedances', 'feed_powers']
+                if all(k in data for k in required_keys):
+                    gap_currents = data['gap_currents'].squeeze()
+                    gap_voltages = data['gap_voltages'].squeeze()
+                    impedances = data['impedances'].squeeze()
+                    feed_powers = data['feed_powers'].squeeze()
+                    
+                    # Return in the exact order as specified in the calculation return
+                    return (frequency, omega, mu, epsilon, light_speed_c, eta, 
+                            voltage, current, gap_currents, gap_voltages, impedances, feed_powers)
+                else:
+                    raise KeyError("Missing radiation port keys in file.")
 
             if not scattering and not radiation:
-                raise ValueError("Error: 'scattering' and 'radiation' cannot both be False. Please specify one.")
+                raise ValueError("You must specify either 'radiation=True' or 'scattering=True'.")
 
         except FileNotFoundError as e:
             print(f"Error: {e}")
         except KeyError as e:
             print(f"Key Error: {e}")
         except ValueError as e:
-            print(f"Value Error (likely malformed data): {e}")
+            print(f"Value Error: {e}")
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+            print(f"An unexpected error occurred during loading: {e}")

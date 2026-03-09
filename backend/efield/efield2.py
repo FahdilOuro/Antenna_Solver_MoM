@@ -179,209 +179,277 @@ def load_gain_power_data(filename_to_load):
         # Handle unexpected errors
         print(f"An unexpected error occurred: {e}")
 
-def radiation_intensity_distribution_over_sphere_surface(path, filename_current_to_load,
-                                                         mode='radiation', voltage_amplitude=0.5, show=True, save_image=False):
+def load_or_create_hollow_sphere(msh_path='data/gmsh_files/hollow_sphere.msh', 
+                                 mat_path='data/antennas_mesh/hollow_sphere.mat', 
+                                 scale_factor=300):
     """
-        Calculate and visualize the radiation intensity and gain distribution on the surface of a sphere surrounding an antenna.
+    Ensures the hollow sphere mesh exists and loads its coordinates and connectivity.
 
-        This function loads the necessary data (mesh, currents, sphere), performs electromagnetic field calculations
-        for each triangle of the sphere, and computes metrics such as total power, linear gain, and logarithmic gain.
-        The results are then saved and visualized.
+    Parameters:
+        msh_path (str): Path to the .msh file.
+        mat_path (str): Path to the .mat file.
+        scale_factor (float): Scaling factor for the sphere radius.
 
-        Parameters:
-            * path.mat_mesh2 : str
-                Path to the .mat_mesh2 file containing the processed mesh data of the antenna.
-            * filename_current_to_load : str
-                Path to the file containing the current data on the antenna.
-            * filename_sphere_to_load : str
-                Path to the file containing the sphere data (coordinates and triangles).
-
-        Returns:
-        No explicit return. The results are saved to a file and visualized.
-
-        Main steps:
-            1. Load input data (mesh, currents, sphere).
-            2. Calculate electromagnetic fields on the sphere's triangles.
-            3. Compute radiation metrics: total power, linear and logarithmic gain.
-            4. Save the computed results.
-            5. Visualize the results as a gain distribution over the sphere.
+    Returns:
+        tuple: (sphere_points, sphere_triangles)
     """
-
-    print(f"MODE SELECTED: {mode}")
-    # create hollow sphere data
-    hollow_sphere_msh_path = 'data/gmsh_files/hollow_sphere.msh'
-    hollow_sphere_mat_path = 'data/antennas_mesh/hollow_sphere.mat'
-    # verify if the .mat file already exists to avoid unnecessary regeneration
-    if not os.path.isfile(hollow_sphere_mat_path):
-        print("Creating hollow sphere mesh and extracting data to .mat file...")
-        # verify if the .msh file already exists to avoid unnecessary regeneration
-        if not os.path.isfile(hollow_sphere_msh_path):
-            print("Creating hollow sphere mesh...")
+    if not os.path.isfile(mat_path):
+        print("Creating hollow sphere mesh and extracting data...")
+        if not os.path.isfile(msh_path):
             create_hollow_sphere()
-        extract_msh_to_mat(hollow_sphere_msh_path, hollow_sphere_mat_path)
+        extract_msh_to_mat(msh_path, mat_path)
 
+    data_sphere = loadmat(mat_path)
+    # Scale coordinates and convert to 0-based indexing for Python
+    sphere_points = data_sphere['p'] * scale_factor
+    sphere_triangles = data_sphere['t'] - 1
+    
+    return sphere_points, sphere_triangles
+
+def deform_sphere_for_radiation_pattern(sphere_points, gain_db, dynamic_range=20):
+    """
+    Deforms sphere coordinates based on gain values to create a 3D radiation pattern.
+
+    Parameters:
+        sphere_points (ndarray): Original coordinates of the sphere.
+        gain_db (ndarray): Gain values in dB for each point.
+        dynamic_range (float): Range in dB to display (values below max - range are clipped).
+
+    Returns:
+        ndarray: Deformed sphere coordinates.
+    """
+    # Calculate threshold based on peak gain
+    threshold_db = np.max(gain_db) - dynamic_range
+    
+    # Normalize gain for deformation (clamped at 0.01 for visualization)
+    normalized_gain = np.maximum(gain_db - threshold_db, 0.01)
+    
+    # Apply deformation: scale point vectors by normalized gain
+    # Note: division by 1000 is used here to match your original scaling logic
+    sphere_points_update = (normalized_gain * sphere_points) / 1000
+    
+    return sphere_points_update
+
+def radiation_intensity_distribution_over_sphere_surface(path, mode='radiation', voltage_amplitude=1, show=True, save_image=False):
+    """
+    Calculate and visualize the radiation intensity and gain distribution on the surface of a sphere surrounding an antenna.
+
+    Parameters:
+        path (Namespace): Object containing file paths (e.g., path.mat_mesh2, path.mat_current).
+        mode (str): Simulation mode, either 'radiation' or 'scattering'.
+        voltage_amplitude (float): Excitation voltage amplitude in Volts.
+        show (bool): If True, displays the interactive 3D plot.
+        save_image (bool): If True, saves the visualization as a PDF file.
+
+    Returns:
+        None. Results are saved to disk and optionally displayed.
+    """
+    print(f"MODE SELECTED: {mode}")
+
+    # --- 1. DATA LOADING & INITIALIZATION ---
+    # Load sphere geometry using the helper function
+    sphere_points, sphere_triangles = load_or_create_hollow_sphere()
+    
+    # Load antenna mesh data
+    _, triangles, edges, *_ = DataManager_rwg2.load_data(path.mat_mesh2)
+
+    # Load current and physical parameters
+    if mode == 'scattering':
+        frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(path.mat_current, scattering=True)
+        gap_current = 0 
+    elif mode == 'radiation':
+        frequency, omega, _, _, light_speed_c, eta, _, current, _, gap_current, *_ = DataManager_rwg4.load_data(path.mat_current, radiation=True)
+    else:
+        raise ValueError("Mode must be either 'radiation' or 'scattering'.")
+
+    # Compute physical constants
+    k = omega / light_speed_c
+    complex_k = 1j * k
+    print(f"Frequency = {frequency:.2e} Hz | Wavelength lambda = {light_speed_c / frequency:.4f} m")
+
+    # Compute dipoles and dipole moments
+    dipole_center, dipole_moment = compute_dipole_center_moment(triangles, edges, current)
+
+    # --- 2. TOTAL POWER CALCULATION (TRIANGLE LOOP) ---
+    sphere_total_of_triangles = sphere_triangles.shape[1]
+    total_power = 0
+    u_triangles = np.zeros(sphere_total_of_triangles)
+
+    for i in range(sphere_total_of_triangles):
+        # Identify triangle vertices and compute center (observation point)
+        tri_idx = sphere_triangles[:, i]
+        obs_point = np.sum(sphere_points[:, tri_idx], axis=1) / 3
+
+        # Compute EM fields and Poynting vector norm (w)
+        _, _, _, w, u_triangles[i], _ = compute_e_h_field(obs_point, eta, complex_k, dipole_moment, dipole_center)
+
+        # Calculate triangle area for integration
+        v1 = sphere_points[:, tri_idx[0]] - sphere_points[:, tri_idx[1]]
+        v2 = sphere_points[:, tri_idx[2]] - sphere_points[:, tri_idx[1]]
+        area = np.linalg.norm(np.cross(v1, v2)) / 2
+
+        # Integrate power: P_total = sum(W * Area)
+        total_power += w * area
+
+    # --- 3. ANTENNA METRICS ---
+    gain_linear_max = 4 * np.pi * np.max(u_triangles) / total_power
+    gain_logarithmic_max = 10 * np.log10(gain_linear_max)
+
+    print(f"\n[Antenna Results]")
+    print(f"  Total Radiated Power : {total_power:.4f} W")
+    print(f"  Max Gain : {gain_linear_max:.4f} ({gain_logarithmic_max:.2f} dBi)")
+
+    efficiency_total = 0
+    if mode == 'radiation':
+        gap_current_val = np.linalg.norm(gap_current) if isinstance(gap_current, np.ndarray) else abs(gap_current)
+        
+        if gap_current_val != 0:
+            rad_resistance = 2 * total_power / gap_current_val**2
+            p_in = 0.5 * voltage_amplitude * gap_current_val
+            efficiency_total = min(total_power / p_in, 1.0) if p_in > 0 else 0
+            
+            print(f"  Radiation Resistance : {rad_resistance:.4f} Ohms")
+            print(f"  Total Efficiency : {efficiency_total*100:.2f} %")
+
+    # Save results
+    save_gain_power_data(path.mat_gain_power, total_power, gain_linear_max, gain_logarithmic_max, efficiency_total)
+
+    # --- 4. PATTERN VISUALIZATION PREP (POINT LOOP) ---
+    sphere_total_of_points = sphere_points.shape[1]
+    u_points = np.zeros(sphere_total_of_points)
+
+    for i in range(sphere_total_of_points):
+        obs_point = sphere_points[:, i]
+        # Compute intensity U at each vertex
+        _, _, _, _, u_points[i], _ = compute_e_h_field(obs_point, eta, complex_k, dipole_moment, dipole_center)
+
+    # Convert intensity to gain (dB) for vertices
+    u_points_db = 10 * np.log10(np.maximum(4 * np.pi * u_points / total_power, 1e-12))
+
+    # Apply 3D deformation using the helper function (uses vertex data)
+    sphere_points_update = deform_sphere_for_radiation_pattern(sphere_points, u_points_db, dynamic_range=20)
+
+    # --- 5. DISPLAY & SAVE (FIXING THE VALUE ERROR) ---
+    if show:
+        # Calculate color data per FACE (triangle) by averaging the 3 vertices gain values
+        # This matches the length of sphere_triangles as required by Plotly
+        u_faces_db = np.mean(u_points_db[sphere_triangles], axis=0)
+        
+        plot_title = f"{path.name} - Gain Distribution (dBi)"
+        
+        # We pass u_faces_db for the color map to avoid the "length mismatch" error
+        fig = visualize_surface_current(sphere_points_update, sphere_triangles, u_faces_db, plot_title)
+        fig.show()
+
+        if save_image:
+            output_dir = "data/fig_image/"
+            os.makedirs(output_dir, exist_ok=True)
+            pdf_path = os.path.join(output_dir, f'radiation_pattern_{path.name}.pdf')
+            
+            fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=0, b=0))
+            fig.write_image(pdf_path, format="pdf")
+            print(f"Image saved: {pdf_path}")
+
+    print("\n" + "="*60 + "\n")
+
+'''def circular_gain_distribution_over_sphere(path, polar_type='RHCP', mode='radiation', voltage_amplitude=1, show=True):
+    """
+    Calculate and visualize the circular gain (RHCP or LHCP) distribution over a sphere.
+
+    Parameters:
+        * path : Object containing file paths (mat_mesh2, mat_current, etc.).
+        * polar_type : str, 'RHCP' or 'LHCP' to define which component to display.
+        * mode : str, 'radiation' or 'scattering'.
+        * voltage_amplitude : float, supply voltage.
+        * show : bool, whether to display the 3D plot.
+
+    Returns:
+        * fig : The plotly figure object.
+    """
+    # 1. Load sphere and mesh data
+    hollow_sphere_mat_path = 'data/antennas_mesh/hollow_sphere.mat'
     data_sphere = loadmat(hollow_sphere_mat_path)
+    sphere_points = data_sphere['p'] * 300 
+    sphere_triangles = data_sphere['t'] - 1 
 
     _, triangles, edges, *_ = DataManager_rwg2.load_data(path.mat_mesh2)
 
     if mode == 'scattering':
-        frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=True)
+        frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(path.mat_current, scattering=True)
     elif mode == 'radiation':
-        frequency, omega, _, _, light_speed_c, eta, _, current, _, gap_current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=True)
-    else:
-        raise ValueError("Mode must be either 'radiation' or 'scattering'.")
-
-    # Load sphere data
-    sphere_points = data_sphere['p'] * 300    # Sphere coordinates are scaled by 100 (radius of 100 m).
-    sphere_triangles = data_sphere['t'] - 1   # Convert MATLAB indices (1-based) to Python indices (0-based).
-
-    # Compute wave number k and its complex component
-    k = omega / light_speed_c    # Wave number (in rad/m).
-    complex_k = 1j * k           # Complex component.
-
-    # Display frequency and wavelength
-    print(f"Frequency = {frequency} Hz")
-    print(f"Wavelength lambda = {light_speed_c / frequency} m")
-
-    # Compute dipoles and dipole moments (complex)
+        frequency, omega, _, _, light_speed_c, eta, _, current, _, gap_current, *_ = DataManager_rwg4.load_data(path.mat_current, radiation=True)
+    
+    k = omega / light_speed_c
+    complex_k = 1j * k
     dipole_center, dipole_moment = compute_dipole_center_moment(triangles, edges, current)
 
-    # Initialization for field and total power calculation
+    # 2. First pass: Calculate Total Radiated Power (P_total)
+    # Necessary to normalize the gain later
     sphere_total_of_triangles = sphere_triangles.shape[1]
     total_power = 0
-    observation_point = np.zeros((3, sphere_total_of_triangles))
-    poynting_vector = np.zeros((3, sphere_total_of_triangles))
-    norm_observation_point = np.zeros(sphere_total_of_triangles)
-    e_field_total = np.zeros((3, sphere_total_of_triangles), dtype=complex)
-    h_field_total = np.zeros((3, sphere_total_of_triangles), dtype=complex)
-    sphere_triangle_area = np.zeros(sphere_total_of_triangles)
-    w = np.zeros(sphere_total_of_triangles)
-    u = np.zeros(sphere_total_of_triangles)
+    
+    for i in range(sphere_total_of_triangles):
+        tri = sphere_triangles[:, i]
+        obs_p = np.sum(sphere_points[:, tri], axis=1) / 3
+        # Get total w (Poynting norm)
+        _, _, _, w, _, _ = compute_e_h_field(obs_p, eta, complex_k, dipole_moment, dipole_center)
+        
+        # Area calculation
+        v1 = sphere_points[:, tri[0]] - sphere_points[:, tri[1]]
+        v2 = sphere_points[:, tri[2]] - sphere_points[:, tri[1]]
+        area = np.linalg.norm(np.cross(v1, v2)) / 2
+        total_power += w * area
 
-    # Loop over each triangle of the sphere to calculate fields and energy
-    for triangle_in_sphere in range(sphere_total_of_triangles):
-        sphere_triangle = sphere_triangles[:, triangle_in_sphere]
-        observation_point[:, triangle_in_sphere] = np.sum(sphere_points[:, sphere_triangle], axis=1) / 3
-
-        (e_field_total[:, triangle_in_sphere],
-         h_field_total[:, triangle_in_sphere],
-         poynting_vector[:, triangle_in_sphere],
-         w[triangle_in_sphere],
-         u[triangle_in_sphere],
-         norm_observation_point[triangle_in_sphere]) = compute_e_h_field(observation_point[:, triangle_in_sphere],
-                                                                        eta,
-                                                                        complex_k,
-                                                                        dipole_moment,
-                                                                        dipole_center)
-
-        vecteur_1 = sphere_points[:, sphere_triangle[0]] - sphere_points[:, sphere_triangle[1]]
-        vecteur_2 = sphere_points[:, sphere_triangle[2]] - sphere_points[:, sphere_triangle[1]]
-        sphere_triangle_area[triangle_in_sphere] = np.linalg.norm(np.cross(vecteur_1, vecteur_2)) / 2
-
-        # Contribution of each triangle to the total power
-        total_power += w[triangle_in_sphere] * sphere_triangle_area[triangle_in_sphere]
-
-    # Calculation of the antenna directivity: it is a measure of how focused an antenna's radiation pattern is in a specific direction 
-    # compared to an idealized isotropic antenna that radiates equally in all directions.
-    # It quantifies the antenna's ability to concentrate radiated power in a particular direction.
-    # Here we call it gain
-    # Calculation of gain (linear and logarithmic)
-    gain_linear = 4 * np.pi * u / total_power
-    gain_logarithmic = 10 * np.log10(gain_linear)
-    gain_linear_max = 4 * np.pi * np.max(u) / total_power
-    gain_logarithmic_max = 10 * np.log10(gain_linear_max)
-
-    print(f"\nTotal Power : {total_power : 4f}")
-    print(f"Gain Linear : {gain_linear_max : 4f}")
-    print(f"Gain Logarithmic (Max) : {gain_logarithmic_max : 4f} dBi")
-    if mode == 'radiation':
-        print(f"\ngap_current = {gap_current}")
-        # If gap_current is an array, take the norm or absolute value of the first element
-        if isinstance(gap_current, np.ndarray):
-            gap_current_abs = np.abs(gap_current)
-            if gap_current_abs.size == 1:
-                gap_current_val = gap_current_abs.item()
-            else:
-                gap_current_val = np.linalg.norm(gap_current_abs)
-        else:
-            gap_current_val = abs(gap_current)
-        if gap_current_val != 0:
-            radiation_resistance = 2 * total_power / gap_current_val**2
-        else:
-            radiation_resistance = 0
-            print("Warning: gap_current is zero, radiation_resistance set to 0")
-        print(f"Radiation Resistance : {radiation_resistance : 4f} Ohms")
-
-        V_gap = voltage_amplitude  # Supply voltage in volts
-        P_in = 0.5 * V_gap * gap_current_val
-        print(f"Input Power (P_in) : {P_in:.4f} W")
-        if P_in != 0:
-            efficiency_total = total_power / P_in
-            print(f"Total Efficiency : {efficiency_total:.4f}")
-        else:
-            efficiency_total = 0
-            print("Warning: Input Power (P_in) is zero, efficiency_total set to 0")
-
-        if efficiency_total > 1:
-            print("Warning: Total Efficiency is greater than 1, which is physically impossible. Please check the calculations.")
-            efficiency_total = 1.0  # Limit total efficiency to 1
-
-    # Save the calculated results into a .mat file
-    save_gain_power_data(path.mat_gain_power, total_power, gain_linear_max, gain_logarithmic_max, efficiency_total)
-
-    # Visualization of the results
-    plot_name_gain = path.name + ' gain distribution over a large sphere surface'
+    # 3. Second pass: Calculate Circular Gain at each point
     sphere_total_of_points = sphere_points.shape[1]
-    poynting_vector_point = np.zeros((3, sphere_total_of_points))
-    norm_observation_point = np.zeros(sphere_total_of_points)
-    e_field_total_points = np.zeros((3, sphere_total_of_points), dtype=complex)
-    h_field_total_points = np.zeros((3, sphere_total_of_points), dtype=complex)
-    w_points = np.zeros(sphere_total_of_points)
-    u_points = np.zeros(sphere_total_of_points)
+    u_circular = np.zeros(sphere_total_of_points)
 
-    for point_in_sphere in range(sphere_total_of_points):
-        observation_point = sphere_points[:, point_in_sphere]
+    for i in range(sphere_total_of_points):
+        obs_p = sphere_points[:, i]
+        r = np.linalg.norm(obs_p)
+        
+        # Step A: Get total E-field
+        e_total, _, _, _, _, _ = compute_e_h_field(obs_p, eta, complex_k, dipole_moment, dipole_center)
+        
+        # Step B: Get Spherical components (E_theta, E_phi)
+        e_theta, e_phi = compute_spherical_e_field(obs_p, r, e_total)
+        
+        # Step C: Get RHCP/LHCP components
+        e_rhcp, e_lhcp = compute_circular_components(e_theta, e_phi)
+        
+        # Step D: Calculate specific intensity for requested polarization
+        if polar_type.upper() == 'RHCP':
+            e_pol = e_rhcp
+        else:
+            e_pol = e_lhcp
+            
+        # Radiation Intensity U = (1/2*eta) * |E|^2 * r^2
+        u_circular[i] = (1 / (2 * eta)) * (np.abs(e_pol)**2) * (r**2)
 
-        (e_field_total_points[:, point_in_sphere],
-         h_field_total_points[:, point_in_sphere],
-         poynting_vector_point[:, point_in_sphere],
-         w_points[point_in_sphere],
-         u_points[point_in_sphere],
-         norm_observation_point[point_in_sphere]) = compute_e_h_field(observation_point,
-                                                                      eta,
-                                                                      complex_k,
-                                                                      dipole_moment,
-                                                                      dipole_center)
+    # 4. Convert Intensity to Gain (dBi)
+    # Gain = 4 * PI * U / P_total
+    gain_linear = (4 * np.pi * u_circular) / total_power
+    gain_db = 10 * np.log10(np.maximum(gain_linear, 1e-12)) # Avoid log(0)
 
-    u_points_db = 10 * np.log10(4 * np.pi * u_points / total_power)
-    threshold_db = max(u_points_db) - 20
-    u_points_db = np.maximum(u_points_db[:sphere_total_of_points] - threshold_db, 0.01)
-    sphere_points_update = u_points_db * sphere_points / 1000
+    # 5. Prepare Visualization
+    # Deformation of the sphere for 3D pattern
+    threshold_db = np.max(gain_db) - 30
+    display_vals = np.maximum(gain_db - threshold_db, 0.01)
+    sphere_deformed = (display_vals / np.max(display_vals)) * sphere_points
+    
+    plot_title = f"{path.name} - {polar_type} Gain Distribution (dBi)"
 
     if show:
-        # Visualization of the logarithmic gain
-        fig2 = visualize_surface_current(sphere_points_update, sphere_triangles, gain_logarithmic, plot_name_gain)
-        fig2.show()
+        fig = visualize_surface_current(sphere_deformed, sphere_triangles, gain_db, plot_title)
+        fig.show()
+        return fig
 
-        if save_image:
-            # Output folder path
-            output_dir_fig_image = "data/fig_image/"
-            
-            # Create the folder if it does not exist
-            if not os.path.exists(output_dir_fig_image):
-                os.makedirs(output_dir_fig_image)
-                print(f"Folder created: {output_dir_fig_image}")
-            
-            # Name of the PDF file to save
-            pdf_path = os.path.join(output_dir_fig_image, 'radiation_intensity_distribution' + ".pdf")
-            
-            # Set transparent background and remove white margins
-            fig2.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            margin=dict(l=0, r=0, t=0, b=0)
-            )
+    return None
 
-            # Save the figure
-            fig2.write_image(pdf_path, format="pdf")
-            print(f"\nImage saved as PDF: {pdf_path}\n")
+# --- Wrapper functions for easy calls ---
+
+def display_rhcp_gain(path, mode='radiation'):
+    return circular_gain_distribution_over_sphere(path, polar_type='RHCP', mode=mode)
+
+def display_lhcp_gain(path, mode='radiation'):
+    return circular_gain_distribution_over_sphere(path, polar_type='LHCP', mode=mode)'''

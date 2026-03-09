@@ -87,3 +87,99 @@ def compute_e_h_field(observation_point, eta, complex_k, dipole_moment, dipole_c
     u = (norm_observation_point ** 2) * w
 
     return e_field_total, h_field_total, poynting_vector, w, u, norm_observation_point
+
+def compute_spherical_e_field(observation_point, norm_observation_point, e_field_total):
+    """
+    Calculate the spherical components (E_theta, E_phi) of the electric field
+    at a specific observation point.
+
+    This function takes the total Cartesian electric field and applies a coordinate
+    transformation to project it onto the spherical basis vectors at the given
+    observation point.
+
+    Parameters
+    ----------
+    observation_point : array_like
+        Cartesian coordinates (x, y, z) of the observation point (3-element vector).
+    norm_observation_point : float
+        Euclidean distance from the origin to the observation point (r).
+    e_field_total : array_like
+        Total electric field vector in Cartesian coordinates (E_x, E_y, E_z).
+
+    Returns
+    -------
+    e_theta : complex
+        Electric field component in the theta direction (complex number).
+    e_phi : complex
+        Electric field component in the phi direction (complex number).
+
+    Notes
+    -----
+    The spherical angles are computed as:
+        theta = arccos(z / r) for r > 0, and 0 for r = 0
+        phi = arctan2(y, x)
+    """
+    # Step 1: Extract Cartesian coordinates from the observation point
+    x, y, z = observation_point[0], observation_point[1], observation_point[2]
+    r = norm_observation_point
+
+    # Step 2: Compute the spherical angles (theta and phi)
+    # Prevent division by zero if the point is exactly at the origin
+    theta = np.arccos(z / r) if r != 0 else 0.0
+    phi = np.arctan2(y, x)
+
+    # Step 3: Extract Cartesian components of the complex Electric field
+    E_x, E_y, E_z = e_field_total[0], e_field_total[1], e_field_total[2]
+
+    # Step 4: Project the Cartesian E-field onto the Spherical unit vectors
+    # Formula for E_theta
+    e_theta = (E_x * np.cos(theta) * np.cos(phi) + 
+               E_y * np.cos(theta) * np.sin(phi) - 
+               E_z * np.sin(theta))
+               
+    # Formula for E_phi
+    e_phi = (-E_x * np.sin(phi) + 
+              E_y * np.cos(phi))
+
+    return e_theta, e_phi
+
+def compute_circular_components(e_theta, e_phi):
+    """
+    Calculate RHCP and LHCP components from spherical electric field phasors.
+    
+    This implementation follows the IEEE/Balanis convention based on a 
+    positive time-harmonic dependency exp(+jwt). In this convention, 
+    looking in the direction of propagation (away from the antenna):
+    - RHCP: The electric field vector rotates clockwise.
+    - LHCP: The electric field vector rotates counter-clockwise.
+
+    Parameters
+    ----------
+    e_theta : complex
+        Complex phasor of the electric field in the theta (polaire) direction.
+    e_phi : complex
+        Complex phasor of the electric field in the phi (azimuthal) direction.
+    
+    Returns
+    -------
+    rhcp : complex
+        Right-Hand Circular Polarization component: (E_theta + j*E_phi) / sqrt(2).
+    lhcp : complex
+        Left-Hand Circular Polarization component: (E_theta - j*E_phi) / sqrt(2).
+        
+    Notes
+    -----
+    The phase difference (delta_phi = phase_phi - phase_theta) determines 
+    the polarization:
+    - If delta_phi = +90 deg: The wave is purely RHCP.
+    - If delta_phi = -90 deg: The wave is purely LHCP.
+    """
+    # Constant for normalization
+    inv_sqrt2 = 1.0 / np.sqrt(2)
+    
+    # According to Balanis (IEEE), RHCP uses (+j) and LHCP uses (-j)
+    # for the transverse field components projection.
+    rhcp = inv_sqrt2 * (e_theta + 1j * e_phi)
+    lhcp = inv_sqrt2 * (e_theta - 1j * e_phi)
+    
+    return rhcp, lhcp

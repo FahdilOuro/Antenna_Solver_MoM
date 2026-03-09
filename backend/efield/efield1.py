@@ -7,9 +7,9 @@ import numpy as np
 
 from backend.rwg.rwg2 import DataManager_rwg2
 from backend.rwg.rwg4 import DataManager_rwg4
-from backend.utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
+from backend.utils.dipole_parameters import *
 
-def calculate_electric_magnetic_field_at_point(path, filename_current_to_load, observation_point, mode='radiation'):
+def calculate_electric_magnetic_field_at_point(path, observation_point, mode='radiation'):
     """
         Calculate and display electric fields, magnetic fields, Poynting vector, energy, and Radar Cross Section (RCS)
         at a specified observation point, using mesh data and currents loaded from .mat files.
@@ -42,9 +42,9 @@ def calculate_electric_magnetic_field_at_point(path, filename_current_to_load, o
     _, triangles, edges, *_ = DataManager_rwg2.load_data(path.mat_mesh2)
 
     if mode == 'scattering':
-        frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(filename_current_to_load, scattering=True)
+        frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(path.mat_current, scattering=True)
     elif mode == 'radiation':
-        frequency, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(filename_current_to_load, radiation=True)
+        frequency, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(path.mat_current, radiation=True)
     else:
         raise ValueError("mode must be either 'radiation' or 'scattering'")
 
@@ -82,9 +82,9 @@ def calculate_electric_magnetic_field_at_point(path, filename_current_to_load, o
 
     print('')
     print("Poynting vector is equal to : ")
-    print(f"{poynting_vector[0] : 8f} W/m^2")
-    print(f"{poynting_vector[1] : 8f} W/m^2")
-    print(f"{poynting_vector[2] : 8f} W/m^2")
+    print(f"{poynting_vector[0]} W/m^2")
+    print(f"{poynting_vector[1]} W/m^2")
+    print(f"{poynting_vector[2]} W/m^2")
 
     print('')
     print(f"w = {w} W/m^2")
@@ -101,3 +101,106 @@ def calculate_electric_magnetic_field_at_point(path, filename_current_to_load, o
 
         print('')
         print(f"RCS = {rcs}")
+
+def analyze_point_fields_polarization(path, observation_point, mode='radiation'):
+    """
+    Calculates and displays comprehensive electromagnetic field data at a single point.
+    
+    This function utilizes 'compute_spherical_e_field' to handle coordinate 
+    transformations and focuses on extracting polarization metrics (RHCP, LHCP, Axial Ratio).
+
+    Parameters:
+        path (Namespace): Object containing file paths (e.g., path.mat_mesh2).
+        observation_point (list, tuple, or ndarray): The (x, y, z) coordinates.
+        mode (str): Simulation mode, either 'radiation' or 'scattering'.
+
+    Returns:
+        None. Results are printed directly to the console.
+    """
+    # 1. Load mesh and current data from MAT files
+    _, triangles, edges, *_ = DataManager_rwg2.load_data(path.mat_mesh2)
+
+    if mode == 'scattering':
+        _, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(path.mat_current, scattering=True)
+    elif mode == 'radiation':
+        _, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(path.mat_current, radiation=True)
+    else:
+        raise ValueError("Mode must be either 'radiation' or 'scattering'.")
+
+    # 2. Physical Constants
+    k = omega / light_speed_c
+    complex_k = 1j * k
+    dipole_center, dipole_moment = compute_dipole_center_moment(triangles, edges, current)
+
+    # 3. Compute Cartesian Fields and Power Metrics
+    e_field_total, _, poynting_vector, _, u, norm_obs_point = compute_e_h_field(observation_point, eta, complex_k, dipole_moment, dipole_center)
+
+    # 4. Compute Spherical Components using our helper function
+    e_theta, e_phi = compute_spherical_e_field(observation_point, norm_obs_point, e_field_total)
+
+    # 5. Extract angles for display purposes
+    x, y, z = observation_point
+    r = norm_obs_point
+    theta_deg = np.degrees(np.arccos(z / r)) if r != 0 else 0.0
+    phi_deg = np.degrees(np.arctan2(y, x))
+
+    # 6. Circular Polarization & Axial Ratio Calculation
+    e_rhcp, e_lhcp = compute_circular_components(e_theta, e_phi)
+
+    abs_rhcp = np.abs(e_rhcp)
+    abs_lhcp = np.abs(e_lhcp)
+    
+    # Calculate Axial Ratio (AR)
+    # AR = (|E_rhcp| + |E_lhcp|) / ||E_rhcp| - |E_lhcp||
+    diff = np.abs(abs_rhcp - abs_lhcp)
+    if diff < 1e-12:
+        axial_ratio_linear = float('inf')
+        axial_ratio_db = float('inf')
+    else:
+        axial_ratio_linear = (abs_rhcp + abs_lhcp) / diff
+        axial_ratio_db = 20 * np.log10(axial_ratio_linear)
+
+    # ==========================================
+    # DISPLAY SECTION
+    # ==========================================
+    print("\n" + "="*60)
+    print(f" ELECTROMAGNETIC ANALYSIS AT POINT: {path.name}")
+    print("="*60)
+    
+    print(f"\n[Location]")
+    print(f"  Cartesian (X, Y, Z) : ({x:.3f}, {y:.3f}, {z:.3f}) m")
+    print(f"  Spherical (r, θ, φ) : ({r:.3f} m, {theta_deg:.2f}°, {phi_deg:.2f}°)")
+
+    print(f"\n[Cartesian E-Field (V/m)]")
+    for i, label in enumerate(['Ex', 'Ey', 'Ez']):
+        print(f"  {label} : {e_field_total[i].real:+.7e} {e_field_total[i].imag:+.7e}j")
+
+    print(f"\n[Spherical E-Field (V/m)]")
+    print(f"  E_theta : {e_theta.real:+.7e} {e_theta.imag:+.7e}j  (|E| = {np.abs(e_theta):.5e})")
+    print(f"  E_phi   : {e_phi.real:+.7e} {e_phi.imag:+.7e}j  (|E| = {np.abs(e_phi):.5e})")
+
+    print(f"\n[Circular Polarization]")
+    print(f"  E_RHCP  : {e_rhcp.real:+.7e} {e_rhcp.imag:+.7e}j  (|E| = {abs_rhcp:.5e})")
+    print(f"  E_LHCP  : {e_lhcp.real:+.7e} {e_lhcp.imag:+.7e}j  (|E| = {abs_lhcp:.5e})")
+    print(f"  Axial Ratio : {axial_ratio_linear:.4f} ({axial_ratio_db:.2f} dB)")
+    
+    # Quick interpretation of the results
+    if axial_ratio_db < 3.0:
+        status = "CIRCULAR"
+    elif axial_ratio_db > 20.0:
+        status = "LINEAR"
+    else:
+        status = "ELLIPTICAL"
+    print(f"  Detected Polarization Type: **{status}**")
+
+    print(f"\n[Power Metrics]")
+    print(f"  Poynting (Px, Py, Pz) : ({poynting_vector[0]:.2e}, {poynting_vector[1]:.2e}, {poynting_vector[2]:.2e}) W/m²")
+    print(f"  Intensity (u)         : {u:.5e} W/sr")
+
+    if mode == 'scattering':
+        e_dot_conj = np.sum(np.real(e_field_total * np.conj(e_field_total)))
+        rcs = 4 * np.pi * (r ** 2) * e_dot_conj
+        print(f"\n[Radar Cross Section]")
+        print(f"  RCS : {rcs:.5e} m²")
+    
+    print("\n" + "="*60 + "\n")

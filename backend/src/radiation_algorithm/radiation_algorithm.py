@@ -70,11 +70,23 @@ def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excita
     # Save impedance data
     DataManager_rwg3.save_data(path, frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z)
     
-    frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, source_voltage, impedance, feed_power = \
+    '''frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, source_voltage, impedance, feed_power = \
+    calculate_current_radiation(path, feed_point, voltage_amplitude, excitation_unit_vector, gap_width, voltage_phase)'''
+    frequency, voltage, current, port_results = \
     calculate_current_radiation(path, feed_point, voltage_amplitude, excitation_unit_vector, gap_width, voltage_phase)
 
-    # Save current data
-    DataManager_rwg4.save_data_for_radiation(path, frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, source_voltage, impedance, feed_power)
+    # Extract port-specific data into numpy arrays for structured saving
+    # This converts the list of dictionaries into clean vectors
+    gap_currents = np.array([p['gap_current'] for p in port_results])
+    gap_voltages = np.array([p['source_voltage'] for p in port_results])
+    impedances   = np.array([p['impedance'] for p in port_results])
+    feed_powers  = np.array([p['power'] for p in port_results])
+
+    # print(f"Impedances : {impedances[0]}")
+
+    # 3. Save everything using the updated DataManager
+    DataManager_rwg4.save_data_for_radiation(path, frequency, omega, mu, epsilon, light_speed_c, eta, 
+                                             voltage, current, gap_currents, gap_voltages, impedances, feed_powers)
 
     # Compute surface currents from the total current
     surface_current_density = calculate_current_density(current, triangles, edges, vecteurs_rho)
@@ -107,4 +119,4 @@ def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excita
             fig.write_image(pdf_path, format="pdf")
             print(f"\nImage saved in PDF format: {pdf_path}\n")
 
-    return matrice_z, voltage, current, surface_current_density, gap_current, source_voltage, impedance, feed_power
+    return matrice_z, voltage, current, surface_current_density, gap_currents, gap_voltages, impedances, feed_powers

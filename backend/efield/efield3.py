@@ -75,15 +75,19 @@ def compute_polar(observation_point_list_phi, numbers_of_points, eta, complex_k,
 
 def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=False):
     """
-        Generates the antenna directivity pattern in the Phi = 0° and Phi = 90° planes.
-        This function loads the necessary data (mesh, currents, radiated power),
-        computes polar intensity plots, and displays the results.
-        Parameters:
-            * filename_mesh2_to_load : Path to the file containing the antenna mesh.
-            * filename_current_to_load : Path to the file containing the currents on the antenna.
-            * filename_gain_power_to_load : Path to the file containing gain and power data.
+    Generates a modern and professional polar plot of the antenna directivity pattern.
+    
+    This function processes MoM simulation data to visualize the radiation intensity 
+    in the Phi = 0° and Phi = 90° planes with enhanced aesthetics. The 90° angle 
+    is positioned at the top of the plot for specific visualization requirements.
+
+    Parameters:
+        path (Namespace): Object containing file paths (mesh, current, gain_power).
+        mode (str): Simulation mode, either 'radiation' or 'scattering'.
+        show (bool): If True, displays the plot.
+        save_image (bool): If True, saves the plot as a high-resolution PDF.
     """
-    # Load the necessary data
+    # Load data
     _, triangles, edges, *_ = DataManager_rwg2.load_data(path.mat_mesh2)
     
     radiation = (mode == 'radiation')
@@ -98,53 +102,56 @@ def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=Fa
     
     total_power, *_ = load_gain_power_data(path.mat_gain_power)
     
-    # Compute fundamental parameters
-    k = omega / light_speed_c    # Wave number (rad/m)
-    complex_k = 1j * k           # Complex wave number component
-    dipole_center, dipole_moment = compute_dipole_center_moment(triangles, edges, current)  # Dipole moments
+    # Physics computation
+    k = omega / light_speed_c
+    complex_k = 1j * k
+    dipole_center, dipole_moment = compute_dipole_center_moment(triangles, edges, current)
     
-    numbers_of_points = 100    # Number of points per plane
-    radius = 100               # Radius of the observation sphere
+    points_count = 200 # Higher resolution
+    radius = 100
     
-    # Compute observation points for Phi = 0° and Phi = 90°
-    theta = np.linspace(0, 2 * np.pi, numbers_of_points)    # Theta angles (0 to 360°)
-    points_yz = compute_circle_points(radius, numbers_of_points, plane="yz")
-    points_xy = compute_circle_points(radius, numbers_of_points, plane="xy")
+    theta = np.linspace(0, 2 * np.pi, points_count)
+    points_yz = compute_circle_points(radius, points_count, plane="yz")
+    points_xy = compute_circle_points(radius, points_count, plane="xy")
     
-    # Compute polar intensity plots
-    polar_0 = compute_polar(points_yz, numbers_of_points, eta, complex_k, dipole_moment, dipole_center, total_power)
-    polar_90 = compute_polar(points_xy, numbers_of_points, eta, complex_k, dipole_moment, dipole_center, total_power)
+    polar_0 = compute_polar(points_yz, points_count, eta, complex_k, dipole_moment, dipole_center, total_power)
+    polar_90 = compute_polar(points_xy, points_count, eta, complex_k, dipole_moment, dipole_center, total_power)
     
     if show or save_image:
-        # Visualize the polar plot
-        ax = plt.subplot(projection='polar')
-        ax.plot(theta, polar_0, color='red', label='Phi = 0°')
-        ax.plot(theta, polar_90, color='blue', label='Phi = 90°')
+        # Style configuration
+        plt.style.use('seaborn-v0_8-whitegrid')
+        plt.rcParams.update({'font.size': 11, 'font.family': 'sans-serif'})
+
+        fig, ax = plt.subplots(figsize=(9.5, 10), subplot_kw={'projection': 'polar'})
         
-        # Configure axes and legends
-        # ax.set_theta_zero_location("N")    # 0° at north
-        # ax.set_theta_direction(-1)         # Clockwise direction for angles
-        ax.set_rlabel_position(-30)      # Radial label position
-        ax.text(0, max(polar_0) + 5, "z", ha='center', va='bottom', fontsize=10, color='red')
-        ax.legend()
-        ax.grid(True)
-        ax.set_title(path.name + " E-field pattern in Phi = 0° and 90° plane", va='bottom')
+        # Rotate the plot: 90 degrees at the top (North)
+        # Default 0 is East (right). To put 90 at Top, we keep 0 at East.
+        ax.set_theta_offset(0) 
+        ax.set_theta_direction(1) # Counter-clockwise
+
+        # Plot data with vibrant colors
+        ax.plot(theta, polar_0, color='#FF5733', label=r'Elevation Plane $\phi = 0^\circ$ (YZ)', linewidth=2.5)
+        ax.plot(theta, polar_90, color='#3357FF', label=r'Azimuth Plane $\Theta = 90^\circ$ (XY)', linewidth=2.5, linestyle='--')
         
-        # IMPORTANT: Save BEFORE showing
+        # Grid and Ticks
+        # Set ticks every 30 degrees
+        angles = np.arange(0, 360, 30)
+        ax.set_thetagrids(angles)
+        
+        # Styling the radial axis (intensity)
+        ax.set_rlabel_position(115) 
+        ax.tick_params(axis='both', which='major', labelsize=10, grid_alpha=0.5)
+        
+        # Legend and Title
+        ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=2, frameon=True)
+        # ax.set_title(f"Radiation Pattern - {path.name}\nMode: {mode.upper()}", fontsize=15, fontweight='bold', pad=20)
+
         if save_image:
-            # Create directory if it does not exist
-            output_dir_fig_image = "data/fig_image/"
-            if not os.path.exists(output_dir_fig_image):
-                os.makedirs(output_dir_fig_image)
-            
-            # Save the figure
-            pdf_path = os.path.join(output_dir_fig_image, 'antenna_directivity_pattern' + ".pdf")
-            plt.tight_layout()
-            plt.savefig(pdf_path, format='pdf', bbox_inches='tight')
-            print(f"The figure has been saved in {pdf_path}")
+            output_dir = "data/fig_image/"
+            os.makedirs(output_dir, exist_ok=True)
+            plt.savefig(os.path.join(output_dir, f'pattern_{path.name}.pdf'), bbox_inches='tight')
         
-        # Show AFTER saving
         if show:
             plt.show()
         else:
-            plt.close()  # Close the figure if not showing to free memory
+            plt.close()
