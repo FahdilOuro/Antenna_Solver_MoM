@@ -3,10 +3,10 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 
-from backend.efield.efield2 import load_gain_power_data
+from backend.efield.efield2 import load_gain_power_data, load_and_prepare_antenna_data
 from backend.rwg.rwg2 import DataManager_rwg2
 from backend.rwg.rwg4 import DataManager_rwg4
-from backend.utils.dipole_parameters import compute_dipole_center_moment, compute_e_h_field
+from backend.utils.dipole_parameters import *
 
 def compute_circle_points(radius, num_points, plane="yz"):
     """
@@ -63,7 +63,7 @@ def compute_polar(observation_point_list_phi, numbers_of_points, eta, complex_k,
          h_field_total[:, index_point],
          poynting_vector[:, index_point],
          w[index_point], u[index_point],
-         norm_observation_point) = compute_e_h_field(observation_point,
+         _) = compute_e_h_field(observation_point,
                                                      eta,
                                                      complex_k,
                                                      dipole_moment,
@@ -72,6 +72,46 @@ def compute_polar(observation_point_list_phi, numbers_of_points, eta, complex_k,
 
     polar = 10 * np.log10(4 * np.pi * u / total_power)  # Conversion to dB
     return polar
+
+def compute_circular_polar(observation_points, numbers_of_points, eta, complex_k, dipole_moment, dipole_center, total_power, polar_type='RHCP'):
+    """
+    Computes the circular gain (RHCP or LHCP) distribution (in dBic) on a given polar plane.
+
+    Parameters:
+        observation_points (np.ndarray): List of observation points (Nx3).
+        numbers_of_points (int): Total number of points.
+        eta (float): Medium impedance.
+        complex_k (complex): 1j * k.
+        dipole_moment (np.ndarray): Dipole moments.
+        dipole_center (np.ndarray): Dipole centers.
+        total_power (float): Total radiated power.
+        polar_type (str): 'RHCP' or 'LHCP'.
+
+    Returns:
+        np.ndarray: Polar plot values in dBic.
+    """
+    u_circular = np.zeros(numbers_of_points)
+
+    for i in range(numbers_of_points):
+        obs_p = observation_points[i]
+        r = np.linalg.norm(obs_p)
+        
+        # 1. Get total E-field
+        e_total, *_ = compute_e_h_field(obs_p, eta, complex_k, dipole_moment, dipole_center)
+        
+        # 2. Convert to spherical components
+        e_theta, e_phi = compute_spherical_e_field(obs_p, r, e_total)
+        
+        # 3. Extract circular components
+        e_rhcp, e_lhcp = compute_circular_components(e_theta, e_phi)
+        
+        # 4. Select polarization and compute intensity U
+        e_pol = e_rhcp if polar_type.upper() == 'RHCP' else e_lhcp
+        u_circular[i] = (1 / (2 * eta)) * (np.abs(e_pol)**2) * (r**2)
+
+    # Convert to dBic (Circular Gain)
+    polar_dbic = 10 * np.log10(np.maximum(4 * np.pi * u_circular / total_power, 1e-12))
+    return polar_dbic
 
 def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=False):
     """
@@ -139,12 +179,12 @@ def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=Fa
         ax.set_thetagrids(angles)
         
         # Styling the radial axis (intensity)
-        ax.set_rlabel_position(115) 
+        # ax.set_rlabel_position(115) 
         ax.tick_params(axis='both', which='major', labelsize=10, grid_alpha=0.5)
         
         # Legend and Title
         ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=2, frameon=True)
-        # ax.set_title(f"Radiation Pattern - {path.name}\nMode: {mode.upper()}", fontsize=15, fontweight='bold', pad=20)
+        ax.set_title(f"Radiation Pattern - {path.name}\nMode: {mode}", fontsize=15, fontweight='bold', pad=20)
 
         if save_image:
             output_dir = "data/fig_image/"
@@ -155,3 +195,94 @@ def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=Fa
             plt.show()
         else:
             plt.close()
+
+def antenna_circular_directivity_pattern(path, polar_type='RHCP', mode='radiation', show=True, save_image=False):
+    """
+    Generates a polar plot for RHCP or LHCP directivity pattern in Phi=0 and Phi=90 planes.
+    """
+    print(f"--- GENERATING {polar_type} POLAR PATTERN ---")
+
+    # 1. Load and prepare data (using the helper from previous step)
+    data = load_and_prepare_antenna_data(path, mode)
+    sphere_points, sphere_triangles, frequency, light_speed_c, eta, complex_k, dipole_center, dipole_moment, _ = data
+    
+    # Load total power from previously saved data
+    path_mat_polar_gain_power = path.mat_polar_rhcp_gain_power if polar_type.upper() == 'RHCP' else path.mat_polar_lhcp_gain_power
+    total_power, *_ = load_gain_power_data(path_mat_polar_gain_power)
+
+    # 2. Define planes
+    points_count = 360  # Higher resolution for smooth plots
+    radius = 100
+    theta_axis = np.linspace(0, 2 * np.pi, points_count)
+    
+    points_yz = compute_circle_points(radius, points_count, plane="yz") # Phi = 0°
+    points_xz = compute_circle_points(radius, points_count, plane="xz") # Phi = 90°
+
+    # 3. Compute polar data in dBic
+    polar_0 = compute_circular_polar(points_yz, points_count, eta, complex_k, 
+                                     dipole_moment, dipole_center, total_power, polar_type)
+    polar_90 = compute_circular_polar(points_xz, points_count, eta, complex_k, 
+                                      dipole_moment, dipole_center, total_power, polar_type)
+
+    # 4. Visualization
+    if show or save_image:
+        plt.style.use('seaborn-v0_8-whitegrid')
+        fig, ax = plt.subplots(figsize=(8, 9), subplot_kw={'projection': 'polar'})
+        
+        # Styling
+        """ax.set_theta_offset(np.pi/2) # Put 0° at the Top
+        ax.set_theta_direction(-1)   # Clockwise (standard for antenna patterns)"""
+
+        # Rotate the plot: 90 degrees at the top (North)
+        # Default 0 is East (right). To put 90 at Top, we keep 0 at East.
+        ax.set_theta_offset(0) 
+        ax.set_theta_direction(1) # Counter-clockwise
+
+        # Plotting
+        color = '#FF5733' if polar_type == 'RHCP' else '#3357FF'
+        ax.plot(theta_axis, polar_0, color=color, linewidth=2.5,
+                label=rf'{polar_type} - Plane $\phi = 0^\circ$ (YZ)')
+        ax.plot(theta_axis, polar_90, color=color, linewidth=2, linestyle='--', 
+                label=rf'{polar_type} - Plane $\phi = 90^\circ$ (XZ)')
+
+        # Grid and Labels
+        ax.set_thetagrids(np.arange(0, 360, 30))
+        ax.set_rlabel_position(135)
+        ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.2), ncol=1)
+        ax.set_title(f"{polar_type} Directivity Pattern (dBic)\n{path.name}", pad=30, fontweight='bold')
+
+        if save_image:
+            output_dir = "data/fig_image/"
+            os.makedirs(output_dir, exist_ok=True)
+            plt.savefig(os.path.join(output_dir, f'circular_pattern_{polar_type}_{path.name}.pdf'), bbox_inches='tight')
+        
+        if show:
+            plt.show()
+        else:
+            plt.close()
+
+def display_rhcp_polar_pattern(path, mode='radiation', show=True, save_image=False):
+    """
+    Wrapper to generate the RHCP (Right-Hand Circular Polarization) 
+    polar directivity pattern.
+    """
+    return antenna_circular_directivity_pattern(
+        path=path, 
+        polar_type='RHCP', 
+        mode=mode, 
+        show=show, 
+        save_image=save_image
+    )
+
+def display_lhcp_polar_pattern(path, mode='radiation', show=True, save_image=False):
+    """
+    Wrapper to generate the LHCP (Left-Hand Circular Polarization) 
+    polar directivity pattern.
+    """
+    return antenna_circular_directivity_pattern(
+        path=path, 
+        polar_type='LHCP', 
+        mode=mode, 
+        show=show, 
+        save_image=save_image
+    )

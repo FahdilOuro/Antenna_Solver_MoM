@@ -29,10 +29,10 @@ def setup_save_file_paths(name, gmsh_folder_path='data/gmsh_files/', mat_folder_
     mat_polar_lhcp_gain_power_name = f"{name}_polar_lhcp_gain_power.mat"
 
     # 2. Define additional folders for different types of data
-    mat_mesh1_folder_path = 'data/antennas_mesh1/'
-    mat_mesh2_folder_path = 'data/antennas_mesh2/'
-    mat_impedance_folder_path = 'data/antennas_impedance/'
-    mat_current_folder_path = 'data/antennas_current/'
+    mat_mesh1_folder_path      = 'data/antennas_mesh1/'
+    mat_mesh2_folder_path      = 'data/antennas_mesh2/'
+    mat_current_folder_path    = 'data/antennas_current/'
+    mat_impedance_folder_path  = 'data/antennas_impedance/'
     mat_gain_power_folder_path = 'data/antennas_gain_power/'
     mat_freq_sweep_folder_path = 'data/antennas_sweep/'
 
@@ -78,17 +78,17 @@ def setup_save_file_paths(name, gmsh_folder_path='data/gmsh_files/', mat_folder_
 
     # Store paths in a namespace for dot notation access
     paths = SimpleNamespace(
-        name=name,
-        msh = file_msh_path,
-        remsh = file_remsh_path,
-        geo = file_geo_path,
-        mat = file_mat_path,
-        mat_mesh1 = file_mat_mesh1_path,
-        mat_mesh2 = file_mat_mesh2_path,
-        mat_impedance = file_mat_impedance_path,
-        mat_current = file_mat_current_path,
-        mat_gain_power = file_mat_gain_power_path,
-        mat_freq_sweep = file_mat_freq_sweep_path,
+        name                      = name,
+        msh                       = file_msh_path,
+        remsh                     = file_remsh_path,
+        geo                       = file_geo_path,
+        mat                       = file_mat_path,
+        mat_mesh1                 = file_mat_mesh1_path,
+        mat_mesh2                 = file_mat_mesh2_path,
+        mat_impedance             = file_mat_impedance_path,
+        mat_current               = file_mat_current_path,
+        mat_gain_power            = file_mat_gain_power_path,
+        mat_freq_sweep            = file_mat_freq_sweep_path,
         mat_polar_rhcp_gain_power = file_mat_polar_rhcp_gain_power_path,
         mat_polar_lhcp_gain_power = file_mat_polar_lhcp_gain_power_path
     )
