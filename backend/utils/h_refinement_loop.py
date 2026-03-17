@@ -5,7 +5,7 @@ from backend.utils.gmsh_function import extract_ModelMsh_to_mat, extract_msh_to_
 from backend.utils.h_refinement_func import *
 
 
-def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, paths, excitation_unit_vector='x', gap_width=0.001, **solver_kwargs):
+def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, path, excitation_unit_vector='x', gap_width=0.001, **solver_kwargs):
     """
     Executes the iterative mesh refinement loop with a flexible solver function.
     
@@ -18,11 +18,9 @@ def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, paths
         paths: SimpleNamespace containing file paths (msh, geo, mat).
         **solver_kwargs: All keyword arguments needed by the solver function.
                         For scattering: frequency, wave_incident_direction, polarization
-                        For radiation: frequency, feed_point, voltage_amplitude, monopole, etc.
+                        For radiation: frequency, feed_point, voltage_amplitude, etc.
     """
     show_image = True
-
-    extract_msh_to_mat(paths.msh, paths.mat)
 
     # Initialize the mesh size array based on the number of grid points
     sizes = np.ones(len(grid_points)) * config.initial_mesh_size
@@ -33,21 +31,18 @@ def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, paths
     grid_tree = KDTree(grid_points)
     
     # Initial solver run to get the first surface current density
-    _, _, _, surface_current_density = solver_function(paths.mat, show=show_image, excitation_unit_vector=excitation_unit_vector, gap_width=gap_width, **solver_kwargs)
+    _, _, _, surface_current_density, *_ = solver_function(path, show=show_image, excitation_unit_vector=excitation_unit_vector, gap_width=gap_width, **solver_kwargs)
     
     for i in range(config.max_iterations):
         print(f"\n>>> Starting Iteration {i + 1}/{config.max_iterations}")
 
-        # 1. Mesh Analysis & Element Selection
-        if i == 0:
-            centroids = get_mesh_centroids(paths.msh)
-        else:
-            centroids = get_mesh_centroids(paths.remsh)
+        # 1. Element Selection
+        centroids = get_mesh_centroids(path.msh)
         
         # Estimate errors based on surface current density
         # errors = simple_estimation(surface_current_density)
 
-        errors = compute_error_estimation(paths.mat, surface_current_density)
+        errors = compute_error_estimation(path.mat, surface_current_density)
 
         # 3. Calculate the threshold using the percentile function
         # To get the TOP 20%, we need to find the 80th percentile (100 - 20)
@@ -77,11 +72,11 @@ def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, paths
         setup_performance_config()
 
         # Apply the refinement logic
-        define_mesh_by_grid_refined(paths.geo, grid_points, sizes, config.initial_mesh_size)
+        define_mesh_by_grid_refined(path.geo, grid_points, sizes, config.initial_mesh_size)
 
         # Save and export the model
-        gmsh.write(paths.remsh)
-        extract_ModelMsh_to_mat(paths.mat)
+        gmsh.write(path.msh) # change remsh by msh
+        extract_ModelMsh_to_mat(path.mat)
         gmsh.finalize()
 
         """# 5. Show image on last iteration
@@ -89,7 +84,7 @@ def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, paths
             show_image = True"""
 
         # 6. Run Physics Solver on the new mesh
-        _, _, _, surface_current_density = solver_function(paths.mat, show=show_image, excitation_unit_vector=excitation_unit_vector, gap_width=gap_width, **solver_kwargs)
+        _, _, _, surface_current_density, *_ = solver_function(path, show=show_image, excitation_unit_vector=excitation_unit_vector, gap_width=gap_width, **solver_kwargs)
 
         # 7. Logging Statistics
         old_sizes = sizes.copy()
@@ -100,7 +95,7 @@ def run_refinement_cycle(solver_function, config, grid_points, r_vicinity, paths
 
     print("\n>>> Refinement process completed.")
 
-def run_scattering_refinement(config, grid_points, r_vicinity, paths, 
+def run_scattering_refinement(config, grid_points, r_vicinity, path, 
                                frequency, wave_incident_direction, polarization):
     """
     Wrapper for scattering-based refinement.
@@ -110,7 +105,8 @@ def run_scattering_refinement(config, grid_points, r_vicinity, paths,
         config=config,
         grid_points=grid_points,
         r_vicinity=r_vicinity,
-        paths=paths,
+        path=path,
+        excitation_unit_vector=None,
         frequency=frequency,
         wave_incident_direction=wave_incident_direction,
         polarization=polarization
@@ -118,7 +114,7 @@ def run_scattering_refinement(config, grid_points, r_vicinity, paths,
 
 
 # Example 2: Using radiation algorithm
-def run_radiation_refinement(config, grid_points, r_vicinity, paths,
+def run_radiation_refinement(config, grid_points, r_vicinity, path,
                               frequency, feed_point, voltage_amplitude=1, excitation_unit_vector='x', gap_width=0.001,
                               load_lumped_elements=False, LoadPoint=None,
                               LoadValue=None, LoadDir=None):
@@ -130,7 +126,7 @@ def run_radiation_refinement(config, grid_points, r_vicinity, paths,
         config=config,
         grid_points=grid_points,
         r_vicinity=r_vicinity,
-        paths=paths,
+        path=path,
         frequency=frequency,
         feed_point=feed_point,
         voltage_amplitude=voltage_amplitude,

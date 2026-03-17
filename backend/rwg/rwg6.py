@@ -30,12 +30,19 @@ def surface_calculate_current_density(current, triangles, edges, vecteurs_rho):
 
     return surface_current_density
 
-def plot_surface_current_distribution(filename_mesh, filename_current, mode='scattering'):
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.interpolate import interp1d
+from scipy.spatial import cKDTree
+
+def plot_surface_current_distribution(path, mode='scattering'):
     """
-    Plots the surface current distribution along the dipole length.
+    Plots the surface current distribution along the dipole length with 
+    the aesthetic style of the S11 plot (Adelle font, clean grid).
     
-    Parameters:
-    - mode: 'scattering' or 'radiation'
+    Args:
+        path (object, optional): An object containing .mat_mesh2 and .mat_current attributes.
+        mode (str): Mode of operation, either 'scattering' or 'radiation'.
     """
     # 1. Parameter validation
     if mode not in ['scattering', 'radiation']:
@@ -44,57 +51,64 @@ def plot_surface_current_distribution(filename_mesh, filename_current, mode='sca
     print(f"MODE SELECTED: {mode}")
 
     # 2. Load geometry and current data
-    # Note: Adapting to your existing DataManager structure
-    points, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh)
+    points, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(path.mat_mesh2)
     
     if mode == 'scattering':
-        # Unpacking specifically for scattering format
-        *_, current = DataManager_rwg4.load_data(filename_current, scattering=True)
+        *_, current = DataManager_rwg4.load_data(path.mat_current, scattering=True)
     else:
-        # Unpacking specifically for radiation format
-        *_, current, _, _, _, _ = DataManager_rwg4.load_data(filename_current, radiation=True)
+        *_, current, _, _, _, _ = DataManager_rwg4.load_data(path.mat_current, radiation=True)
 
     # 3. Compute surface current density (J)
-    # This assumes J is a vector (Jx, Jy, Jz) for each triangle
     surface_current_density = surface_calculate_current_density(current, triangles, edges, vecteurs_rho)
     
     # 4. Spatial sampling along the Y-axis
-    K = 100 # Number of sampling points
+    K = 100 
     y_min, y_max = np.min(points.points[1, :]), np.max(points.points[1, :])
     y_samples = np.linspace(y_min, y_max, K)
     
-    # Create the coordinates for sampling (assumed centered at X=0, Z=0)
-    # Shape (K, 3)
     sampling_points = np.zeros((K, 3))
     sampling_points[:, 1] = y_samples 
 
-    # 5. Efficient Nearest Neighbor Search using KDTree
-    # Instead of a manual loop, KDTree finds the closest triangle center for all points at once
+    # 5. Efficient Nearest Neighbor Search
     tree = cKDTree(triangles.triangles_center.T)
     _, indices = tree.query(sampling_points)
     
-    # Extract Jx and Jy at the found indices
     X_samples = np.abs(surface_current_density[0, indices])
     Y_samples = np.abs(surface_current_density[1, indices])
 
-    # 6. Smooth Interpolation
-    y_fine = np.linspace(y_min, y_max, 300)
+    # 6. Smooth Interpolation (Using 500 points for high-resolution as in S11 plot)
+    y_fine = np.linspace(y_min, y_max, 500)
     jx_interp = interp1d(y_samples, X_samples, kind='cubic')(y_fine)
     jy_interp = interp1d(y_samples, Y_samples, kind='cubic')(y_fine)
 
-    # 7. Professional Plotting
-    plt.style.use('seaborn-v0_8-whitegrid') # Modern clean style
-    fig, ax = plt.subplots(figsize=(14, 8))
+    # --- 7. Professional Plotting (Aesthetic Match with plot_s11) ---
     
-    ax.plot(y_fine, jx_interp, label=r'$|J_x|$', linewidth=2)
-    ax.plot(y_fine, jy_interp, '--', label=r'$|J_y|$', linewidth=2)
+    # Font Configuration
+    plt.rcParams['font.family'] = 'serif'
+    plt.rcParams['font.serif'] = ['Adelle', 'DejaVu Serif', 'Times New Roman']
     
-    ax.set_title(f'Surface Current Distribution ({mode.capitalize()})', fontsize=14)
-    ax.set_xlabel('Dipole length (m)', fontsize=12)
-    ax.set_ylabel('Current Density (A/m)', fontsize=12)
+    fig, ax = plt.subplots(figsize=(14, 8), dpi=100)
     
-    ax.legend(frameon=True)
-    ax.spines[['top', 'right']].set_visible(False) # Remove unnecessary borders
+    # Plotting lines with S11 color palette
+    # Using #c90f0f (Red) and #2c3e50 (Dark Slate) from your S11 style
+    ax.plot(y_fine, jx_interp, color="#c90f0f", linewidth=2.5, label=r'$|J_x|$', zorder=2)
+    ax.plot(y_fine, jy_interp, color="#2c3e50", linewidth=2.0, linestyle='--', 
+            label=r'$|J_y|$', alpha=0.8, zorder=2)
+    
+    # Labels and Title
+    ax.set_title(f'Surface Current Distribution ({mode.capitalize()})', 
+                 fontsize=15, pad=20, fontweight='bold')
+    ax.set_xlabel('Dipole length (m)', fontsize=13, labelpad=10)
+    ax.set_ylabel('Current Density (A/m)', fontsize=13, labelpad=10)
+    
+    # Subtle grid and spine management (Exact match with plot_s11)
+    ax.grid(True, which='both', linestyle=':', alpha=0.5, color='#bdc3c7')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_axisbelow(True)
+
+    # Legend style
+    ax.legend(frameon=False, fontsize=11)
     
     plt.tight_layout()
     plt.show()

@@ -315,7 +315,7 @@ def define_mesh_by_grid_refined(geo_file_path, grid_coords, sizes_array, backgro
     # 7. Optimize quality
     optimize_mesh()
 
-    gmsh.fltk.run()
+    # gmsh.fltk.run() # Uncomment to see the gmsh view
 
 def get_mesh_centroids(mesh_file_path):
     """

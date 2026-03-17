@@ -245,20 +245,71 @@ def optimize_mesh(dim=2, iterations=3):
 
     print("--- Optimization Complete ---")
 
-def generate_and_save_mesh(geo_filename, msh_filename, initial_mesh_size):
-    gmsh.model.occ.synchronize()
-    gmsh.write(geo_filename)
-    print(f"Geometry file saved in {geo_filename} successfully")
+def generate_and_save_mesh(path=None, initial_mesh_size=1e10, geo_filename=None, msh_filename=None):
+    """
+    Generates a 2D mesh using Gmsh and saves the geometry and mesh files.
 
-    gmsh.model.mesh.setSize(gmsh.model.getEntities(0), initial_mesh_size)
+    This function checks if the required filenames are provided directly
+    or via a path object. If they are missing, it raises a ValueError.
 
-    gmsh.model.mesh.generate(2)
+    Args:
+        geo_filename (str, optional): The name of the geometry file.
+        msh_filename (str, optional): The name of the mesh file.
+        path (object, optional): An object containing .geo and .msh attributes.
+        initial_mesh_size (float, optional): The initial element size for the mesh. Defaults to 1e10.
 
-    optimize_mesh()
+    Raises:
+        ValueError: If the required filenames are not provided.
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
     
-    # gmsh.fltk.run()            # Uncomment to have the gmsh view
-    gmsh.write(msh_filename)
-    print(f"Mesh file saved in {msh_filename} successfully")
+    # Check if a path object is NOT provided
+    if path is None:
+        # Check if either geo_filename or msh_filename is missing
+        if geo_filename is None or msh_filename is None:
+            # Raise an error directly to indicate missing arguments
+            raise ValueError("Both 'geo_filename' and 'msh_filename' must be provided when 'path' is None.")
+    else:
+        # Extract the filenames from the path object's attributes
+        geo_filename = path.geo
+        msh_filename = path.msh
+
+    try:
+        # Synchronize the internal CAD representation with the Gmsh model
+        gmsh.model.occ.synchronize()
+
+        # Write the geometry data to the specified .geo file
+        gmsh.write(geo_filename)
+        print(f"Geometry file saved in {geo_filename} successfully")
+
+        # Retrieve all points (dimension 0) in the model to set their mesh size
+        points = gmsh.model.getEntities(0)
+
+        # Apply the specified initial mesh size to all retrieved points
+        gmsh.model.mesh.setSize(points, initial_mesh_size)
+
+        # Generate a 2D mesh based on the geometry
+        gmsh.model.mesh.generate(2)
+
+        # Call the external function to optimize the generated mesh
+        optimize_mesh()
+        
+        # gmsh.fltk.run()            # Uncomment to have the gmsh view
+
+        # Write the generated mesh data to the specified .msh file
+        gmsh.write(msh_filename)
+        print(f"Mesh file saved in {msh_filename} successfully")
+
+        # Return True to indicate successful execution
+        return True
+
+    except Exception as e:
+        # Catch any exceptions raised by Gmsh and print the error message
+        print(f"An error occurred during mesh generation: {e}")
+        # Return False to indicate failure
+        return False
 
 def create_hollow_sphere(radius=1.0, mesh_size=0.055, save_msh_file='data/gmsh_files/hollow_sphere.msh'):
     """
@@ -299,6 +350,6 @@ def create_hollow_sphere(radius=1.0, mesh_size=0.055, save_msh_file='data/gmsh_f
     gmsh.write(save_msh_file)
 
     # Launch the GUI to visualize
-    gmsh.fltk.run()
+    # gmsh.fltk.run()
 
     gmsh.finalize()
