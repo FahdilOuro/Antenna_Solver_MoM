@@ -93,3 +93,77 @@ def impedance_matrice_z(edges_data, triangles_data, barycentric_triangles_data, 
             update(position, vecteur_rho_barycentric_minus, -1)
 
     return matrice_z
+
+def rwg_gram_matrix(edges_data, triangles_data, vecteurs_rho_data):
+    """
+    Assembles the global Gram matrix G using NumPy vectorization.
+    
+    This function pre-calculates triangle-edge connectivity and uses Einstein 
+    summation to compute the 9-point quadrature integral efficiently.
+    """
+    num_edges = edges_data.total_number_of_edges
+    num_tri = triangles_data.total_of_triangles
+    G_global = np.zeros((num_edges, num_edges), dtype=np.float64)
+
+    # --- Step 1: Pre-calculate connectivity (Triangle to Edges mapping) ---
+    # This replaces the slow 'for e_idx in range(num_edges)' inside the triangle loop.
+    tri_to_edges = [[] for _ in range(num_tri)]
+    tri_edge_sides = [[] for _ in range(num_tri)]
+    
+    for e_idx in range(num_edges):
+        tp = triangles_data.triangles_plus[e_idx]
+        tm = triangles_data.triangles_minus[e_idx]
+        if tp != -1:
+            tri_to_edges[tp].append(e_idx)
+            tri_edge_sides[tp].append('plus')
+        if tm != -1:
+            tri_to_edges[tm].append(e_idx)
+            tri_edge_sides[tm].append('minus')
+
+    print(f"Starting vectorized G calculation for {num_tri} triangles...")
+
+    # --- Step 2: Main loop over triangles ---
+    for tri_idx in range(num_tri):
+        area = triangles_data.triangles_area[tri_idx]
+        edges_in_tri = tri_to_edges[tri_idx]
+        sides_in_tri = tri_edge_sides[tri_idx]
+        n_local      = len(edges_in_tri)
+        
+        if not edges_in_tri:
+            continue
+
+        # Get lengths for the 3 edges of the current triangle
+        l_local = edges_data.edges_length[edges_in_tri] # Shape: (3,)
+        
+        # --- Step 3: Vectorized Rho Extraction ---
+        # We extract all rho vectors for the 3 edges at once.
+        # Original shape is (3, 9, N_edges) -> We want (3_edges, 9_points, 3_coords)
+        rho_local = np.zeros((n_local, 9, 3), dtype=np.float64)
+        
+        for i, (e_idx, side) in enumerate(zip(edges_in_tri, sides_in_tri)):
+            if side == 'plus':
+                # Slicing (3, 9, e_idx) and transposing to (9, 3)
+                rho_local[i] = vecteurs_rho_data.vecteur_rho_barycentric_plus[:, :, e_idx].T
+            else:
+                rho_local[i] = vecteurs_rho_data.vecteur_rho_barycentric_minus[:, :, e_idx].T
+
+        g_block = np.zeros((n_local, n_local), dtype=np.float64)
+        
+        for i in range(n_local):
+            for j in range(i, n_local):          # j >= i  →  upper triangle + diagonal
+                # Sum dot products over the 9 quadrature points
+                # dot_ij = np.dot(rho_local[i].ravel(), rho_local[j].ravel()) # Equivalent to: 
+                dot_ij = np.einsum('kd,kd->', rho_local[i], rho_local[j])
+
+                val = (l_local[i] * l_local[j] / (36.0 * area)) * dot_ij
+
+                g_block[i, j]  = val
+                g_block[j, i]  = val   # symmetry: free copy, no recomputation
+
+        # --- Step 5: Assemble into global matrix ---
+        G_global[np.ix_(edges_in_tri, edges_in_tri)] += g_block
+
+        if tri_idx % 100 == 0:
+            print(f"  Processed {tri_idx}/{num_tri} triangles...")
+
+    return G_global
