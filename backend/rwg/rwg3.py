@@ -43,7 +43,7 @@ def calculate_z_matrice(triangles, edges, barycentric_triangles, vecteurs_rho, f
     factor_fi = factor * edges.edges_length * constant_2                     # Factor for scalar potential
 
     # Impedance matrix calculation
-    matrice_z = impedance_matrice_z(edges, triangles, barycentric_triangles, vecteurs_rho, complexe_k, factor_a, factor_fi)
+    matrice_z = impedance_matrix_z(edges, triangles, barycentric_triangles, vecteurs_rho, complexe_k, factor_a, factor_fi)
 
     return omega, mu, epsilon, light_speed_c, eta, matrice_z
 
@@ -137,7 +137,7 @@ def calculate_z_matrice_lumped_elements(points, triangles, edges, barycentric_tr
     factor_fi = factor * edges.edges_length * constant_2                     # Scalar potential factor
 
     # Compute impedance matrix
-    matrice_z = impedance_matrice_z(edges, triangles, barycentric_triangles, vecteurs_rho, complexe_k, factor_a, factor_fi)
+    matrice_z = impedance_matrix_z(edges, triangles, barycentric_triangles, vecteurs_rho, complexe_k, factor_a, factor_fi)
 
     # Lumped impedance implementation
     LoadPoint = LoadPoint.T  # (3, LNumber)

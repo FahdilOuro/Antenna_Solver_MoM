@@ -6,6 +6,8 @@ from scipy.io import savemat, loadmat
 from backend.rwg.rwg2 import DataManager_rwg2
 from backend.rwg.rwg3 import DataManager_rwg3
 from backend.utils.gap_source import *
+from backend.utils.impmet import rwg_gram_matrix
+from backend.utils.lossy_electric_conductor import calculate_normal_surface_impedance
 
 
 # Definition of the incident field
@@ -86,7 +88,8 @@ def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incid
 
     return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current
 
-def calculate_current_radiation(path, feed_point, voltage_amplitude, excitation_unit_vector=None, gap_width=0.05, voltage_phase=None):
+def calculate_current_radiation(path, feed_point, voltage_amplitude, 
+                                excitation_unit_vector=None, gap_width=0.05, voltage_phase=None, lossy_conductor=False, impedance_zs=None):
     """
     Calculates the currents, input impedance, and radiated power for one or multiple antenna ports.
 
@@ -122,8 +125,14 @@ def calculate_current_radiation(path, feed_point, voltage_amplitude, excitation_
         excitation_unit_vector, gap_width, voltage_phase
     )
 
-    # 2. Solve the linear system (Z * I = V)
-    current = np.linalg.solve(matrice_z, voltage)
+    if lossy_conductor:
+        Gram_rwg = rwg_gram_matrix(edges, triangles, vecteurs_rho)
+        Z_material = impedance_zs * Gram_rwg
+        Z_lossy = matrice_z + Z_material
+        current = np.linalg.solve(Z_lossy, voltage)
+    else:
+        # 2. Solve the linear system (Z * I = V)
+        current = np.linalg.solve(matrice_z, voltage)
 
     # 3. Process each port to calculate specific metrics
     feed_points_2d = np.atleast_2d(feed_point)

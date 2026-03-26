@@ -8,7 +8,7 @@ from backend.utils.gmsh_function import *
 
 
 def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excitation_unit_vector=None, gap_width=0.05, voltage_phase=None,
-                        show=True, save_image=False,
+                        show=True, save_image=False, lossy_conductor=False, conductivity_conductor=None,
                         load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None):
     
     if (not load_lumped_elements and (LoadPoint is not None or LoadValue is not None or LoadDir is not None)) or \
@@ -70,10 +70,17 @@ def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excita
     # Save impedance data
     DataManager_rwg3.save_data(path, frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z)
     
-    '''frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current, gap_current, source_voltage, impedance, feed_power = \
-    calculate_current_radiation(path, feed_point, voltage_amplitude, excitation_unit_vector, gap_width, voltage_phase)'''
+    if lossy_conductor:
+        if conductivity_conductor is not None:
+            impedance_zs = calculate_normal_surface_impedance(frequency, conductivity_conductor)
+        else:
+            raise ValueError("You should give a value for the conductivity. Should not be None")
+        print(f"Conductor (Non-magnetic, mu_r=1): {impedance_zs:.4f} Ohms")
+    else:
+        impedance_zs = None
+    
     frequency, voltage, current, port_results = \
-    calculate_current_radiation(path, feed_point, voltage_amplitude, excitation_unit_vector, gap_width, voltage_phase)
+    calculate_current_radiation(path, feed_point, voltage_amplitude, excitation_unit_vector, gap_width, voltage_phase, lossy_conductor, impedance_zs)
 
     # Extract port-specific data into numpy arrays for structured saving
     # This converts the list of dictionaries into clean vectors

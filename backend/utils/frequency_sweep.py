@@ -6,6 +6,7 @@ from scipy.interpolate import make_interp_spline
 import os
 
 from backend.src.radiation_algorithm.radiation_algorithm import radiation_algorithm
+from backend.efield.efield2 import load_gain_power_data, radiation_intensity_distribution_over_sphere_surface
 
 
 def generate_freq_step(fLow, fHigh, step=2e6):
@@ -59,8 +60,9 @@ def generate_freq_step(fLow, fHigh, step=2e6):
     savemat(path.mat_freq_sweep, data_to_save)'''
 
 def frequency_sweep(path, freq_start, freq_stop, feed_point, step=2e6, voltage_amplitude=1,
-                    excitation_unit_vector=None, gap_width=0.05, voltage_phase=None, load_lumped_elements=False,
-                    LoadPoint=None, LoadValue=None, LoadDir=None, Z0=50, show=False):
+                    excitation_unit_vector=None, gap_width=0.05, voltage_phase=None, 
+                    compute_radiation_intensity=False,
+                    load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None, Z0=50, show=False):
     """
     Performs a frequency sweep and calculates multi-port parameters (Zin, Snn, Power).
     
@@ -79,11 +81,12 @@ def frequency_sweep(path, freq_start, freq_stop, feed_point, step=2e6, voltage_a
     num_ports = feed_points_2d.shape[0]
     
     # Initialize storage lists
-    all_s11_db = []
-    all_impedances = []
-    all_current_vectors = []
-    all_gap_currents = []
-    all_feed_powers = []
+    all_s11_db           = []
+    all_impedances       = []
+    all_current_vectors  = []
+    all_gap_currents     = []
+    all_feed_powers      = []
+    all_efficiency_total = []
 
     # Frequency setup
     frequencies = generate_freq_step(freq_start, freq_stop, step)
@@ -141,12 +144,19 @@ def frequency_sweep(path, freq_start, freq_stop, feed_point, step=2e6, voltage_a
         s11 = (gap_Z_arr - Z0) / (gap_Z_arr + Z0)
         s11_db = 20 * np.log10(np.abs(s11))
 
-        # 4. Store step results
+        if compute_radiation_intensity:
+            # 4: Distribution of radiation intensity over a sphere
+            print("Calculating radiation intensity distribution over sphere surface...")
+            radiation_intensity_distribution_over_sphere_surface(path, show=False)
+            efficiency_total = load_gain_power_data(path.mat_gain_power)[-1]
+
+        # 5. Store step results
         all_s11_db.append(s11_db)
         all_impedances.append(gap_Z_arr)
         all_gap_currents.append(np.atleast_1d(gap_I))
         all_feed_powers.append(np.atleast_1d(gap_P))
         all_current_vectors.append(current_vec)
+        all_efficiency_total.append(efficiency_total)
 
         # Dynamic progress print for each frequency
         # Handles both scalar and array results for display
@@ -162,7 +172,8 @@ def frequency_sweep(path, freq_start, freq_stop, feed_point, step=2e6, voltage_a
         's11_db': np.array(all_s11_db),
         'gap_currents': np.array(all_gap_currents),
         'feed_powers': np.array(all_feed_powers),
-        'current_vectors': np.array(all_current_vectors, dtype=object)
+        'current_vectors': np.array(all_current_vectors, dtype=object),
+        'efficiencies_total': np.array(all_efficiency_total)
     }
 
     savemat(path.mat_freq_sweep, data_to_save)
@@ -178,89 +189,6 @@ def load_freq_sweep_data(filepath):
     feed_powers = data.get('feed_powers', np.array([])).squeeze()
 
     return frequencies, impedances, s11_db, currents, gap_currents, feed_powers
-
-def plot_s11(path, freq_unit='MHz', interpolation_threshold=50,
-                     save_pdf=False, save_folder=None):
-    """
-    Plots the S11 parameter with Adelle font, spline interpolation, 
-    and optional PDF export capability.
-
-    Args:
-        path: Object containing path.mat_freq_sweep.
-        freq_unit: Frequency unit ('Hz', 'kHz', 'MHz', 'GHz').
-        interpolation_threshold: Min points to trigger cubic spline smoothing.
-        save_pdf: Boolean, if True saves the figure as a PDF file.
-        save_folder: Directory path where the PDF will be stored.
-    """
-    # Load simulation data
-    frequencies, _, s11_db, _, _, _ = load_freq_sweep_data(path.mat_freq_sweep)
-    
-    # Unit conversion
-    unit_factors = {'Hz': 1, 'kHz': 1e3, 'MHz': 1e6, 'GHz': 1e9}
-    freq_divisor = unit_factors.get(freq_unit, 1e6)
-    freq_converted = frequencies / freq_divisor
-
-    # --- Font Configuration (Adelle) ---
-    # Attempt to use Adelle if installed, fallback to serif
-    plt.rcParams['font.family'] = 'serif'
-    plt.rcParams['font.serif'] = ['Adelle', 'DejaVu Serif', 'Times New Roman']
-    
-    fig, ax = plt.subplots(figsize=(10, 6), dpi=100)
-    
-    # --- Interpolation Logic ---
-    if len(freq_converted) > interpolation_threshold:
-        print("Interpolation Applied")
-        # Create a smooth curve using 500 points for high-resolution rendering
-        freq_smooth = np.linspace(freq_converted.min(), freq_converted.max(), 500)
-        spline = make_interp_spline(freq_converted, s11_db, k=3)
-        s11_smooth = spline(freq_smooth)
-        
-        ax.plot(freq_smooth, s11_smooth, color="#c90f0f", linewidth=2.5, 
-                label=r'$S_{11}$ Interpolated', zorder=2)
-        # Add discrete points with low opacity to show raw data
-        # ax.scatter(freq_converted, s11_db, color='#2c3e50', s=15, alpha=0.3, zorder=3)
-    else:
-        ax.plot(freq_converted, s11_db, marker='o', markersize=5, color='#2c3e50', 
-                linewidth=1.5, markerfacecolor='white', label=r'$S_{11}$ Data')
-
-    # --- Aesthetic Styling ---
-    # ax.set_title(r'$S_{11}$ Parameter vs Frequency', fontsize=16, pad=20, fontweight='bold')
-    ax.set_xlabel(f'Frequency ({freq_unit})', fontsize=13, labelpad=10)
-    ax.set_ylabel(r'$S_{11}$ (dB)', fontsize=13, labelpad=10)
-    
-    # Threshold line at -10 dB
-    ax.axhline(-10, color="#2825e7", linestyle='--', linewidth=1.2, 
-               label='Return Loss Limit (-10 dB)', alpha=0.9)
-    
-    # Subtle grid and spine management
-    ax.grid(True, which='both', linestyle=':', alpha=0.5, color='#bdc3c7')
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.set_axisbelow(True)
-
-    ax.legend(frameon=False, fontsize=10)
-    
-    plt.tight_layout()
-
-    # --- PDF Export Logic ---
-    if save_pdf:
-        # Determine the destination folder: default to the .mat file directory if not provided
-        if save_folder is None:
-            save_folder = os.path.dirname(path.mat_freq_sweep)
-        
-        # Ensure the directory exists
-        os.makedirs(save_folder, exist_ok=True)
-        
-        # Construct the filename using the path name attribute
-        # We use os.path.join to safely merge the folder path and the filename
-        pdf_filename = f"S11_Sweep_Result_{path.name}.pdf"
-        full_save_path = os.path.join(save_folder, pdf_filename)
-        
-        # Save with high quality and vector format
-        plt.savefig(full_save_path, format='pdf', bbox_inches='tight')
-        print(f"Graph successfully saved to: {full_save_path}")
-
-    plt.show()
 
 def plot_s_parameters(path, port_idx=None, freq_unit='MHz', interpolation_threshold=50,
                       save_pdf=False, save_folder=None):
@@ -364,5 +292,97 @@ def plot_s_parameters(path, port_idx=None, freq_unit='MHz', interpolation_thresh
         
         plt.savefig(full_save_path, format='pdf', bbox_inches='tight')
         print(f"Figure exported to: {full_save_path}")
+
+    plt.show()
+
+def plot_radiation_efficiency(path, freq_unit='MHz', interpolation_threshold=50, 
+                    save_pdf=False, save_folder=None):
+    """
+    Plots the total efficiency over frequency with a professional aesthetic style.
+
+    Args:
+        path: Object containing path.mat_freq_sweep.
+        freq_unit: Frequency unit ('Hz', 'kHz', 'MHz', 'GHz').
+        interpolation_threshold: Min points to trigger cubic spline smoothing.
+        save_pdf: Boolean, if True saves the figure as a PDF file.
+        save_folder: Directory path where the PDF will be stored.
+    """
+    # 1. Load simulation data from MATLAB file
+    try:
+        data = loadmat(path.mat_freq_sweep)
+        frequencies = data['frequencies'].flatten()
+        # Ensure the key matches your data_to_save dictionary
+        efficiency_total = data['efficiencies_total'].flatten()
+    except KeyError as e:
+        print(f"Error: Key {e} not found in {path.mat_freq_sweep}. Check your save dictionary.")
+        return
+
+    # 2. Frequency unit conversion
+    unit_factors = {'Hz': 1, 'kHz': 1e3, 'MHz': 1e6, 'GHz': 1e9}
+    freq_divisor = unit_factors.get(freq_unit, 1e6)
+    freq_converted = frequencies / freq_divisor
+
+    # Convert efficiency to percentage if it's in decimal format (0-1)
+    if np.max(efficiency_total) <= 1.01:
+        efficiency_total = efficiency_total * 100
+
+    # --- Font & Style Configuration ---
+    plt.rcParams['font.family'] = 'serif'
+    plt.rcParams['font.serif'] = ['Adelle', 'DejaVu Serif', 'Times New Roman']
+    
+    fig, ax = plt.subplots(figsize=(12, 7), dpi=100)
+    
+    # Using a professional deep blue for efficiency plots
+    main_color = "#2980b9" 
+
+    # 3. Plotting Logic (Spline vs Linear)
+    if len(freq_converted) > interpolation_threshold:
+        # High-resolution cubic spline for smooth visualization
+        freq_smooth = np.linspace(freq_converted.min(), freq_converted.max(), 500)
+        spline = make_interp_spline(freq_converted, efficiency_total, k=3)
+        eff_smooth = spline(freq_smooth)
+        
+        # Clip values to ensure they don't exceed 100% due to spline overshoot
+        eff_smooth = np.clip(eff_smooth, 0, 100)
+        
+        ax.plot(freq_smooth, eff_smooth, color=main_color, linewidth=2.5, 
+                label='Total Efficiency (Interp.)', zorder=2)
+    else:
+        ax.plot(freq_converted, efficiency_total, marker='s', markersize=5, 
+                color=main_color, linewidth=1.5, markerfacecolor='white', 
+                label='Total Efficiency Data')
+
+    # --- Aesthetic Styling ---
+    ax.set_xlabel(f'Frequency ({freq_unit})', fontsize=13, labelpad=10)
+    ax.set_ylabel('Total Efficiency (%)', fontsize=13, labelpad=10)
+    
+    # Set Y-axis limits for percentage
+    ax.set_ylim(0, 105) 
+    
+    # Reference lines (e.g., 50% and 90% benchmarks)
+    ax.axhline(90, color="#27ae60", linestyle='--', linewidth=1, alpha=0.4, label='High Efficiency (90%)')
+    ax.axhline(50, color="#e67e22", linestyle='--', linewidth=1, alpha=0.4)
+    
+    # Grid and Spines styling
+    ax.grid(True, which='both', linestyle=':', alpha=0.5, color='#bdc3c7')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_axisbelow(True)
+
+    ax.legend(frameon=False, fontsize=10, loc='lower right')
+    
+    plt.tight_layout()
+
+    # --- PDF Export ---
+    if save_pdf:
+        if save_folder is None:
+            save_folder = os.path.dirname(path.mat_freq_sweep)
+        os.makedirs(save_folder, exist_ok=True)
+        
+        pdf_filename = f"Efficiency_Total_{path.name}.pdf"
+        full_save_path = os.path.join(save_folder, pdf_filename)
+        
+        plt.savefig(full_save_path, format='pdf', bbox_inches='tight')
+        print(f"Efficiency plot exported to: {full_save_path}")
 
     plt.show()

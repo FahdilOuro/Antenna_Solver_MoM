@@ -21,7 +21,7 @@
 """
 import numpy as np
 
-def impedance_matrice_z(edges_data, triangles_data, barycentric_triangles_data, vecteurs_rho_data, parameter_k, factor_a, factor_fi):
+def impedance_matrix_z(edges_data, triangles_data, barycentric_triangles_data, vecteurs_rho_data, parameter_k, factor_a, factor_fi):
     """
     Calculates the impedance matrix Z for the interactions between the edges of the mesh.
 
@@ -162,8 +162,5 @@ def rwg_gram_matrix(edges_data, triangles_data, vecteurs_rho_data):
 
         # --- Step 5: Assemble into global matrix ---
         G_global[np.ix_(edges_in_tri, edges_in_tri)] += g_block
-
-        if tri_idx % 100 == 0:
-            print(f"  Processed {tri_idx}/{num_tri} triangles...")
 
     return G_global

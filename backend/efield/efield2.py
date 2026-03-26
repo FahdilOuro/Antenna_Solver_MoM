@@ -286,11 +286,13 @@ def compute_total_radiated_power(sphere_points, sphere_triangles, eta, complex_k
         
     return total_power, u_triangles
 
-def compute_antenna_efficiency_metrics(mode, total_power, gap_current, voltage_amplitude):
+'''def compute_antenna_efficiency_metrics(mode, total_power, gap_current, voltage_amplitude):
     """
     Calculate and display the radiation resistance and total efficiency if in radiation mode.
     """
     efficiency_total = 0
+
+    print(f"gap_current : {gap_current}")
     
     if mode == 'radiation':
         # Safely extract the gap current absolute value
@@ -300,13 +302,54 @@ def compute_antenna_efficiency_metrics(mode, total_power, gap_current, voltage_a
             # Calculate metrics
             rad_resistance = 2 * total_power / gap_current_val**2
             p_in = 0.5 * voltage_amplitude * gap_current_val
+            if total_power / p_in > 1.0:
+                print("efficiency > 1 !!! Abnormal")
             efficiency_total = min(total_power / p_in, 1.0) if p_in > 0 else 0
             
             # Print results to console
             print(f"  Radiation Resistance : {rad_resistance:.4f} Ohms")
             print(f"  Total Efficiency : {efficiency_total*100:.2f} %")
             
-    return efficiency_total
+    return efficiency_total'''
+
+def compute_antenna_efficiency_metrics(total_power, gap_current, voltage_amplitude):
+    """
+    Calculates the radiation efficiency of the antenna.
+    
+    Args:
+        total_power: Radiated power (Watts) obtained from far-field integration.
+        gap_current: Complex current at the feed point (Amperes).
+        voltage_amplitude: Peak voltage amplitude at the feed (Volts).
+        
+    Returns:
+        float: Radiation efficiency (between 0 and 1).
+    """
+    # 1. Calculate the Accepted Power (Active Power)
+    # Formula: P_acc = 0.5 * Re(V * conj(I))
+    # We use the conjugate of the current to get the real part of the complex power.
+    p_accepted = 0.5 * np.real(voltage_amplitude * np.conj(gap_current))
+    
+    # 2. Safety check for very low power to avoid division by zero
+    if p_accepted <= 1e-15:
+        return 0.0
+    
+    # 3. Efficiency calculation
+    efficiency_rad = total_power / p_accepted
+
+    print(f"  Total Efficiency : {efficiency_rad}")
+    
+    # 4. Numerical stability handling
+    # If efficiency is slightly > 1 due to numerical noise in far-field integration,
+    # we cap it at 1.0 and issue a small warning.
+    if efficiency_rad > 1.0:
+        if efficiency_rad > 1.00: # Warning only if the error is significant (>5%)
+             print(f"  Warning: Numerical noise detected. Raw efficiency: {efficiency_rad*100:.2f}%")
+        efficiency_rad = 1.0
+
+    # Print results to console
+    print(f"  Total Efficiency : {efficiency_rad*100:.2f} %")
+    
+    return efficiency_rad
 
 def render_and_save_pattern(show, save_image, sphere_points_update, sphere_triangles, gain_points_db, plot_title, pdf_filename):
     """
@@ -340,7 +383,7 @@ def radiation_intensity_distribution_over_sphere_surface(path, mode='radiation',
 
     # 1. Load data and setup parameters
     sphere_points, sphere_triangles, frequency, light_speed_c, eta, complex_k, dipole_center, dipole_moment, gap_current = load_and_prepare_antenna_data(path, mode)
-    print(f"Frequency = {frequency:.2e} Hz | Wavelength lambda = {light_speed_c / frequency:.4f} m")
+    # print(f"Frequency = {frequency:.2e} Hz | Wavelength lambda = {light_speed_c / frequency:.4f} m")
 
     # 2. Calculate Total Radiated Power
     total_power, u_triangles = compute_total_radiated_power(sphere_points, sphere_triangles, eta, complex_k, dipole_moment, dipole_center)
@@ -353,7 +396,7 @@ def radiation_intensity_distribution_over_sphere_surface(path, mode='radiation',
     print(f"  Total Radiated Power : {total_power:.4f} W")
     print(f"  Max Gain : {gain_linear_max:.4f} ({gain_logarithmic_max:.2f} dBi)")
 
-    efficiency_total = compute_antenna_efficiency_metrics(mode, total_power, gap_current, voltage_amplitude)
+    efficiency_total = compute_antenna_efficiency_metrics(total_power, gap_current, voltage_amplitude)
 
     # Save calculated metrics
     save_gain_power_data(path.mat_gain_power, total_power, gain_linear_max, gain_logarithmic_max, efficiency_total)
@@ -416,7 +459,7 @@ def polar_circular_gain_distribution_over_sphere(path, polar_type='RHCP', mode='
     print(f"Total Power : {total_power:.4f} W")
     print(f"Max {polar_type} Gain : {gain_logarithmic_max:.4f} dBic")
 
-    efficiency_total = compute_antenna_efficiency_metrics(mode, total_power, gap_current, voltage_amplitude)
+    efficiency_total = compute_antenna_efficiency_metrics(total_power, gap_current, voltage_amplitude)
 
     # Save calculated metrics
     path_mat_polar_gain_power = path.mat_polar_rhcp_gain_power if polar_type.upper() == 'RHCP' else path.mat_polar_lhcp_gain_power
