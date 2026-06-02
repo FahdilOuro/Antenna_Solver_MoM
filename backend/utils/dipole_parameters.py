@@ -75,7 +75,7 @@ def compute_e_h_field(observation_point, eta, complex_k, dipole_moment, dipole_c
     h_field_total = np.sum(h_field, axis=1)
 
     # Compute the Poynting vector (power density carried by the EM waves)
-    poynting_vector = np.real(0.5 * (np.cross(e_field_total.flatten(), np.conj(h_field_total).flatten())))
+    poynting_vector = 0.5 * np.real((np.cross(e_field_total.flatten(), np.conj(h_field_total).flatten())))
 
     # Norm of the observation point position
     norm_observation_point = np.linalg.norm(observation_point)

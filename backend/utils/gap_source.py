@@ -46,7 +46,7 @@ def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed
     total_voltage_vector = np.zeros(num_edges, dtype=complex)
     
     # This list will store the indices of feeding edges for each port
-    all_feeding_indices = []
+    all_feeding_edges = []
     
     threshold = gap_width / 2
     axis_map = {'x': 0, 'y': 1, 'z': 2}
@@ -71,8 +71,8 @@ def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed
 
         # Mesh density check
         if np.min(dist_p) > threshold and np.min(dist_n) > threshold:
-            print(f"Warning: Port {i} has no nearby centroids. Storing empty indices.")
-            all_feeding_indices.append(np.array([], dtype=int))
+            print(f"Warning: Port {i} has no nearby centroids. Storing empty edges.")
+            all_feeding_edges.append(np.array([], dtype=int))
             continue
 
         # Windowing (Equation 7)
@@ -83,10 +83,10 @@ def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed
         # Save indices for this specific port
         # We find indices where at least one window function is active (non-zero)
         port_indices = np.where((window_p > 0) | (window_n > 0))[0]
-        all_feeding_indices.append(port_indices)
+        all_feeding_edges.append(port_indices)
 
         # Apply Equation (7) and add to global vector
         common_factor = (l_m * v_complex) / (2 * gap_width)
         total_voltage_vector += common_factor * (window_p * rho_p_ax + window_n * rho_n_ax)
 
-    return total_voltage_vector, all_feeding_indices
+    return total_voltage_vector, all_feeding_edges

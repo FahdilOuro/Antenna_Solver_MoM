@@ -246,7 +246,7 @@ def load_and_prepare_antenna_data(path, mode):
         frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(path.mat_current, scattering=True)
         gap_current = 0
     elif mode == 'radiation':
-        frequency, omega, _, _, light_speed_c, eta, _, current, _, gap_current, *_ = DataManager_rwg4.load_data(path.mat_current, radiation=True)
+        frequency, omega, _, _, light_speed_c, eta, _, current, gap_current, *_ = DataManager_rwg4.load_data(path.mat_current, radiation=True)
     else:
         raise ValueError("Mode must be either 'radiation' or 'scattering'.")
     
