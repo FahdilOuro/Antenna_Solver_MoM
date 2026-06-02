@@ -132,6 +132,8 @@ credentials.json
 secrets.ini
 config.ini
 .local.ini
+Analyse.md
+CLAUDE.md
 
 # =============================================
 # Performance profiling and analysis

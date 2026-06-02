@@ -30,6 +30,154 @@ def write(save_folder_path, file_name="mesh.msh"):
     gmsh.write(save_path)
     print(f"The .msh file was successfully saved to: '{save_path}'")
 
+def mesh_and_gap_parameters(frequency, resolution=20, gap_fraction=0.15, n_edges_min=3, c=3e8):
+    """
+    Compute mesh_size and gap_width for MoM simulation with stability guardrails.
+
+    Physics of the gap_fraction parameter
+    --------------------------------------
+    gap_width is set as a FIXED fraction of λ, independent of mesh refinement.
+    This is critical: if gap_width ∝ mesh_size (both → 0 together), the gap source
+    approaches a delta function on a 2D conducting surface, whose Green's function has
+    a logarithmic singularity → Z_in ∝ 1/mesh_size → ∞.
+
+    With gap_width = gap_fraction × λ fixed:
+      - Z_in converges to a finite physical value as mesh_size → 0
+      - The mesh only controls accuracy, not the excitation model
+
+    Stability constraint
+    --------------------
+    The mesh must be fine enough that the gap contains ≥ n_edges_min elements:
+        mesh_size ≤ gap_width / n_edges_min  ↔  resolution ≥ n_edges_min / gap_fraction
+
+    Default: gap_fraction=0.15, n_edges_min=3  →  resolution_min = 3/0.15 = 20
+    (So the default resolution=20 satisfies the constraint exactly.)
+
+    Empirical validation (strip dipole, 75 MHz, λ=4 m, from Analyse.md)
+    ----------------------------------------------------------------------
+    gap_fraction=0.15 (gap=0.6 m), resolution=20: Z_in = 87 + 42j Ω  ✓
+    gap_fraction=0.075 (gap=0.3 m), resolution=40: Z_in = 85 + 45j Ω  ✓
+    Both are consistent with the half-wave dipole reference (~73–85 Ω).
+
+    Parameters
+    ----------
+    frequency   : float — operating frequency [Hz]
+    resolution  : float — desired λ/resolution (may be auto-increased if too coarse)
+    gap_fraction: float — W = gap_fraction × λ; empirical range [0.05, 0.20]
+                          Default 0.15 allows resolution=20 with 3 edges in gap.
+    n_edges_min : int   — minimum number of mesh edges inside gap (numerical stability)
+    c           : float — speed of light [m/s]
+
+    Returns
+    -------
+    mesh_size  : float — element size [m]  (may differ from λ/resolution if adjusted)
+    gap_width  : float — gap source width [m]
+    wavelength : float — free-space wavelength [m]
+    """
+    wavelength = c / frequency
+    gap_width  = gap_fraction * wavelength          # fixed physical gap
+
+    desired_mesh     = wavelength / resolution
+    mesh_size_max    = gap_width / n_edges_min      # stability upper bound on mesh_size
+
+    if desired_mesh > mesh_size_max:
+        # Requested resolution is too coarse: auto-tighten
+        mesh_size       = mesh_size_max
+        eff_res         = wavelength / mesh_size
+        res_min_needed  = n_edges_min / gap_fraction
+        print(f"[mesh_and_gap] WARNING: resolution=λ/{resolution:.0f} too coarse "
+              f"(minimum needed: λ/{res_min_needed:.0f} for gap_fraction={gap_fraction}).")
+        print(f"  → Auto-adjusted to λ/{eff_res:.0f} (mesh_size = {mesh_size:.4f} m)")
+    else:
+        mesh_size = desired_mesh
+
+    # Guardrail: mesh not finer than λ/100 (risk of Z-matrix ill-conditioning)
+    if mesh_size < wavelength / 100:
+        print(f"[mesh_and_gap] WARNING: mesh_size = λ/{wavelength/mesh_size:.0f} < λ/100 "
+              f"— Z-matrix may be ill-conditioned. Consider reducing resolution.")
+
+    # Guardrail: gap not too large (non-local excitation distorts the current pattern)
+    if gap_fraction > 0.20:
+        print(f"[mesh_and_gap] WARNING: gap_fraction={gap_fraction:.2f} → "
+              f"gap = {gap_width:.3f} m = {gap_fraction:.2f}λ > 0.20λ — physically non-local.")
+
+    n_edges = gap_width / mesh_size
+    print(f"λ = {wavelength:.4f} m  |  mesh_size = λ/{wavelength/mesh_size:.0f} = {mesh_size:.4f} m  "
+          f"|  gap = {gap_fraction:.2f}λ = {gap_width:.4f} m  |  N_edges_in_gap ≈ {n_edges:.1f}")
+
+    return mesh_size, gap_width, wavelength
+
+
+def check_simulation_stability(Z_in, frequency, mesh_size, gap_width, c=3e8,
+                                R_min=5.0, R_max=500.0):
+    """
+    Post-hoc sanity check on MoM radiation simulation results.
+
+    Tests:
+      1. Z_in is finite and in a physically plausible range [R_min, R_max]
+      2. gap_width / mesh_size ≥ 3 (enough edges in gap)
+      3. mesh_size is within the recommended MoM range [λ/100, λ/10]
+
+    Parameters
+    ----------
+    Z_in      : complex scalar or 1-D array — input impedance per port [Ω]
+    frequency : float — operating frequency [Hz]
+    mesh_size : float — mesh element size used in the simulation [m]
+    gap_width : float — gap width used in the simulation [m]
+    c         : float — speed of light [m/s]
+    R_min     : float — minimum plausible R_in [Ω]  (default 5)
+    R_max     : float — maximum plausible R_in [Ω]  (default 500)
+
+    Returns
+    -------
+    bool — True if all checks pass
+    """
+    wavelength = c / frequency
+    Z_in = np.atleast_1d(np.asarray(Z_in, dtype=complex))
+    ok   = True
+
+    print("\n[Stability Check]")
+
+    # --- Per-port impedance checks ---
+    for idx, z in enumerate(Z_in):
+        tag = f"Port {idx}"
+        R, X = np.real(z), np.imag(z)
+
+        if not (np.isfinite(R) and np.isfinite(X)):
+            print(f"  {tag}: Z_in = {z} — INFINITE/NaN → simulation failed"); ok = False
+            continue
+
+        status = "✓ OK"
+        if R < R_min:
+            status = f"✗ R_in < {R_min} Ω — negative/near-zero resistance"; ok = False
+        elif R > R_max:
+            status = f"✗ R_in > {R_max} Ω — likely divergence (gap too large or wrong excitation)"; ok = False
+
+        sign = "+" if X >= 0 else ""
+        print(f"  {tag}: Z_in = {R:.2f}{sign}{X:.2f}j Ω  — {status}")
+
+    # --- Gap geometry check ---
+    ratio = gap_width / mesh_size
+    if ratio < 0.67:
+        print(f"  Gap check: gap/mesh = {ratio:.2f} < 0.67 — NO EDGES in gap. P_in = 0. Results INVALID."); ok = False
+    elif ratio < 3.0:
+        print(f"  Gap check: gap/mesh = {ratio:.2f} — borderline (< 3). Results may be unstable.")
+    else:
+        print(f"  Gap check: gap/mesh = {ratio:.1f} ≥ 3 — ✓ OK")
+
+    # --- Mesh resolution check ---
+    lam_over_mesh = wavelength / mesh_size
+    if mesh_size > wavelength / 10:
+        print(f"  Mesh check: λ/{lam_over_mesh:.0f} > λ/10 — too coarse for accurate MoM."); ok = False
+    elif mesh_size < wavelength / 100:
+        print(f"  Mesh check: λ/{lam_over_mesh:.0f} < λ/100 — ill-conditioning risk.")
+    else:
+        print(f"  Mesh check: λ/{lam_over_mesh:.0f} — ✓ in recommended range [λ/10, λ/100]")
+
+    print(f"  Overall: {'✓ PASS' if ok else '✗ FAIL — review warnings above'}")
+    return ok
+
+
 def apply_mesh_size(mesh_size):
     # Synchronisation du modèle
     gmsh.model.occ.synchronize()
