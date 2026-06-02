@@ -41,9 +41,8 @@ def compute_dipole_center_moment(triangles_data, edges_data, current_data):
     dipole_center = 0.5 * (point_plus_center + point_minus_center)
 
     # Vectorized calculation of dipole moments
-    delta = -point_plus_center + point_minus_center
-    scaling = edges_data.edges_length * current_data  # (N,)
-    dipole_moment = delta * scaling  # Broadcasting (3,N) * (N,) → (3,N)
+    delta = point_minus_center - point_plus_center
+    dipole_moment = edges_data.edges_length * current_data * delta
 
     return dipole_center, dipole_moment
 

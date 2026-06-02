@@ -120,7 +120,7 @@ def rwg_gram_matrix(edges_data, triangles_data, vecteurs_rho_data):
             tri_to_edges[tm].append(e_idx)
             tri_edge_sides[tm].append('minus')
 
-    print(f"Starting vectorized G calculation for {num_tri} triangles...")
+    print(f"Computing Gram matrix ({num_tri} triangles)...")
 
     # --- Step 2: Main loop over triangles ---
     for tri_idx in range(num_tri):

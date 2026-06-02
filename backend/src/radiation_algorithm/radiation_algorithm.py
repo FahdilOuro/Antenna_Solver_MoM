@@ -5,6 +5,7 @@ from backend.rwg.rwg4 import *
 from backend.rwg.rwg5 import *
 
 from backend.utils.gmsh_function import *
+from backend.utils.lossy_electric_conductor import calculate_normal_surface_impedance
 
 
 def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excitation_unit_vector=None, gap_width=0.05, voltage_phase=None,
@@ -32,6 +33,10 @@ def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excita
     edges = triangles.get_edges()
 
     filter_complexes_jonctions(points, triangles, edges)  # Filter complex junctions to simplify the mesh structure
+
+    print(f"Number of points: {points.total_of_points}")
+    print(f"Number of triangles: {triangles.total_of_triangles}")
+    print(f"Number of edges: {edges.total_number_of_edges}")
 
     edges.compute_edges_length(points)
 
@@ -78,7 +83,7 @@ def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excita
         print(f"Conductor (Non-magnetic, mu_r=1): {impedance_zs:.4f} Ohms")
     else:
         impedance_zs = None
-    
+
     frequency, voltage, current, port_results = \
     calculate_current_radiation(path, feed_point, voltage_amplitude, excitation_unit_vector, gap_width, voltage_phase, lossy_conductor, impedance_zs)
 
@@ -88,8 +93,6 @@ def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excita
     gap_voltages = np.array([p['source_voltage'] for p in port_results])
     impedances   = np.array([p['impedance'] for p in port_results])
     feed_powers  = np.array([p['power'] for p in port_results])
-
-    # print(f"Impedances : {impedances[0]}")
 
     # 3. Save everything using the updated DataManager
     DataManager_rwg4.save_data_for_radiation(path, frequency, omega, mu, epsilon, light_speed_c, eta, 

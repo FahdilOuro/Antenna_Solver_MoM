@@ -1,92 +1,106 @@
 import numpy as np
 
-def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_points, 
-                         excitation_unit_vector, gap_width, phases=None):
+def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude,
+                         feed_points, excitation_unit_vector, gap_width, phases=None):
     """
-    Implements the Enhanced Gap Source model for multiple feed points.
-    Returns the global voltage vector and a list of indices for each port.
-    """
+    Implements the Enhanced Gap Source model (Ding et al., 2013, eq. 7).
     
-    # 1. Standardize feed_points to (N, 3)
+    Parameters
+    ----------
+    triangles : object
+        Must expose: triangles_plus (int array, shape (num_edges,)),
+                     triangles_minus (int array, shape (num_edges,)),
+                     triangles_center (float array, shape (3, num_triangles))
+    edges : object
+        Must expose: total_number_of_edges (int),
+                     edges_length (float array, shape (num_edges,))
+    vecteurs_rho : object
+        Must expose: vecteur_rho_plus  (float array, shape (3, num_edges)),
+                     vecteur_rho_minus (float array, shape (3, num_edges))
+    voltage_amplitude : float or array-like
+    feed_points : array-like, shape (num_feeds, 3)
+    excitation_unit_vector : str or list of str  ('x', 'y', or 'z')
+    gap_width : float
+    phases : float or array-like, optional (radians)
+    
+    Returns
+    -------
+    total_voltage_vector : complex ndarray, shape (num_edges,)
+    all_feeding_edges : list of int ndarray
+    """
     feed_points = np.atleast_2d(feed_points)
     num_feeds = feed_points.shape[0]
 
-    # 2. Handle vector/scalar for voltage_amplitude
+    # --- Broadcast scalar inputs ---
     if np.isscalar(voltage_amplitude):
-        amplitudes = np.full(num_feeds, voltage_amplitude)
+        amplitudes = np.full(num_feeds, float(voltage_amplitude))
     else:
-        amplitudes = np.asarray(voltage_amplitude)
+        amplitudes = np.asarray(voltage_amplitude, dtype=float)
 
-    # 3. Handle vector/scalar for phases
     if phases is None:
         phases = np.zeros(num_feeds)
     elif np.isscalar(phases):
-        phases = np.full(num_feeds, phases)
+        phases = np.full(num_feeds, float(phases))
     else:
-        phases = np.asarray(phases)
+        phases = np.asarray(phases, dtype=float)
 
-    # 4. Handle vector/scalar for excitation_unit_vector
     if isinstance(excitation_unit_vector, str):
         unit_vectors = [excitation_unit_vector] * num_feeds
     else:
-        unit_vectors = excitation_unit_vector
+        unit_vectors = list(excitation_unit_vector)
 
     if len(unit_vectors) != num_feeds:
-        raise ValueError("The number of excitation vectors must match the number of feed points.")
+        raise ValueError("excitation_unit_vector length must match number of feed points.")
 
     complex_amplitudes = amplitudes * np.exp(1j * phases)
 
-    # 5. Extract fixed geometry data
-    num_edges = edges.total_number_of_edges
-    l_m = edges.edges_length
-    tri_plus_idx = triangles.triangles_plus
-    tri_minus_idx = triangles.triangles_minus  
-    centroids = triangles.triangles_center
-    
+    # --- Fixed geometry ---
+    num_edges    = edges.total_number_of_edges
+    l_m          = edges.edges_length                  # (num_edges,)
+    tri_plus_idx = triangles.triangles_plus            # (num_edges,)
+    tri_minus_idx= triangles.triangles_minus           # (num_edges,)
+    centroids    = triangles.triangles_center          # (3, num_triangles)
+
+    rho_plus  = vecteurs_rho.vecteur_rho_plus          # (3, num_edges)
+    rho_minus = vecteurs_rho.vecteur_rho_minus         # (3, num_edges)
+
     total_voltage_vector = np.zeros(num_edges, dtype=complex)
-    
-    # This list will store the indices of feeding edges for each port
-    all_feeding_edges = []
-    
-    threshold = gap_width / 2
+    all_feeding_edges    = []
     axis_map = {'x': 0, 'y': 1, 'z': 2}
 
-    # 6. Accumulate contributions
     for i in range(num_feeds):
-        axis_str = unit_vectors[i]
-        ax_idx = axis_map[axis_str]
-        
+        ax_idx     = axis_map[unit_vectors[i]]
         gap_center = feed_points[i, ax_idx]
-        v_complex = complex_amplitudes[i]
+        v_complex  = complex_amplitudes[i]
 
-        # Extract components specific to the current excitation axis
-        rho_p_ax = vecteurs_rho.vecteur_rho_plus[ax_idx, :]   
-        rho_n_ax = vecteurs_rho.vecteur_rho_minus[ax_idx, :]  
-        coord_cp = centroids[ax_idx, tri_plus_idx]
-        coord_cn = centroids[ax_idx, tri_minus_idx]
+        # Centroid coordinate along excitation axis for T+ and T-
+        coord_cp = centroids[ax_idx, tri_plus_idx]    # (num_edges,)
+        coord_cn = centroids[ax_idx, tri_minus_idx]   # (num_edges,)
 
-        # Calculate distances
-        dist_p = np.abs(coord_cp - gap_center)
-        dist_n = np.abs(coord_cn - gap_center)
+        # Step function window: 1 if centroid is inside the gap, 0 otherwise
+        # Implements u(z + W/2) - u(z - W/2) from eq. (7)
+        half_W   = gap_width / 2.0
+        window_p = np.where(np.abs(coord_cp - gap_center) <= half_W, 1.0, 0.0)
+        window_n = np.where(np.abs(coord_cn - gap_center) <= half_W, 1.0, 0.0)
 
-        # Mesh density check
-        if np.min(dist_p) > threshold and np.min(dist_n) > threshold:
-            print(f"Warning: Port {i} has no nearby centroids. Storing empty edges.")
-            all_feeding_edges.append(np.array([], dtype=int))
+        # Warn if no edge is selected (mesh too coarse relative to gap width)
+        port_indices = np.where((window_p > 0) | (window_n > 0))[0]
+        if port_indices.size == 0:
+            print(f"Warning: Port {i} — no edges found within gap. "
+                  f"Gap width ({gap_width:.4g}) may be smaller than mesh size.")
+            all_feeding_edges.append(port_indices)
             continue
 
-        # Windowing (Equation 7)
-        # Note: An edge is part of the gap if either triangle T+ or T- is within the window
-        window_p = np.where(dist_p <= threshold, 1.0, 0.0)
-        window_n = np.where(dist_n <= threshold, 1.0, 0.0)
-        
-        # Save indices for this specific port
-        # We find indices where at least one window function is active (non-zero)
-        port_indices = np.where((window_p > 0) | (window_n > 0))[0]
         all_feeding_edges.append(port_indices)
 
-        # Apply Equation (7) and add to global vector
-        common_factor = (l_m * v_complex) / (2 * gap_width)
-        total_voltage_vector += common_factor * (window_p * rho_p_ax + window_n * rho_n_ax)
+        # dot product rho . e_hat  (eq. 7: rho_m^+ . e_z, rho_m^- . e_z)
+        rho_p_dot = rho_plus[ax_idx, :]    # (num_edges,)  scalar proj. on excitation axis
+        rho_n_dot = rho_minus[ax_idx, :]   # (num_edges,)
+
+        # Assemble eq. (7)
+        common_factor = (l_m * v_complex) / (2.0 * gap_width)
+        total_voltage_vector += common_factor * (
+            window_p * rho_p_dot + window_n * rho_n_dot
+        )
 
     return total_voltage_vector, all_feeding_edges

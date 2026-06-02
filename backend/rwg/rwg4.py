@@ -7,7 +7,6 @@ from backend.rwg.rwg2 import DataManager_rwg2
 from backend.rwg.rwg3 import DataManager_rwg3
 from backend.utils.gap_source import *
 from backend.utils.impmet import rwg_gram_matrix
-from backend.utils.lossy_electric_conductor import calculate_normal_surface_impedance
 
 
 # Definition of the incident field
@@ -116,11 +115,11 @@ def calculate_current_radiation(path, feed_point, voltage_amplitude,
                        and 'source_voltage' for each individual port.
     """
     # Load meshed and impedance data
-    _, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(path.mat_mesh2)
+    points, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(path.mat_mesh2)
     frequency, _, _, _, _, _, matrice_z = DataManager_rwg3.load_data(path.mat_impedance)
 
     # 1. Initialize the global voltage vector and retrieve feeding indices per port
-    voltage, all_feeding_indices = multiple_gap_sources(
+    voltage, all_feeding_edges = multiple_gap_sources(
         triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, 
         excitation_unit_vector, gap_width, voltage_phase
     )
@@ -131,65 +130,46 @@ def calculate_current_radiation(path, feed_point, voltage_amplitude,
         Z_lossy = matrice_z + Z_material
         current = np.linalg.solve(Z_lossy, voltage)
     else:
-        # 2. Solve the linear system (Z * I = V)
         current = np.linalg.solve(matrice_z, voltage)
 
-    # 3. Process each port to calculate specific metrics
+    # P_in = 0.5 Re(V·I*) — the only formula consistent with the MoM energy identity
+    P_in_total = 0.5 * np.real(np.dot(voltage, np.conj(current)))
+    print(f"Total input power P_in = 0.5*Re(V·I*) = {P_in_total:.6e} W")
+
     feed_points_2d = np.atleast_2d(feed_point)
-    num_ports = len(all_feeding_indices)
+    num_feed_group_edges = len(all_feeding_edges)
     port_results = []
 
-    for i in range(num_ports):
-        indices = all_feeding_indices[i]
+    for i in range(num_feed_group_edges):
+        feeding_edges = all_feeding_edges[i]
 
-        if indices.size == 0:
+        if feeding_edges.size == 0:
             print(f"Warning: Port {i} at {feed_points_2d[i]} has no feeding edges.")
             continue
 
-        # Extract local current coefficients and edge lengths for the gap
-        local_coeffs = current[indices]
-        edge_lengths = edges.edges_length[indices]
-        is_values = local_coeffs * edge_lengths
-
-        # --- RECTIFICATION OF GAP CURRENT ---
-        # Calculate mean magnitude to avoid cancellation from arbitrary RWG edge orientations
-        gap_current_mag = np.mean(np.abs(is_values))
-        
-        # Determine the initial complex phase from the sum of currents
-        is_sum = np.sum(is_values)
-        dominant_phase = np.exp(1j * np.angle(is_sum))
-        
-        # Estimate the complex gap current
-        temp_gap_current = gap_current_mag * dominant_phase
-        
-        # Determine specific source voltage for this port
         amp = voltage_amplitude[i] if not np.isscalar(voltage_amplitude) else voltage_amplitude
-        phi = 0 if voltage_phase is None else (voltage_phase[i] if not np.isscalar(voltage_phase) else voltage_phase)
-        source_voltage = amp * np.exp(1j * phi)
 
-        # --- PHYSICAL CONSISTENCY CHECK ---
-        # Ensure Re(Z) > 0 for passive antennas by flipping phase if necessary
-        if temp_gap_current != 0:
-            z_test = source_voltage / temp_gap_current
-            final_gap_current = -temp_gap_current if z_test.real < 0 else temp_gap_current
-        else:
-            final_gap_current = 0j
+        V_port = voltage[feeding_edges]
+        I_port = current[feeding_edges]
+        S_port    = 0.5 * np.dot(V_port, np.conj(I_port))   # complex power S = P + jQ
+        P_in_port = np.real(S_port)
+        Q_in_port = np.imag(S_port)
 
-        # 4. Calculate final port metrics
-        impedance = source_voltage / final_gap_current if final_gap_current != 0 else np.inf
-        active_power = 0.5 * np.real(source_voltage * np.conj(final_gap_current))
+        # I_eff such that ½ Re(V₀·I_eff*) = P_in_port → Z_in = V₀/I_eff
+        gap_current_eff = 2.0 * np.conj(S_port) / amp if amp != 0 else 0j
+        impedance = amp / gap_current_eff if np.abs(gap_current_eff) > 0 else np.inf
 
-        # Store detailed results for this port
+        print(f"Port {i}: P_in = {P_in_port:.4e} W  |  Q_in = {Q_in_port:.4e} VAR"
+              f"  |  Z_in = {impedance:.4f} Ω")
+
         port_results.append({
             'port_index': i,
             'location': feed_points_2d[i],
-            'gap_current': final_gap_current,
+            'gap_current': gap_current_eff,
             'impedance': impedance,
-            'power': active_power,
-            'source_voltage': source_voltage
+            'power': P_in_port,
+            'source_voltage': amp
         })
-
-        # print(f"Port_result : {port_results}")
 
     # Returns the environmental constants, global vectors, and the list of port-specific data
     return frequency, voltage, current, port_results

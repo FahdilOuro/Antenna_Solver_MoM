@@ -224,21 +224,28 @@ class Edges:
 
     def compute_edges_length(self, point_data):
         """
-            Compute the lengths of all edges.
+        Compute the lengths of all edges using vectorized operations for better performance.
 
-            This method uses the coordinates of the mesh points to calculate the length
-            of each edge using the Euclidean norm between the two points defining the edge.
+        This method retrieves the coordinates of all start and end points of the edges 
+        simultaneously and calculates the Euclidean norm across the entire set.
 
-            Parameter:
+        Parameters:
             point_data (Points): A Points object containing the coordinates of the mesh points.
         """
+        # Access the (3, N) coordinates array from the Points object
         points = point_data.points
-        edges_length = []
-        for edge in range(self.total_number_of_edges):
-            # Compute the edge length using the Euclidean norm between the two points
-            edge_length = np.linalg.norm(points[:, self.first_points[edge]] - points[:, self.second_points[edge]])
-            edges_length.append(edge_length)
-        self.edges_length = np.array(edges_length)       
+        
+        # Use advanced indexing to get all start and end points for every edge at once.
+        # p1 and p2 will have a shape of (3, total_number_of_edges).
+        p1 = points[:, self.first_points]
+        p2 = points[:, self.second_points]
+        
+        # Calculate the vector differences between the pairs of points
+        diff = p1 - p2
+        
+        # Compute the Euclidean norm (distance) along the first axis (the coordinates X, Y, Z)
+        # This replaces the manual loop and calculates all lengths in a single pass.
+        self.edges_length = np.linalg.norm(diff, axis=0)       
 
     def set_edges(self, first_points, second_points):
         """

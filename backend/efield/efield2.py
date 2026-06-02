@@ -92,7 +92,7 @@ def visualize_surface_current(points_data, triangles_data, radiation_intensity, 
     # Return the created Plotly figure
     return fig
 
-def save_gain_power_data(path_mat_gain_power, total_power, gain_linear, gain_logarithmic, efficiency_total):
+def save_gain_power_data(path_mat_gain_power, total_power, gain_linear, gain_logarithmic, radiated_efficiency):
     """
     Save total power and gain data into a .mat file.
 
@@ -114,7 +114,7 @@ def save_gain_power_data(path_mat_gain_power, total_power, gain_linear, gain_log
         'totalPower': total_power,
         'gainLinear': gain_linear,
         'gainLogarithmic': gain_logarithmic,
-        'efficiencyTotal': efficiency_total
+        'efficiencyTotal': radiated_efficiency
     }
 
     # Save the data into the .mat file
@@ -136,7 +136,7 @@ def load_gain_power_data(filename_to_load):
             * total_power : float or n-d-array, total power loaded from the file.
             * gain_linear : float or n-d-array, linear gain loaded from the file.
             * gain_logarithmic : float or n-d-array, logarithmic gain (in dB) loaded from the file.
-            * efficiency_total : float or n-d-array, efficiency loaded from the file.
+            * radiated_efficiency : float or n-d-array, efficiency loaded from the file.
 
         Exceptions:
             * FileNotFoundError : raised if the specified file does not exist.
@@ -156,12 +156,12 @@ def load_gain_power_data(filename_to_load):
         total_power = data['totalPower'].squeeze()
         gain_linear = data['gainLinear'].squeeze()
         gain_logarithmic = data['gainLogarithmic'].squeeze()
-        efficiency_total = data['efficiencyTotal'].squeeze()
+        radiated_efficiency = data['efficiencyTotal'].squeeze()
 
         print(f"Data loaded from {filename_to_load}")
 
         # Return extracted data
-        return total_power, gain_linear, gain_logarithmic, efficiency_total
+        return total_power, gain_linear, gain_logarithmic, radiated_efficiency
     
     except FileNotFoundError as e:
         # Handle errors if the file is not found
@@ -181,7 +181,7 @@ def load_gain_power_data(filename_to_load):
 
 def load_or_create_hollow_sphere(msh_path='data/gmsh_files/hollow_sphere.msh', 
                                  mat_path='data/antennas_mesh/hollow_sphere.mat', 
-                                 scale_factor=300):
+                                 scale_factor=100.0):
     """
     Ensures the hollow sphere mesh exists and loads its coordinates and connectivity.
 
@@ -194,15 +194,26 @@ def load_or_create_hollow_sphere(msh_path='data/gmsh_files/hollow_sphere.msh',
         tuple: (sphere_points, sphere_triangles)
     """
     if not os.path.isfile(mat_path):
-        print("Creating hollow sphere mesh and extracting data...")
+        print("Hollow sphere .mat file not found. Checking for .msh file...")
         if not os.path.isfile(msh_path):
+            print("Hollow sphere .msh file not found. Creating it...")
             create_hollow_sphere()
         extract_msh_to_mat(msh_path, mat_path)
 
     data_sphere = loadmat(mat_path)
     # Scale coordinates and convert to 0-based indexing for Python
     sphere_points = data_sphere['p'] * scale_factor
-    sphere_triangles = data_sphere['t'] - 1
+    sphere_triangles = data_sphere['t']
+    if sphere_triangles.shape[0] == 4:
+        sphere_triangles = sphere_triangles[:3, :]
+    elif sphere_triangles.shape[0] != 3:
+        raise ValueError(f"Unexpected shape for sphere_triangles: {sphere_triangles.shape}. Expected (3, n) or (4, n).")
+    
+    # Make sphere_triangles minus 1 to convert from 1-based indexing (MATLAB) to 0-based indexing (Python)
+    sphere_triangles -= 1
+
+    # print number of points and triangles for verification
+    print(f"Hollow sphere loaded: {sphere_points.shape[1]} points, {sphere_triangles.shape[1]} triangles.")
     
     return sphere_points, sphere_triangles
 
@@ -244,20 +255,23 @@ def load_and_prepare_antenna_data(path, mode):
     # 3. Load current and specific physical parameters depending on the mode
     if mode == 'scattering':
         frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(path.mat_current, scattering=True)
-        gap_current = 0
+        impedances = np.array([0.0])
+        feed_powers = np.array([0.0])
     elif mode == 'radiation':
-        frequency, omega, _, _, light_speed_c, eta, _, current, gap_current, *_ = DataManager_rwg4.load_data(path.mat_current, radiation=True)
+        frequency, omega, _, _, light_speed_c, eta, _, current, _, _, impedances, feed_powers = DataManager_rwg4.load_data(path.mat_current, radiation=True)
+        # feed_powers = P_in computed as 0.5*Re(V·I*) in calculate_current_radiation()
+        # — the only formula consistent with the MoM energy identity for any reactivity level
     else:
         raise ValueError("Mode must be either 'radiation' or 'scattering'.")
-    
+
     # 4. Compute physical constants (wave number)
     k = omega / light_speed_c
     complex_k = 1j * k
-    
+
     # 5. Compute dipoles and their moments
     dipole_center, dipole_moment = compute_dipole_center_moment(triangles, edges, current)
-    
-    return sphere_points, sphere_triangles, frequency, light_speed_c, eta, complex_k, dipole_center, dipole_moment, gap_current
+
+    return sphere_points, sphere_triangles, frequency, light_speed_c, eta, complex_k, dipole_center, dipole_moment, feed_powers, impedances
 
 def compute_total_radiated_power(sphere_points, sphere_triangles, eta, complex_k, dipole_moment, dipole_center):
     """
@@ -271,10 +285,11 @@ def compute_total_radiated_power(sphere_points, sphere_triangles, eta, complex_k
     # Loop over each triangle to calculate fields and energy
     for i in range(sphere_total_of_triangles):
         tri = sphere_triangles[:, i]
-        obs_p = np.sum(sphere_points[:, tri], axis=1) / 3
+        observation_triangle_points = sphere_points[:, tri]
+        observation_point = np.sum(observation_triangle_points, axis=1) / 3
         
         # Calculate electromagnetic fields at the triangle center
-        _, _, _, w, u_triangles[i], _ = compute_e_h_field(obs_p, eta, complex_k, dipole_moment, dipole_center)
+        _, _, _, w, u_triangles[i], _ = compute_e_h_field(observation_point, eta, complex_k, dipole_moment, dipole_center)
         
         # Calculate the area of the current triangle
         v1 = sphere_points[:, tri[0]] - sphere_points[:, tri[1]]
@@ -286,69 +301,48 @@ def compute_total_radiated_power(sphere_points, sphere_triangles, eta, complex_k
         
     return total_power, u_triangles
 
-'''def compute_antenna_efficiency_metrics(mode, total_power, gap_current, voltage_amplitude):
-    """
-    Calculate and display the radiation resistance and total efficiency if in radiation mode.
-    """
-    efficiency_total = 0
-
-    print(f"gap_current : {gap_current}")
-    
-    if mode == 'radiation':
-        # Safely extract the gap current absolute value
-        gap_current_val = np.linalg.norm(gap_current) if isinstance(gap_current, np.ndarray) else abs(gap_current)
-        
-        if gap_current_val != 0:
-            # Calculate metrics
-            rad_resistance = 2 * total_power / gap_current_val**2
-            p_in = 0.5 * voltage_amplitude * gap_current_val
-            if total_power / p_in > 1.0:
-                print("efficiency > 1 !!! Abnormal")
-            efficiency_total = min(total_power / p_in, 1.0) if p_in > 0 else 0
-            
-            # Print results to console
-            print(f"  Radiation Resistance : {rad_resistance:.4f} Ohms")
-            print(f"  Total Efficiency : {efficiency_total*100:.2f} %")
-            
-    return efficiency_total'''
-
-def compute_antenna_efficiency_metrics(total_power, gap_current, voltage_amplitude):
+def compute_antenna_efficiency_metrics(total_power, feed_powers, impedances):
     """
     Calculates the radiation efficiency of the antenna.
-    
+
     Args:
-        total_power: Radiated power (Watts) obtained from far-field integration.
-        gap_current: Complex current at the feed point (Amperes).
-        voltage_amplitude: Peak voltage amplitude at the feed (Volts).
-        
+        total_power  : P_rad [W] — integrated Poynting vector over the far-field sphere.
+        feed_powers  : P_in  [W] — array of per-port active input powers, computed as
+                       0.5*Re(V·I*) in calculate_current_radiation().  This is the only
+                       formula consistent with the MoM energy identity: for a lossless PEC,
+                       P_in = P_rad exactly (η = 1).
+        impedances   : complex input impedances per port [Ω].
+
     Returns:
-        float: Radiation efficiency (between 0 and 1).
+        float: Radiation efficiency (0 to 1; should be ≈1.0 for a PEC).
     """
-    # 1. Calculate the Accepted Power (Active Power)
-    # Formula: P_acc = 0.5 * Re(V * conj(I))
-    # We use the conjugate of the current to get the real part of the complex power.
-    p_accepted = 0.5 * np.real(voltage_amplitude * np.conj(gap_current))
-    
-    # 2. Safety check for very low power to avoid division by zero
-    if p_accepted <= 1e-15:
+    feed_powers = np.atleast_1d(feed_powers)
+    P_in = float(np.real(np.sum(feed_powers)))   # total active input power [W]
+
+    print(f"\n[Power Budget]")
+    print(f"  P_in  (0.5*Re(V·I*)) = {P_in:.6e} W")
+    print(f"  P_rad (sphere integ.) = {total_power:.6e} W")
+
+    if P_in <= 1e-20:
+        print("  Warning: P_in ≈ 0 — cannot compute efficiency (check mesh and gap geometry).")
         return 0.0
-    
-    # 3. Efficiency calculation
-    efficiency_rad = total_power / p_accepted
 
-    print(f"  Total Efficiency : {efficiency_rad}")
-    
-    # 4. Numerical stability handling
-    # If efficiency is slightly > 1 due to numerical noise in far-field integration,
-    # we cap it at 1.0 and issue a small warning.
-    if efficiency_rad > 1.0:
-        if efficiency_rad > 1.00: # Warning only if the error is significant (>5%)
-             print(f"  Warning: Numerical noise detected. Raw efficiency: {efficiency_rad*100:.2f}%")
-        efficiency_rad = 1.0
+    efficiency_rad = total_power / P_in
+    print(f"  Raw efficiency       = {efficiency_rad*100:.4f} %")
 
-    # Print results to console
-    print(f"  Total Efficiency : {efficiency_rad*100:.2f} %")
-    
+    impedances = np.atleast_1d(impedances)
+    for idx, z_in in enumerate(impedances):
+        if np.isfinite(z_in):
+            print(f"  Port {idx}: Z_in = {z_in:.4f} Ω  |  R_in = {np.real(z_in):.4f} Ω")
+
+    # For a PEC, η should be 1.0 ± numerical noise.
+    # Values significantly > 1 indicate a problem upstream (wrong P_in or P_rad).
+    if efficiency_rad > 1.01:
+        print(f"  WARNING: η = {efficiency_rad*100:.2f}% > 100% — energy conservation violated."
+              f"  Check: (1) gap_width vs mesh size, (2) sphere radius vs λ.")
+
+    efficiency_rad = min(efficiency_rad, 1.0)
+    print(f"  Total Efficiency     = {efficiency_rad*100:.2f} %")
     return efficiency_rad
 
 def render_and_save_pattern(show, save_image, sphere_points_update, sphere_triangles, gain_points_db, plot_title, pdf_filename):
@@ -375,31 +369,28 @@ def render_and_save_pattern(show, save_image, sphere_points_update, sphere_trian
             fig.write_image(pdf_path, format="pdf")
             print(f"Image saved: {pdf_path}")
 
-def radiation_intensity_distribution_over_sphere_surface(path, mode='radiation', voltage_amplitude=1, show=True, save_image=False):
+def radiation_intensity_distribution_over_sphere_surface(path, mode='radiation', show=True, save_image=False):
     """
     Calculate and visualize the total radiation intensity and gain distribution on the surface of a sphere.
     """
-    print(f"MODE SELECTED: {mode}")
-
     # 1. Load data and setup parameters
-    sphere_points, sphere_triangles, frequency, light_speed_c, eta, complex_k, dipole_center, dipole_moment, gap_current = load_and_prepare_antenna_data(path, mode)
-    # print(f"Frequency = {frequency:.2e} Hz | Wavelength lambda = {light_speed_c / frequency:.4f} m")
+    sphere_points, sphere_triangles, _, _, eta, complex_k, dipole_center, dipole_moment, feed_powers, impedances = load_and_prepare_antenna_data(path, mode)
 
     # 2. Calculate Total Radiated Power
     total_power, u_triangles = compute_total_radiated_power(sphere_points, sphere_triangles, eta, complex_k, dipole_moment, dipole_center)
 
     # 3. Calculate Antenna Metrics
-    gain_linear_max = 4 * np.pi * np.max(u_triangles) / total_power
-    gain_logarithmic_max = 10 * np.log10(gain_linear_max)
+    gain_linear = 4 * np.pi * np.max(u_triangles) / total_power
+    gain_logarithmic = 10 * np.log10(gain_linear)
 
     print(f"\n[Antenna Results]")
-    print(f"  Total Radiated Power : {total_power:.4f} W")
-    print(f"  Max Gain : {gain_linear_max:.4f} ({gain_logarithmic_max:.2f} dBi)")
+    print(f"  Total Radiated Power : {total_power} W")
+    print(f"  Gain : {gain_linear:.4f} ({gain_logarithmic:.2f} dBi)")
 
-    efficiency_total = compute_antenna_efficiency_metrics(total_power, gap_current, voltage_amplitude)
+    radiated_efficiency = compute_antenna_efficiency_metrics(total_power, feed_powers, impedances)
 
     # Save calculated metrics
-    save_gain_power_data(path.mat_gain_power, total_power, gain_linear_max, gain_logarithmic_max, efficiency_total)
+    save_gain_power_data(path.mat_gain_power, total_power, gain_linear, gain_logarithmic, radiated_efficiency)
 
     # 4. Pattern Visualization Prep (Calculate fields at vertices)
     sphere_total_of_points = sphere_points.shape[1]
@@ -419,14 +410,14 @@ def radiation_intensity_distribution_over_sphere_surface(path, mode='radiation',
     pdf_filename = f"radiation_pattern_{path.name}.pdf"
     render_and_save_pattern(show, save_image, sphere_points_update, sphere_triangles, u_points_db, plot_title, pdf_filename)
 
-def polar_circular_gain_distribution_over_sphere(path, polar_type='RHCP', mode='radiation', voltage_amplitude=1, show=True, save_image=False):
+def polar_circular_gain_distribution_over_sphere(path, polar_type='RHCP', mode='radiation', show=True, save_image=False):
     """
     Calculate and visualize the circular gain (RHCP or LHCP) distribution over a sphere.
     """
     print(f"\n--- CALCULATING {polar_type} GAIN ({mode.upper()} MODE) ---")
 
     # 1. Load data and setup parameters
-    sphere_points, sphere_triangles, frequency, light_speed_c, eta, complex_k, dipole_center, dipole_moment, gap_current = load_and_prepare_antenna_data(path, mode)
+    sphere_points, sphere_triangles, frequency, light_speed_c, eta, complex_k, dipole_center, dipole_moment, feed_powers, impedances = load_and_prepare_antenna_data(path, mode)
     print(f"Frequency = {frequency:.2e} Hz | Wavelength lambda = {light_speed_c / frequency:.4f} m")
 
     # 2. Calculate Total Radiated Power (First Pass)
@@ -459,11 +450,11 @@ def polar_circular_gain_distribution_over_sphere(path, polar_type='RHCP', mode='
     print(f"Total Power : {total_power:.4f} W")
     print(f"Max {polar_type} Gain : {gain_logarithmic_max:.4f} dBic")
 
-    efficiency_total = compute_antenna_efficiency_metrics(total_power, gap_current, voltage_amplitude)
+    radiated_efficiency = compute_antenna_efficiency_metrics(total_power, feed_powers, impedances)
 
     # Save calculated metrics
     path_mat_polar_gain_power = path.mat_polar_rhcp_gain_power if polar_type.upper() == 'RHCP' else path.mat_polar_lhcp_gain_power
-    save_gain_power_data(path_mat_polar_gain_power, total_power, gain_linear_max, gain_logarithmic_max, efficiency_total)
+    save_gain_power_data(path_mat_polar_gain_power, total_power, gain_linear_max, gain_logarithmic_max, radiated_efficiency)
 
     # 5. Deformation & Visualization
     sphere_points_update = deform_sphere_for_radiation_pattern(sphere_points, gain_db, dynamic_range=20)
