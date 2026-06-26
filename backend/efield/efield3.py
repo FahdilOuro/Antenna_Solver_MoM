@@ -204,7 +204,7 @@ def antenna_circular_directivity_pattern(path, polar_type='RHCP', mode='radiatio
 
     # 1. Load and prepare data (using the helper from previous step)
     data = load_and_prepare_antenna_data(path, mode)
-    sphere_points, sphere_triangles, frequency, light_speed_c, eta, complex_k, dipole_center, dipole_moment, _ = data
+    sphere_points, sphere_triangles, frequency, light_speed_c, eta, complex_k, dipole_center, dipole_moment, *_ = data
     
     # Load total power from previously saved data
     path_mat_polar_gain_power = path.mat_polar_rhcp_gain_power if polar_type.upper() == 'RHCP' else path.mat_polar_lhcp_gain_power
