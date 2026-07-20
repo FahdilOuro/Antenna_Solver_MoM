@@ -29,7 +29,6 @@ import gmsh
 from backend.utils.gmsh_function import setup_performance_config, generate_and_save_mesh, extract_msh_to_mat
 from backend.utils.file_path import setup_save_file_paths
 from backend.rwg.rwg1 import Points, Triangles, load_mesh_file, filter_complexes_jonctions
-from backend.rwg.rwg2 import Barycentric_triangle, Vecteurs_Rho
 from backend.utils.impmet import impedance_matrix_z
 from backend.cma.eigen_solver import GeneralizedEigenSolver
 from backend.cma.cma_parameters import CMAParameters
@@ -65,9 +64,9 @@ def mesh_size_for_freq(freq_max, edges_per_lambda=12.0):
 
 
 def build_plate_mesh(name, mesh_size):
-    """Generate the plate geometry+mesh with Gmsh, then run rwg1/rwg2 preprocessing.
+    """Generate the plate geometry+mesh with Gmsh, then run rwg1 preprocessing.
 
-    Returns (points, triangles, edges, bary, rho, E).
+    Returns (points, triangles, edges, E).
     """
     path = setup_save_file_paths(name)
 
@@ -89,14 +88,9 @@ def build_plate_mesh(name, mesh_size):
     filter_complexes_jonctions(points, triangles, edges)
     edges.compute_edges_length(points)
 
-    bary = Barycentric_triangle()
-    bary.calculate_barycentric_center(points, triangles)
-    rho = Vecteurs_Rho()
-    rho.calculate_vecteurs_rho(points, triangles, edges, bary)
-
     E = edges.total_number_of_edges
     print(f"[{name}] points={points.total_of_points}  triangles={triangles.total_of_triangles}  E={E}")
-    return points, triangles, edges, bary, rho, E
+    return points, triangles, edges, E
 
 
 def solve_at_frequency(points, triangles, edges, freq, n_modes=N_MODES_SOLVE):
@@ -202,7 +196,7 @@ def find_zero_crossing(freqs, lam):
 
 def run_sweep(name, mesh_size, freqs, out_dir, n_modes=N_MODES_SOLVE):
     os.makedirs(out_dir, exist_ok=True)
-    points, triangles, edges, bary, rho, E = build_plate_mesh(name, mesh_size)
+    points, triangles, edges, E = build_plate_mesh(name, mesh_size)
 
     records = []
     t_start = time.time()

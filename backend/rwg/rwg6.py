@@ -51,7 +51,7 @@ def plot_surface_current_distribution(path, mode='scattering'):
     print(f"MODE SELECTED: {mode}")
 
     # 2. Load geometry and current data
-    points, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(path.mat_mesh2)
+    points, triangles, edges, vecteurs_rho = DataManager_rwg2.load_data(path.mat_mesh2)
     
     if mode == 'scattering':
         *_, current = DataManager_rwg4.load_data(path.mat_current, scattering=True)

@@ -33,17 +33,13 @@ def scattering_algorithm_E_field(mesh, frequency, wave_incident_direction, polar
     # Load saved mesh data
     filename_mesh1_to_load = save_folder_name_mesh1 + save_file_name_mesh1
 
-    # Define and compute barycentric triangles
-    barycentric_triangles = Barycentric_triangle()
-    barycentric_triangles.calculate_barycentric_center(points, triangles)
-
     # Compute RHO vectors for the edges
     vecteurs_rho = Vecteurs_Rho()
-    vecteurs_rho.calculate_vecteurs_rho(points, triangles, edges, barycentric_triangles)
+    vecteurs_rho.calculate_vecteurs_rho(points, triangles, edges)
 
-    # Save barycentric triangles and RHO vectors data
+    # Save RHO vectors data
     save_folder_name_mesh2 = 'data/antennas_mesh2/'
-    save_file_name_mesh2 = DataManager_rwg2.save_data(filename_mesh1_to_load, save_folder_name_mesh2, barycentric_triangles, vecteurs_rho)
+    save_file_name_mesh2 = DataManager_rwg2.save_data(filename_mesh1_to_load, save_folder_name_mesh2, vecteurs_rho)
 
     # Load processed mesh data
     filename_mesh2_to_load = save_folder_name_mesh2 + save_file_name_mesh2

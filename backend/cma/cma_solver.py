@@ -5,6 +5,7 @@ import numpy as np
 
 from backend.rwg.rwg3 import DataManager_rwg3
 from backend.rwg.rwg2 import DataManager_rwg2
+from backend.utils.mesh_io import verify_mesh_fingerprint
 from backend.cma.cma_parameters import CMAParameters
 from backend.cma.eigen_solver import GeneralizedEigenSolver
 from backend.cma.modal_data import ModalData, DataManager_cma
@@ -53,12 +54,9 @@ class CharacteristicModeSolver:
         ModalData
         """
         # 1. Load impedance matrix
+        # (guard against mixing a stale impedance file with a regenerated mesh)
+        verify_mesh_fingerprint(self.path.mat_mesh2, self.path.mat_impedance)
         impedance_data = DataManager_rwg3.load_data(self.path.mat_impedance)
-        if impedance_data is None:
-            raise FileNotFoundError(
-                f"Impedance file not found: {self.path.mat_impedance}. "
-                "Run the MoM solver (radiation_algorithm) first."
-            )
         frequency, _omega, _mu, _epsilon, _c, _eta, Z = impedance_data
 
         # 2. Load mesh (needed for current reconstruction later)
@@ -141,12 +139,7 @@ class CharacteristicModeSolver:
         if self._triangles is not None:
             return
         mesh_data = DataManager_rwg2.load_data(self.path.mat_mesh2)
-        if mesh_data is None:
-            raise FileNotFoundError(
-                f"Mesh file not found: {self.path.mat_mesh2}. "
-                "Run rwg1 and rwg2 preprocessing first."
-            )
-        points, triangles, edges, _bary, vecteurs_rho = mesh_data
+        points, triangles, edges, vecteurs_rho = mesh_data
         self._points       = points
         self._triangles    = triangles
         self._edges        = edges

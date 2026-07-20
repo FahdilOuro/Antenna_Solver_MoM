@@ -1,12 +1,13 @@
 import os
 
 import numpy as np
-from scipy.io import savemat, loadmat
+from scipy.io import savemat
 
 from backend.rwg.rwg2 import DataManager_rwg2
 from backend.rwg.rwg3 import DataManager_rwg3
 from backend.utils.gap_source import *
 from backend.utils.impmet import rwg_gram_matrix
+from backend.utils.mesh_io import MeshDataError, load_matfile_or_raise, verify_mesh_fingerprint
 
 
 # Definition of the incident field
@@ -49,8 +50,13 @@ def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incid
             * The incident wave direction ('wave_incident_direction') and polarization must be properly
               normalized to ensure consistent results.
     """
-    # Load meshed data (points, triangles, edges, barycenters, rho vectors)
-    _, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh_2)
+    # Guard against combining a mesh2 file and an impedance file that were
+    # generated from different meshes (e.g. the mesh was re-generated but the
+    # impedance matrix wasn't recomputed).
+    verify_mesh_fingerprint(filename_mesh_2, filename_impedance)
+
+    # Load meshed data (points, triangles, edges, rho vectors)
+    _, triangles, edges, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh_2)
     # Load impedance data (frequency, EM parameters, Z matrix)
     frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z = DataManager_rwg3.load_data(filename_impedance)
 
@@ -114,18 +120,23 @@ def calculate_current_radiation(path, feed_point, voltage_amplitude,
         port_results : list, list of dicts containing 'current', 'impedance', 'power', 
                        and 'source_voltage' for each individual port.
     """
+    # Guard against combining a mesh2 file and an impedance file that were
+    # generated from different meshes (e.g. the mesh was re-generated but the
+    # impedance matrix wasn't recomputed).
+    verify_mesh_fingerprint(path.mat_mesh2, path.mat_impedance)
+
     # Load meshed and impedance data
-    points, triangles, edges, _, vecteurs_rho = DataManager_rwg2.load_data(path.mat_mesh2)
+    points, triangles, edges, vecteurs_rho = DataManager_rwg2.load_data(path.mat_mesh2)
     frequency, _, _, _, _, _, matrice_z = DataManager_rwg3.load_data(path.mat_impedance)
 
     # 1. Initialize the global voltage vector and retrieve feeding indices per port
     voltage, all_feeding_edges = multiple_gap_sources(
-        triangles, edges, vecteurs_rho, voltage_amplitude, feed_point, 
+        triangles, edges, vecteurs_rho, voltage_amplitude, feed_point,
         excitation_unit_vector, gap_width, voltage_phase
     )
 
     if lossy_conductor:
-        Gram_rwg = rwg_gram_matrix(edges, triangles, vecteurs_rho)
+        Gram_rwg = rwg_gram_matrix(edges, triangles, points)
         Z_material = impedance_zs * Gram_rwg
         Z_lossy = matrice_z + Z_material
         current = np.linalg.solve(Z_lossy, voltage)
@@ -285,14 +296,19 @@ class DataManager_rwg4:
 
         Returns:
             tuple : Extracted data in the order defined by the saving process.
-        """
-        try:
-            if not os.path.isfile(filename):
-                raise FileNotFoundError(f"File '{filename}' does not exist.")
 
-            # Load the raw .mat data
-            data = loadmat(filename)
-            
+        Raises:
+            ValueError: if neither `radiation` nor `scattering` is set.
+            MeshDataError: if the file is missing or its contents are
+                malformed (missing/invalid keys). Chained from the original
+                exception.
+        """
+        if not scattering and not radiation:
+            raise ValueError("You must specify either 'radiation=True' or 'scattering=True'.")
+
+        data = load_matfile_or_raise(filename)
+
+        try:
             # 1. Common global parameters extraction
             frequency = data['frequency'].squeeze()
             omega = data['omega'].squeeze()
@@ -305,38 +321,31 @@ class DataManager_rwg4:
 
             # 2. Scattering-specific logic
             if scattering:
-                if 'wave_incident_direction' in data and 'polarization' in data:
-                    wave_incident_direction = data['wave_incident_direction'].squeeze()
-                    polarization = data['polarization'].squeeze()
-                    return (frequency, omega, mu, epsilon, light_speed_c, eta, 
-                            wave_incident_direction, polarization, voltage, current)
-                else:
+                if 'wave_incident_direction' not in data or 'polarization' not in data:
                     raise KeyError("Missing scattering keys in file.")
+                wave_incident_direction = data['wave_incident_direction'].squeeze()
+                polarization = data['polarization'].squeeze()
+                return (frequency, omega, mu, epsilon, light_speed_c, eta,
+                        wave_incident_direction, polarization, voltage, current)
 
             # 3. Radiation-specific logic (Updated for multi-port support)
-            if radiation:
-                # Check for the updated plural keys
-                required_keys = ['gap_currents', 'gap_voltages', 'impedances', 'feed_powers']
-                if all(k in data for k in required_keys):
-                    gap_currents = data['gap_currents'].squeeze()
-                    gap_voltages = data['gap_voltages'].squeeze()
-                    impedances = data['impedances'].squeeze()
-                    feed_powers = data['feed_powers'].squeeze()
-                    
-                    # Return in the exact order as specified in the calculation return
-                    return (frequency, omega, mu, epsilon, light_speed_c, eta, 
-                            voltage, current, gap_currents, gap_voltages, impedances, feed_powers)
-                else:
-                    raise KeyError("Missing radiation port keys in file.")
+            required_keys = ['gap_currents', 'gap_voltages', 'impedances', 'feed_powers']
+            if not all(k in data for k in required_keys):
+                raise KeyError("Missing radiation port keys in file.")
+            gap_currents = data['gap_currents'].squeeze()
+            gap_voltages = data['gap_voltages'].squeeze()
+            impedances = data['impedances'].squeeze()
+            feed_powers = data['feed_powers'].squeeze()
 
-            if not scattering and not radiation:
-                raise ValueError("You must specify either 'radiation=True' or 'scattering=True'.")
+            # Return in the exact order as specified in the calculation return
+            return (frequency, omega, mu, epsilon, light_speed_c, eta,
+                    voltage, current, gap_currents, gap_voltages, impedances, feed_powers)
 
-        except FileNotFoundError as e:
-            print(f"Error: {e}")
         except KeyError as e:
-            print(f"Key Error: {e}")
+            raise MeshDataError(
+                f"'{filename}' is missing expected key {e}. It may have been "
+                f"generated by an older/incompatible version of the pipeline, "
+                f"or with the wrong radiation/scattering flag."
+            ) from e
         except ValueError as e:
-            print(f"Value Error: {e}")
-        except Exception as e:
-            print(f"An unexpected error occurred during loading: {e}")
+            raise MeshDataError(f"'{filename}' contains malformed data: {e}") from e

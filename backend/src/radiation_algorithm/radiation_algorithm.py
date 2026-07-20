@@ -43,16 +43,12 @@ def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excita
     # Save processed mesh data
     DataManager_rwg1.save_data(path, points, triangles, edges)
 
-    # Definition and calculation of barycentric triangles
-    barycentric_triangles = Barycentric_triangle()
-    barycentric_triangles.calculate_barycentric_center(points, triangles)
-
     # Calculation of RHO vectors for edges
     vecteurs_rho = Vecteurs_Rho()
-    vecteurs_rho.calculate_vecteurs_rho(points, triangles, edges, barycentric_triangles)
+    vecteurs_rho.calculate_vecteurs_rho(points, triangles, edges)
 
-    # Save barycentric triangles and RHO vectors data
-    DataManager_rwg2.save_data(path, barycentric_triangles, vecteurs_rho)
+    # Save RHO vectors data
+    DataManager_rwg2.save_data(path, vecteurs_rho)
 
     # Calculation of electromagnetic constants and impedance matrix Z
     if load_lumped_elements:

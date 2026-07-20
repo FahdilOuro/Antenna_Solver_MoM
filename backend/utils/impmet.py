@@ -1,22 +1,21 @@
 """
 Impedance matrix assembly for the RWG MoM EFIE solver.
 
-Two implementations are provided:
+impedance_matrix_z
+    EFIE double-surface integral (Green's function kernel, singular for
+    self/adjacent triangle pairs).  Double Gauss-Dunavant product quadrature
+    on both testing and source triangles; self pairs use the Duffy
+    collapsed-coordinate transform; adjacent pairs use higher-order Gauss.
+    Returns a symmetric Z with physical units and no hidden 1/9 averaging.
 
-impedance_matrix_z (new — Phase 4)
-    Correct double Gauss-Dunavant product quadrature on both testing and source
-    triangles.  Self pairs use the Duffy collapsed-coordinate transform.
-    Adjacent pairs use higher-order Gauss.  Returns a symmetric Z with physical
-    units and no hidden 1/9 averaging.
-
-impedance_matrix_z_makarov_legacy (renamed from `impedance_matrix_z`)
-    Original hybrid single-point/9-barycentric-centre rule from Makarov's
-    MATLAB book.  Kept for comparison.  Known defects: Z ≠ Zᵀ (~13–31 %
-    symmetry error), negative eigenvalues of Re(Z), ~30× error on far pairs.
-    See `_diagnostics/FINDINGS.md`.
-
-rwg_gram_matrix_legacy (renamed from `rwg_gram_matrix`)
-    Original Gram matrix for surface-impedance boundary conditions.
+rwg_gram_matrix
+    Single-surface RWG mass ("Gram") matrix for the surface-impedance
+    boundary condition term of a lossy conductor (Z_lossy = Z + Zs * G).
+    No Green's function and no singularity: f_m . f_n is an exact degree-2
+    polynomial on the shared triangle, so a low-order Gauss-Dunavant rule
+    integrates it to machine precision.  Replaces the previous 9-point
+    barycentric-average approximation (see workflow.md, "Gram matrix
+    Gauss-Dunavant refactor").
 """
 
 import numpy as np
@@ -223,135 +222,115 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
 
 
 # ---------------------------------------------------------------------------
-# Legacy (renamed) — Makarov 2002 hybrid-quadrature implementation
+# RWG Gram matrix (surface-impedance boundary condition term)
 # ---------------------------------------------------------------------------
 
-def impedance_matrix_z_makarov_legacy(edges_data, triangles_data, barycentric_triangles_data,
-                                      vecteurs_rho_data, parameter_k, factor_a, factor_fi):
+def rwg_gram_matrix(edges_data, triangles_data, points_data, quad_order: int = 4) -> np.ndarray:
     """
-    LEGACY — Makarov (2002) hybrid-quadrature Z matrix.
+    Assemble the RWG mass ("Gram") matrix used for the surface-impedance
+    boundary condition (SIBC) term of a lossy conductor:
 
-    Known defects documented in `_diagnostics/FINDINGS.md`:
-        symmetry error ‖R−Rᵀ‖/‖R‖ ≈ 10–13 %
-        negative eigenvalues of Re(Z)
-        ~30× error on far pairs vs. brute-force reference
+        Z_lossy = matrice_z + impedance_zs * rwg_gram_matrix(...)
 
-    Original name was `impedance_matrix_z`; renamed so the correct
-    implementation can take that name.
+    Formula (single surface integral, summed over the triangles shared by
+    edges m and n):
+
+        G_mn = sum_{T in {T+_m,T-_m} ∩ {T+_n,T-_n}}  s_m(T) * s_n(T)
+               * (l_m * l_n / (4 * area(T)^2)) * ∫_T rho_m(r)·rho_n(r) dS
+
+    where rho_i(r) = r - free_vertex_i(T) and s_i(T) = +1 if T is edge i's
+    "+" triangle, -1 if it is the "-" triangle (same sign convention as
+    `impedance_matrix_z`: rho is r-minus-free-vertex on BOTH sides, and the
+    sign is applied explicitly rather than baked into the vector).
+
+    Unlike `impedance_matrix_z`, there is no Green's function and therefore
+    no singularity to regularise: rho_m·rho_n is an exact polynomial of
+    total degree 2 in r, so any Gauss-Dunavant rule of degree >= 2 integrates
+    it to machine precision — `quad_order=4` (6 points, all-positive
+    weights) is used by default. This replaces the previous 9-point
+    barycentric-average approximation, which had genuine (if small)
+    discretisation error; see workflow.md for the before/after comparison.
+
+    Parameters
+    ----------
+    edges_data      : Edges object
+    triangles_data  : Triangles object
+    points_data     : Points object
+    quad_order      : int  Gauss-Dunavant degree (default 4; any value >= 2
+                      in {3,4,5,6,7,11} gives the same result to machine
+                      precision since the integrand is an exact quadratic)
+
+    Returns
+    -------
+    G : real (E, E) Gram matrix
     """
-    total_number_of_edges = edges_data.total_number_of_edges
-    total_of_triangles = triangles_data.total_of_triangles
-    triangles_plus = triangles_data.triangles_plus
-    triangles_minus = triangles_data.triangles_minus
-    triangles_center = triangles_data.triangles_center
-    edges_length = edges_data.edges_length
-    barycentric_triangle_center = barycentric_triangles_data.barycentric_triangle_center
-    vecteur_rho_plus = vecteurs_rho_data.vecteur_rho_plus
-    vecteur_rho_minus = vecteurs_rho_data.vecteur_rho_minus
-    vecteur_rho_barycentric_plus = vecteurs_rho_data.vecteur_rho_barycentric_plus
-    vecteur_rho_barycentric_minus = vecteurs_rho_data.vecteur_rho_barycentric_minus
+    E      = edges_data.total_number_of_edges
+    N_tri  = triangles_data.total_of_triangles
+    tri    = triangles_data.triangles[:3, :]
+    pts    = points_data.points
+    plus   = triangles_data.triangles_plus
+    minus  = triangles_data.triangles_minus
+    areas  = triangles_data.triangles_area
+    lengths = edges_data.edges_length
+    first_pts  = edges_data.first_points
+    second_pts = edges_data.second_points
 
-    vecteur_rho_plus_tiled  = np.tile(vecteur_rho_plus[:, None, :],  (1, 9, 1))
-    vecteur_rho_minus_tiled = np.tile(vecteur_rho_minus[:, None, :], (1, 9, 1))
+    # Free vertex per edge/side (same construction as impedance_matrix_z)
+    free_plus  = np.empty((3, E), dtype=np.float64)
+    free_minus = np.empty((3, E), dtype=np.float64)
+    for m in range(E):
+        ev = {int(first_pts[m]), int(second_pts[m])}
+        tp = int(plus[m]);  tm = int(minus[m])
+        for vi in range(3):
+            if int(tri[vi, tp]) not in ev:
+                free_plus[:, m] = pts[:, tri[vi, tp]];  break
+        for vi in range(3):
+            if int(tri[vi, tm]) not in ev:
+                free_minus[:, m] = pts[:, tri[vi, tm]]; break
 
-    matrice_z = np.zeros((total_number_of_edges, total_number_of_edges), dtype=complex)
+    tri_verts = np.transpose(pts[:, tri], (2, 0, 1))   # (N_tri, 3, 3)
 
-    for triangle in range(total_of_triangles):
-        positions_plus  = triangles_plus  == triangle
-        positions_minus = triangles_minus == triangle
+    xi, w = dunavant_rule(quad_order)
+    Nq = len(w)
+    r_tri = np.empty((N_tri, 3, Nq), dtype=np.float64)
+    for t in range(N_tri):
+        v = tri_verts[t]
+        r_tri[t] = map_to_triangle(xi, v[:, 0], v[:, 1], v[:, 2])
 
-        distances        = barycentric_triangle_center - triangles_center[:, triangle][:, None, None]
-        norm_of_distances = np.sqrt(np.sum(distances**2, axis=0, keepdims=True))
-        g_function        = np.exp(-parameter_k * norm_of_distances) / norm_of_distances
+    rho_plus  = r_tri[plus]  - free_plus.T[:, :, None]    # (E, 3, Nq)
+    rho_minus = r_tri[minus] - free_minus.T[:, :, None]   # (E, 3, Nq)
 
-        g_function_plus  = g_function[:, :, triangles_plus]
-        g_function_minus = g_function[:, :, triangles_minus]
+    # Group edges by the triangle they touch, keeping the +/- sign per edge
+    tri_to_edges   = [[] for _ in range(N_tri)]
+    tri_edge_signs = [[] for _ in range(N_tri)]
+    for e_idx in range(E):
+        tri_to_edges[int(plus[e_idx])].append(e_idx);  tri_edge_signs[int(plus[e_idx])].append(1.0)
+        tri_to_edges[int(minus[e_idx])].append(e_idx); tri_edge_signs[int(minus[e_idx])].append(-1.0)
 
-        fi = (np.sum(g_function_plus,  axis=1, keepdims=True)
-              - np.sum(g_function_minus, axis=1, keepdims=True))
+    G_global = np.zeros((E, E), dtype=np.float64)
 
-        impedance_coupling_zf = factor_fi.reshape(-1, 1) * fi.squeeze().reshape(-1, 1)
-
-        def update(the_position, vecteur_rho_barycentric_p_m, sign):
-            vecteur_rho_barycentric = np.tile(
-                vecteur_rho_barycentric_p_m[:, :, the_position][:, :, None],
-                (1, 1, total_number_of_edges),
-            )
-            a_contribution = (
-                np.sum(g_function_plus  * np.sum(vecteur_rho_barycentric * vecteur_rho_plus_tiled,  axis=0), axis=0)
-                + np.sum(g_function_minus * np.sum(vecteur_rho_barycentric * vecteur_rho_minus_tiled, axis=0), axis=0)
-            )
-            z1 = factor_a * a_contribution[:, None]
-            z1_reshaped = z1.squeeze(axis=1).sum(axis=0)
-            matrice_z[:, the_position] += edges_length[the_position] * (
-                z1_reshaped + sign * impedance_coupling_zf.squeeze()
-            )
-
-        for position in np.where(positions_plus)[0]:
-            update(position, vecteur_rho_barycentric_plus,  +1)
-        for position in np.where(positions_minus)[0]:
-            update(position, vecteur_rho_barycentric_minus, -1)
-
-    return matrice_z
-
-
-# ---------------------------------------------------------------------------
-# Legacy Gram matrix (renamed)
-# ---------------------------------------------------------------------------
-
-def rwg_gram_matrix_legacy(edges_data, triangles_data, vecteurs_rho_data):
-    """
-    LEGACY — RWG Gram matrix for surface-impedance boundary conditions.
-    Original name was `rwg_gram_matrix`.
-    """
-    num_edges = edges_data.total_number_of_edges
-    num_tri   = triangles_data.total_of_triangles
-    G_global  = np.zeros((num_edges, num_edges), dtype=np.float64)
-
-    tri_to_edges  = [[] for _ in range(num_tri)]
-    tri_edge_sides = [[] for _ in range(num_tri)]
-
-    for e_idx in range(num_edges):
-        tp = triangles_data.triangles_plus[e_idx]
-        tm = triangles_data.triangles_minus[e_idx]
-        if tp != -1:
-            tri_to_edges[tp].append(e_idx);   tri_edge_sides[tp].append('plus')
-        if tm != -1:
-            tri_to_edges[tm].append(e_idx);   tri_edge_sides[tm].append('minus')
-
-    print(f"Computing Gram matrix ({num_tri} triangles)...")
-
-    for tri_idx in range(num_tri):
-        area         = triangles_data.triangles_area[tri_idx]
-        edges_in_tri = tri_to_edges[tri_idx]
-        sides_in_tri = tri_edge_sides[tri_idx]
-        n_local      = len(edges_in_tri)
-
+    for t in range(N_tri):
+        edges_in_tri = tri_to_edges[t]
         if not edges_in_tri:
             continue
+        signs_in_tri = tri_edge_signs[t]
+        area = areas[t]
+        l_local = lengths[edges_in_tri]
 
-        l_local   = edges_data.edges_length[edges_in_tri]
-        rho_local = np.zeros((n_local, 9, 3), dtype=np.float64)
+        rho_local = np.stack([
+            rho_plus[e] if s > 0 else rho_minus[e]
+            for e, s in zip(edges_in_tri, signs_in_tri)
+        ])   # (n_local, 3, Nq)
+        sign_local = np.array(signs_in_tri)   # (n_local,)
 
-        for i, (e_idx, side) in enumerate(zip(edges_in_tri, sides_in_tri)):
-            if side == 'plus':
-                rho_local[i] = vecteurs_rho_data.vecteur_rho_barycentric_plus[:, :, e_idx].T
-            else:
-                rho_local[i] = vecteurs_rho_data.vecteur_rho_barycentric_minus[:, :, e_idx].T
+        # ∫_T rho_i . rho_j dS = 2*area * sum_q w_q rho_i(q).rho_j(q)
+        dot_q  = np.einsum('ikq,jkq->ijq', rho_local, rho_local)
+        dot_ij = 2.0 * area * np.einsum('ijq,q->ij', dot_q, w)
 
-        g_block = np.zeros((n_local, n_local), dtype=np.float64)
-
-        for i in range(n_local):
-            for j in range(i, n_local):
-                dot_ij = np.einsum('kd,kd->', rho_local[i], rho_local[j])
-                val    = (l_local[i] * l_local[j] / (36.0 * area)) * dot_ij
-                g_block[i, j] = val
-                g_block[j, i] = val
+        prefactor = (np.outer(sign_local, sign_local)
+                     * np.outer(l_local, l_local) / (4.0 * area ** 2))
+        g_block = prefactor * dot_ij
 
         G_global[np.ix_(edges_in_tri, edges_in_tri)] += g_block
 
     return G_global
-
-
-# Backward-compat aliases (so existing code using `from impmet import *` still works)
-rwg_gram_matrix = rwg_gram_matrix_legacy
