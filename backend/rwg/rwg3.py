@@ -31,6 +31,42 @@ def calculate_z_matrice(points, triangles, edges, frequency):
 
     return omega, mu, epsilon, light_speed_c, eta, matrice_z
 
+
+def calculate_z_matrice_sweep(points, triangles, edges, frequencies):
+    """
+    Calculate the electromagnetic impedance matrix at MULTIPLE frequencies in
+    a single pass, for use by a frequency sweep.
+
+    Unlike calling calculate_z_matrice once per frequency, this reuses every
+    frequency-independent triangle-pair quantity (quadrature points, rho
+    vectors, pairwise distances, Duffy nodes) across the whole sweep instead
+    of recomputing it at each frequency -- see
+    backend.utils.impmet.impedance_matrix_z_sweep and workflow.md,
+    "frequency_sweep one-time precompute".
+
+    Parameters
+    ----------
+    points    : Points object  (physical vertex coordinates)
+    triangles : Triangles object
+    edges     : Edges object
+    frequencies : array-like (N_freq,)  sweep frequencies in Hz
+
+    Returns
+    -------
+    omega (N_freq,), mu, epsilon, light_speed_c, eta, matrice_z (N_freq, E, E)
+    """
+    epsilon = 8.854e-12
+    mu      = 1.257e-6
+
+    light_speed_c = 1.0 / np.sqrt(epsilon * mu)
+    eta           = np.sqrt(mu / epsilon)
+    frequencies   = np.atleast_1d(np.asarray(frequencies, dtype=np.float64))
+    omega         = 2.0 * np.pi * frequencies
+
+    matrice_z = impedance_matrix_z_sweep(edges, triangles, points, frequencies, mu, epsilon)
+
+    return omega, mu, epsilon, light_speed_c, eta, matrice_z
+
 def compute_lumped_impedance(load_values, omega):
     """
         Computes Z = jωL + 1/(jωC) + R from load_values (3, N),

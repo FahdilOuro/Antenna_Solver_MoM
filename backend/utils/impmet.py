@@ -222,6 +222,190 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
 
 
 # ---------------------------------------------------------------------------
+# Multi-frequency sweep: assemble Z at every frequency in a single pass
+# ---------------------------------------------------------------------------
+
+def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencies, mu, epsilon,
+                              quad_order: int = 6, duffy_order: int = 7) -> np.ndarray:
+    """
+    Assemble the RWG EFIE impedance matrix at MULTIPLE frequencies in one pass.
+
+    A frequency sweep that calls `impedance_matrix_z` once per frequency point
+    recomputes, from scratch, every triangle-pair quantity that does not
+    actually depend on frequency: quadrature points, rho vectors, pairwise
+    distances R = |r_t - r_s|, rho_t.rho_s dot products, and (for SELF pairs)
+    the Duffy collapsed-coordinate nodes. Only the Green's-function kernel
+    G(f) = exp(-jk(f)R)/R and the physical prefactors actually change with f.
+
+    This function has the exact same (m,n) fill loop and per-pair
+    categorisation as `impedance_matrix_z`, but computes each pair's
+    frequency-INDEPENDENT geometry once, then evaluates the frequency-
+    DEPENDENT kernel for every sweep point via a broadcast over a leading
+    frequency axis -- so the expensive geometric work (R, rho_dot, Duffy
+    nodes) is paid once per pair instead of once per pair per frequency.
+
+    Every Z_all[i] is identical (to full float64 precision) to what
+    `impedance_matrix_z` would return for frequencies[i] with the same
+    quad_order/duffy_order -- this is purely a caching/vectorisation change,
+    not a change in what is computed. See workflow.md, "frequency_sweep
+    one-time precompute" for the profiled speedup on a real mesh.
+
+    Parameters
+    ----------
+    edges_data, triangles_data, points_data : as in impedance_matrix_z
+    frequencies : array-like (N_freq,)  sweep frequencies in Hz
+    mu, epsilon : float  free-space permeability / permittivity
+    quad_order, duffy_order : int  as in impedance_matrix_z
+
+    Returns
+    -------
+    matrice_z : complex (N_freq, E, E)
+    """
+    frequencies = np.atleast_1d(np.asarray(frequencies, dtype=np.float64))
+    N_freq = frequencies.shape[0]
+
+    light_speed_c = 1.0 / np.sqrt(mu * epsilon)
+    omega_arr     = 2.0 * np.pi * frequencies                          # (Nf,)
+    k_complex_arr = 1j * (omega_arr / light_speed_c)                   # (Nf,)
+    pref_A_arr    = 1j * omega_arr * mu / (4.0 * np.pi)                # (Nf,)
+    pref_Phi_arr  = 1.0 / (1j * omega_arr * epsilon * 4.0 * np.pi)     # (Nf,)
+
+    E      = edges_data.total_number_of_edges
+    N_tri  = triangles_data.total_of_triangles
+    tri    = triangles_data.triangles[:3, :]
+    pts    = points_data.points
+    plus   = triangles_data.triangles_plus
+    minus  = triangles_data.triangles_minus
+    lengths = edges_data.edges_length
+    first_pts  = edges_data.first_points
+    second_pts = edges_data.second_points
+
+    # --- Frequency-independent geometry: identical to impedance_matrix_z ---
+    tri_verts = np.transpose(pts[:, tri], (2, 0, 1))
+
+    free_plus  = np.empty((3, E), dtype=np.float64)
+    free_minus = np.empty((3, E), dtype=np.float64)
+    for m in range(E):
+        ev = {int(first_pts[m]), int(second_pts[m])}
+        tp = int(plus[m]);  tm = int(minus[m])
+        for vi in range(3):
+            if int(tri[vi, tp]) not in ev:
+                free_plus[:, m] = pts[:, tri[vi, tp]];  break
+        for vi in range(3):
+            if int(tri[vi, tm]) not in ev:
+                free_minus[:, m] = pts[:, tri[vi, tm]]; break
+
+    xi_far,  w_far  = dunavant_rule(quad_order)
+    xi_near, w_near = dunavant_rule(min(quad_order + 5, 11))
+    Nq_far, Nq_near = len(w_far), len(w_near)
+
+    r_tri_far  = np.empty((N_tri, 3, Nq_far),  dtype=np.float64)
+    r_tri_near = np.empty((N_tri, 3, Nq_near), dtype=np.float64)
+    for t in range(N_tri):
+        v = tri_verts[t]
+        r_tri_far[t]  = map_to_triangle(xi_far,  v[:, 0], v[:, 1], v[:, 2])
+        r_tri_near[t] = map_to_triangle(xi_near, v[:, 0], v[:, 1], v[:, 2])
+
+    rho_plus_far   = r_tri_far[plus]   - free_plus.T[:, :, None]
+    rho_minus_far  = r_tri_far[minus]  - free_minus.T[:, :, None]
+    rho_plus_near  = r_tri_near[plus]  - free_plus.T[:, :, None]
+    rho_minus_near = r_tri_near[minus] - free_minus.T[:, :, None]
+
+    matrice_z = np.zeros((N_freq, E, E), dtype=complex)
+
+    for m in range(E):
+        lm = lengths[m]
+        tp_m = int(plus[m]);  tm_m = int(minus[m])
+
+        test_sides = [
+            (tp_m, +1.0, free_plus[:, m],  rho_plus_far[m],  rho_plus_near[m]),
+            (tm_m, -1.0, free_minus[:, m], rho_minus_far[m], rho_minus_near[m]),
+        ]
+
+        for n in range(E):
+            ln = lengths[n]
+            tp_n = int(plus[n]);  tm_n = int(minus[n])
+
+            source_sides = [
+                (tp_n, +1.0, free_plus[:, n],  rho_plus_far[n],  rho_plus_near[n]),
+                (tm_n, -1.0, free_minus[:, n], rho_minus_far[n], rho_minus_near[n]),
+            ]
+
+            Z_mn = np.zeros(N_freq, dtype=complex)
+
+            for (T_t, s_t, fv_t, rho_t_far, rho_t_near) in test_sides:
+                tri_t_verts = tri[:, T_t]
+
+                for (T_s, s_s, fv_s, rho_s_far, rho_s_near) in source_sides:
+                    s_ts = s_t * s_s
+                    cat  = classify_triangle_pair(tri_t_verts, tri[:, T_s])
+
+                    if cat == FAR:
+                        r_t, r_s = r_tri_far[T_t], r_tri_far[T_s]
+                        rho_t, rho_s = rho_t_far, rho_s_far
+
+                        # Geometric part -- computed ONCE, reused for every frequency
+                        diff    = r_t[:, :, None] - r_s[:, None, :]           # (3,Nq,Nq)
+                        R       = np.sqrt(np.einsum('ijk,ijk->jk', diff, diff))  # (Nq,Nq)
+                        rho_dot = np.einsum('ip,iq->pq', rho_t, rho_s)        # (Nq,Nq)
+
+                        # Frequency-dependent kernel -- vectorised over the sweep
+                        G = np.exp(-k_complex_arr[:, None, None] * R[None, :, :]) / R[None, :, :]
+                        integrand = (pref_A_arr[:, None, None] * rho_dot[None, :, :]
+                                     + 4.0 * pref_Phi_arr[:, None, None]) * G
+                        sub = np.einsum('p,q,fpq->f', w_far, w_far, integrand)   # (Nf,)
+                        Z_mn += s_ts * lm * ln * sub
+
+                    elif cat == SELF:
+                        r_t, rho_t = r_tri_far[T_t], rho_t_far
+                        v_s = tri_verts[T_s]
+
+                        sub = np.zeros(N_freq, dtype=complex)
+                        for p in range(Nq_far):
+                            r_sing = r_t[:, p]
+                            rho_tp = rho_t[:, p]
+
+                            # Duffy nodes/weights are pure geometry -- computed
+                            # ONCE per (m,n,p), reused for every frequency
+                            d_pts, d_w = duffy_source_nodes(
+                                r_sing, v_s[:, 0], v_s[:, 1], v_s[:, 2],
+                                order=duffy_order,
+                            )
+                            rho_sp    = d_pts.T - fv_s[:, None]
+                            diff_p    = r_sing[:, None] - d_pts.T
+                            R_p       = np.sqrt(np.einsum('id,id->d', diff_p, diff_p))
+                            rho_dot_p = np.einsum('i,id->d', rho_tp, rho_sp)
+
+                            R_p_safe = np.where(R_p > 1e-300, R_p, 1.0)
+                            G_p = np.exp(-k_complex_arr[:, None] * R_p_safe[None, :]) / R_p_safe[None, :]
+                            G_p = np.where((R_p > 1e-300)[None, :], G_p, 0.0)   # (Nf,Nq_d)
+                            integrand_p = (pref_A_arr[:, None] * rho_dot_p[None, :]
+                                           + 4.0 * pref_Phi_arr[:, None]) * G_p
+                            inner = integrand_p @ d_w                            # (Nf,)
+                            sub  += w_far[p] * inner
+
+                        Z_mn += s_ts * lm * ln * sub
+
+                    else:   # EDGE or VERTEX
+                        r_t, r_s = r_tri_near[T_t], r_tri_near[T_s]
+                        rho_t, rho_s = rho_t_near, rho_s_near
+
+                        diff    = r_t[:, :, None] - r_s[:, None, :]
+                        R       = np.sqrt(np.einsum('ijk,ijk->jk', diff, diff))
+                        rho_dot = np.einsum('ip,iq->pq', rho_t, rho_s)
+
+                        G = np.exp(-k_complex_arr[:, None, None] * R[None, :, :]) / R[None, :, :]
+                        integrand = (pref_A_arr[:, None, None] * rho_dot[None, :, :]
+                                     + 4.0 * pref_Phi_arr[:, None, None]) * G
+                        sub = np.einsum('p,q,fpq->f', w_near, w_near, integrand)
+                        Z_mn += s_ts * lm * ln * sub
+
+            matrice_z[:, m, n] = Z_mn
+
+    return matrice_z
+
+
+# ---------------------------------------------------------------------------
 # RWG Gram matrix (surface-impedance boundary condition term)
 # ---------------------------------------------------------------------------
 

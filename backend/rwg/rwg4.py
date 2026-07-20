@@ -143,9 +143,42 @@ def calculate_current_radiation(path, feed_point, voltage_amplitude,
     else:
         current = np.linalg.solve(matrice_z, voltage)
 
-    # P_in = 0.5 Re(V·I*) — the only formula consistent with the MoM energy identity
-    P_in_total = 0.5 * np.real(np.dot(voltage, np.conj(current)))
-    print(f"Total input power P_in = 0.5*Re(V·I*) = {P_in_total:.6e} W")
+    port_results = compute_port_results(voltage, current, all_feeding_edges,
+                                         voltage_amplitude, feed_point)
+
+    # Returns the environmental constants, global vectors, and the list of port-specific data
+    return frequency, voltage, current, port_results
+
+
+def compute_port_results(voltage, current, all_feeding_edges, voltage_amplitude, feed_point, verbose=True):
+    """
+    Compute per-port input impedance, power, and effective gap current from a
+    solved (voltage, current) pair, given the feeding-edge groups returned by
+    `multiple_gap_sources`.
+
+    Extracted from `calculate_current_radiation` so that a frequency sweep
+    (which solves Z(f)*I=V for many frequencies without reloading mesh/port
+    data each time -- see backend.utils.frequency_sweep) can reuse the exact
+    same port-metric formulas instead of re-deriving them.
+
+    Parameters
+    ----------
+    voltage             : complex (E,)  global excitation vector
+    current             : complex (E,)  solved current vector (Z^-1 @ voltage)
+    all_feeding_edges   : list of int ndarray, per port (from multiple_gap_sources)
+    voltage_amplitude   : float or array-like, per-port excitation amplitude
+    feed_point          : array-like, coordinates of the feed point(s)
+    verbose             : bool, print per-port P_in/Q_in/Z_in and the total input power
+
+    Returns
+    -------
+    port_results : list of dicts with keys 'port_index', 'location',
+                   'gap_current', 'impedance', 'power', 'source_voltage'
+    """
+    if verbose:
+        # P_in = 0.5 Re(V·I*) — the only formula consistent with the MoM energy identity
+        P_in_total = 0.5 * np.real(np.dot(voltage, np.conj(current)))
+        print(f"Total input power P_in = 0.5*Re(V·I*) = {P_in_total:.6e} W")
 
     feed_points_2d = np.atleast_2d(feed_point)
     num_feed_group_edges = len(all_feeding_edges)
@@ -155,7 +188,8 @@ def calculate_current_radiation(path, feed_point, voltage_amplitude,
         feeding_edges = all_feeding_edges[i]
 
         if feeding_edges.size == 0:
-            print(f"Warning: Port {i} at {feed_points_2d[i]} has no feeding edges.")
+            if verbose:
+                print(f"Warning: Port {i} at {feed_points_2d[i]} has no feeding edges.")
             continue
 
         amp = voltage_amplitude[i] if not np.isscalar(voltage_amplitude) else voltage_amplitude
@@ -170,8 +204,9 @@ def calculate_current_radiation(path, feed_point, voltage_amplitude,
         gap_current_eff = 2.0 * np.conj(S_port) / amp if amp != 0 else 0j
         impedance = amp / gap_current_eff if np.abs(gap_current_eff) > 0 else np.inf
 
-        print(f"Port {i}: P_in = {P_in_port:.4e} W  |  Q_in = {Q_in_port:.4e} VAR"
-              f"  |  Z_in = {impedance:.4f} Ω")
+        if verbose:
+            print(f"Port {i}: P_in = {P_in_port:.4e} W  |  Q_in = {Q_in_port:.4e} VAR"
+                  f"  |  Z_in = {impedance:.4f} Ohm")
 
         port_results.append({
             'port_index': i,
@@ -182,8 +217,7 @@ def calculate_current_radiation(path, feed_point, voltage_amplitude,
             'source_voltage': amp
         })
 
-    # Returns the environmental constants, global vectors, and the list of port-specific data
-    return frequency, voltage, current, port_results
+    return port_results
 
 class DataManager_rwg4:
     """
