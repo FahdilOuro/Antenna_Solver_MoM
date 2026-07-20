@@ -1,5 +1,10 @@
 import numpy as np
 
+
+class GapSourceError(ValueError):
+    """Raised when a gap-source excitation finds no RWG edge to feed."""
+
+
 def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude,
                          feed_points, excitation_unit_vector, gap_width, phases=None):
     """
@@ -22,7 +27,26 @@ def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude,
     excitation_unit_vector : str or list of str  ('x', 'y', or 'z')
     gap_width : float
     phases : float or array-like, optional (radians)
-    
+
+    Notes on gap localisation
+    -------------------------
+    The gap window is a cube of side `gap_width` centred on each feed point,
+    tested independently on all three coordinates -- not just the excitation
+    axis. For a simple 1D wire/strip (the case eq. 7 was derived for), the
+    structure's cross-section is already far smaller than gap_width, so this
+    is equivalent to testing the excitation axis alone.
+
+    It stops being equivalent at a junction between differently-oriented
+    surfaces sharing the feed point (e.g. a monopole blade standing on a
+    ground plane): testing only the excitation-axis coordinate would then
+    also catch far-away triangles that merely happen to share that one
+    coordinate with the feed point (e.g. a whole band of the ground plane at
+    the same x as a monopole fed along x, regardless of how far it is along
+    y) -- spuriously exciting geometry that has nothing to do with the actual
+    feed location. The 3D box keeps the excitation localised to a small
+    neighbourhood of the feed point regardless of how many differently
+    oriented surfaces meet there.
+
     Returns
     -------
     total_voltage_vector : complex ndarray, shape (num_edges,)
@@ -70,26 +94,41 @@ def multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude,
 
     for i in range(num_feeds):
         ax_idx     = axis_map[unit_vectors[i]]
-        gap_center = feed_points[i, ax_idx]
         v_complex  = complex_amplitudes[i]
+        feed_pt    = feed_points[i, :]                  # (3,) full 3D feed point
 
-        # Centroid coordinate along excitation axis for T+ and T-
-        coord_cp = centroids[ax_idx, tri_plus_idx]    # (num_edges,)
-        coord_cn = centroids[ax_idx, tri_minus_idx]   # (num_edges,)
+        # Centroid position (all 3 coordinates) for T+ and T-
+        centroid_p = centroids[:, tri_plus_idx]         # (3, num_edges)
+        centroid_n = centroids[:, tri_minus_idx]        # (3, num_edges)
 
-        # Step function window: 1 if centroid is inside the gap, 0 otherwise
-        # Implements u(z + W/2) - u(z - W/2) from eq. (7)
+        # 3D box window: 1 if the centroid is within gap_width/2 of the feed
+        # point on EVERY coordinate, 0 otherwise (see "Notes on gap
+        # localisation" above). Reduces to eq. (7)'s 1D step function
+        # u(z+W/2)-u(z-W/2) whenever the structure's cross-section already
+        # fits inside the box, as for a simple wire/strip.
         half_W   = gap_width / 2.0
-        window_p = np.where(np.abs(coord_cp - gap_center) <= half_W, 1.0, 0.0)
-        window_n = np.where(np.abs(coord_cn - gap_center) <= half_W, 1.0, 0.0)
+        window_p = np.all(np.abs(centroid_p - feed_pt[:, None]) <= half_W, axis=0).astype(float)
+        window_n = np.all(np.abs(centroid_n - feed_pt[:, None]) <= half_W, axis=0).astype(float)
 
-        # Warn if no edge is selected (mesh too coarse relative to gap width)
+        # Fail loudly if no edge is selected, rather than silently solving
+        # with a zero excitation for this port: a mismatch between
+        # gap_width, excitation_unit_vector, and feed_points here means the
+        # requested port is not actually feeding anything, which would
+        # otherwise show up only indirectly (e.g. a "missing" structure in
+        # the results) rather than at the point the mistake was made.
         port_indices = np.where((window_p > 0) | (window_n > 0))[0]
         if port_indices.size == 0:
-            print(f"Warning: Port {i} — no edges found within gap. "
-                  f"Gap width ({gap_width:.4g}) may be smaller than mesh size.")
-            all_feeding_edges.append(port_indices)
-            continue
+            raise GapSourceError(
+                f"Port {i} (feed_point={feed_pt}, excitation_unit_vector="
+                f"'{unit_vectors[i]}', gap_width={gap_width:.4g}): no RWG "
+                f"edge found within the gap. Check that feed_points lies on "
+                f"(or very near) the mesh, that gap_width is large enough to "
+                f"reach at least one triangle on every side of the feed you "
+                f"intend to excite, and that excitation_unit_vector matches "
+                f"the actual direction current should flow at this feed "
+                f"(e.g. the antenna's own axis at a junction, not just the "
+                f"axis you happen to be thinking of)."
+            )
 
         all_feeding_edges.append(port_indices)
 
