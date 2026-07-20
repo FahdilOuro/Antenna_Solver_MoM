@@ -189,7 +189,7 @@ class DataManager_rwg2:
             'vecteur_rho_plus' : vecteurs_rho_data.vecteur_rho_plus,
             'vecteur_rho_minus' : vecteurs_rho_data.vecteur_rho_minus,
             'vecteur_rho_barycentric_plus' : vecteurs_rho_data.vecteur_rho_barycentric_plus,
-            'vecteur_rho_barycentric_minus' : vecteurs_rho_data.vecteur_rho_barycentric_plus,
+            'vecteur_rho_barycentric_minus' : vecteurs_rho_data.vecteur_rho_barycentric_minus,
         }
         data.update(new_data)
 

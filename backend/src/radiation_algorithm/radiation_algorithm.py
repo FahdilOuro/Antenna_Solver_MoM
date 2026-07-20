@@ -56,21 +56,11 @@ def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excita
 
     # Calculation of electromagnetic constants and impedance matrix Z
     if load_lumped_elements:
-        omega, mu, epsilon, light_speed_c, eta, matrice_z, _ = calculate_z_matrice_lumped_elements(points,
-                                                                                                   triangles,
-                                                                                                   edges,
-                                                                                                   barycentric_triangles,
-                                                                                                   vecteurs_rho,
-                                                                                                   frequency,
-                                                                                                   LoadPoint,
-                                                                                                   LoadValue,
-                                                                                                   LoadDir)
+        omega, mu, epsilon, light_speed_c, eta, matrice_z, _ = calculate_z_matrice_lumped_elements(
+            points, triangles, edges, frequency, LoadPoint, LoadValue, LoadDir)
     else:
-        omega, mu, epsilon, light_speed_c, eta, matrice_z = calculate_z_matrice(triangles,
-                                                                                edges,
-                                                                                barycentric_triangles,
-                                                                                vecteurs_rho,
-                                                                                frequency)
+        omega, mu, epsilon, light_speed_c, eta, matrice_z = calculate_z_matrice(
+            points, triangles, edges, frequency)
 
     # Save impedance data
     DataManager_rwg3.save_data(path, frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z)

@@ -49,11 +49,8 @@ def scattering_algorithm_E_field(mesh, frequency, wave_incident_direction, polar
     filename_mesh2_to_load = save_folder_name_mesh2 + save_file_name_mesh2
 
     # Compute electromagnetic constants and impedance matrix Z
-    omega, mu, epsilon, light_speed_c, eta, matrice_z = calculate_z_matrice(triangles,
-                                                                            edges,
-                                                                            barycentric_triangles,
-                                                                            vecteurs_rho,
-                                                                            frequency)
+    omega, mu, epsilon, light_speed_c, eta, matrice_z = calculate_z_matrice(
+        points, triangles, edges, frequency)
 
     # Save impedance data
     save_folder_name_impedance = 'data/antennas_impedance/'

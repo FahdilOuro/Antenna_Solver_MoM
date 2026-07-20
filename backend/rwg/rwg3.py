@@ -2,48 +2,32 @@ import os
 from scipy.io import savemat, loadmat
 from backend.utils.impmet import *
 
-def calculate_z_matrice(triangles, edges, barycentric_triangles, vecteurs_rho, frequency):
+def calculate_z_matrice(points, triangles, edges, frequency):
     """
-        Calculates the electromagnetic impedance matrix for a given system.
+    Calculate the electromagnetic impedance matrix for a given mesh.
 
-        Parameters:
-            * triangles : Object representing the mesh triangles.
-            * edges : Object representing the mesh edges.
-            * barycentric_triangles : Object containing the barycentric data of triangles.
-            * vecteurs_rho : Object containing the Rho vectors associated with the triangles.
-            * frequency : Electromagnetic signal frequency (in Hz).
+    Parameters
+    ----------
+    points    : Points object  (physical vertex coordinates)
+    triangles : Triangles object
+    edges     : Edges object
+    frequency : float  (Hz)
 
-        Returns:
-            * omega : Angular frequency (rad/s).
-            * mu : Magnetic permeability of free space (H/m).
-            * epsilon : Permittivity of free space (F/m).
-            * light_speed_c : Speed of light in vacuum (m/s).
-            * eta : Characteristic impedance of free space (Ω).
-            * matrice_z : Calculated impedance matrix.
+    Returns
+    -------
+    omega, mu, epsilon, light_speed_c, eta, matrice_z
     """
-
     # Electromagnetic parameters
-    epsilon = 8.854e-12  # Permittivity of free space (F/m)
-    mu = 1.257e-6        # Magnetic permeability of free space (H/m)
+    epsilon = 8.854e-12
+    mu      = 1.257e-6
 
-    # Calculate electromagnetic constants
-    light_speed_c = 1 / np.sqrt(epsilon * mu)  # Speed of light in vacuum (m/s)
-    eta = np.sqrt(mu / epsilon)                # Characteristic impedance of free space (Ω)
-    omega = 2 * np.pi * frequency              # Angular frequency (rad/s)
-    k = omega / light_speed_c                  # Wave number (rad/m)
-    complexe_k = 1j * k                        # Complex wave number for calculations
+    light_speed_c = 1.0 / np.sqrt(epsilon * mu)
+    eta           = np.sqrt(mu / epsilon)
+    omega         = 2.0 * np.pi * frequency
+    k             = omega / light_speed_c
+    k_complex     = 1j * k   # used as exp(-k_complex * R) = exp(-jkR)
 
-    # Constants to optimize computations
-    constant_1 = mu / (4 * np.pi)                        # Constant for magnetic field calculation
-    constant_2 = 1 / (1j * 4 * np.pi * omega * epsilon)  # Constant for electric field calculation
-    factor = 1 / 9                                       # Weight factor for integrated calculations
-
-    # Edge-specific factors
-    factor_a = factor * (1j * omega * edges.edges_length / 4) * constant_1  # Factor for vector potential
-    factor_fi = factor * edges.edges_length * constant_2                     # Factor for scalar potential
-
-    # Impedance matrix calculation
-    matrice_z = impedance_matrix_z(edges, triangles, barycentric_triangles, vecteurs_rho, complexe_k, factor_a, factor_fi)
+    matrice_z = impedance_matrix_z(edges, triangles, points, k_complex, omega, mu, epsilon)
 
     return omega, mu, epsilon, light_speed_c, eta, matrice_z
 
@@ -92,7 +76,7 @@ def compute_lumped_impedance(load_values, omega):
 
     return DeltaZ
 
-def calculate_z_matrice_lumped_elements(points, triangles, edges, barycentric_triangles, vecteurs_rho, frequency, LoadPoint, LoadValue, LoadDir):
+def calculate_z_matrice_lumped_elements(points, triangles, edges, frequency, LoadPoint, LoadValue, LoadDir):
     """
         Computes the electromagnetic impedance matrix for a given system with lumped elements.
 
@@ -127,17 +111,8 @@ def calculate_z_matrice_lumped_elements(points, triangles, edges, barycentric_tr
     k = omega / light_speed_c                  # Wavenumber (rad/m)
     complexe_k = 1j * k                        # Complex wavenumber for calculations
 
-    # Factors to optimize calculations
-    constant_1 = mu / (4 * np.pi)                        # Factor for magnetic field calculation
-    constant_2 = 1 / (1j * 4 * np.pi * omega * epsilon)  # Factor for electric field calculation
-    factor = 1 / 9                                       # Weight factor for integrated calculations
-
-    # Edge-specific factors
-    factor_a = factor * (1j * omega * edges.edges_length / 4) * constant_1  # Vector potential factor
-    factor_fi = factor * edges.edges_length * constant_2                     # Scalar potential factor
-
     # Compute impedance matrix
-    matrice_z = impedance_matrix_z(edges, triangles, barycentric_triangles, vecteurs_rho, complexe_k, factor_a, factor_fi)
+    matrice_z = impedance_matrix_z(edges, triangles, points, complexe_k, omega, mu, epsilon)
 
     # Lumped impedance implementation
     LoadPoint = LoadPoint.T  # (3, LNumber)
