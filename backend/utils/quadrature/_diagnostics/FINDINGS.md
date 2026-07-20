@@ -1,5 +1,12 @@
 # Phase 0 Diagnostic Findings
 
+> **Note (2026-07-20):** the one-off validation scripts referenced below
+> (`brute_force_reference.py`, `validate_new_impmet.py`, `verify_z_properties.py`)
+> have been deleted after the validation they describe was completed — their
+> conclusions are captured here. The `phase7_plate/` result data has moved to
+> `data/cma_results/phase7_plate/`. This file is kept as the historical record
+> of the Duffy/Gauss-Dunavant singularity-handling implementation.
+
 **Date:** 2026-06-30  
 **Branch:** singularity_handle  
 **Script:** `backend/utils/quadrature/_diagnostics/brute_force_reference.py`  

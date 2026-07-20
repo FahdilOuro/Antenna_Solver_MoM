@@ -55,7 +55,7 @@ RESONANCE_WINDOW_MODE1 = (100e6, 220e6)
 RESONANCE_WINDOW_MODE2 = (200e6, 450e6)
 
 OUT_DIR_DEFAULT = os.path.join(
-    _REPO_ROOT, 'backend', 'utils', 'quadrature', '_diagnostics', 'phase7_plate'
+    _REPO_ROOT, 'data', 'cma_results', 'phase7_plate'
 )
 
 

@@ -92,10 +92,7 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
 
     # Precompute triangle vertex arrays: shape (N_tri, 3, 3)
     # tri_verts[t, :, i] = physical coords of i-th vertex of triangle t
-    tri_verts = np.zeros((N_tri, 3, 3), dtype=np.float64)
-    for t in range(N_tri):
-        for i in range(3):
-            tri_verts[t, :, i] = pts[:, tri[i, t]]
+    tri_verts = np.transpose(pts[:, tri], (2, 0, 1))
 
     # Precompute free vertex for each edge in each ± triangle
     # free_plus[:, m] = vertex of T^+_m NOT on edge m
@@ -115,6 +112,25 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
     xi_far,  w_far  = dunavant_rule(quad_order)       # far pairs
     xi_near, w_near = dunavant_rule(min(quad_order + 5, 11))  # adjacent pairs
 
+    # ---- Per-triangle quadrature points, computed ONCE per triangle ----
+    # (previously map_to_triangle was re-evaluated for every (m,n) pair that
+    # touched a given triangle, i.e. up to O(E) times instead of once)
+    Nq_far, Nq_near = len(w_far), len(w_near)
+    r_tri_far  = np.empty((N_tri, 3, Nq_far),  dtype=np.float64)
+    r_tri_near = np.empty((N_tri, 3, Nq_near), dtype=np.float64)
+    for t in range(N_tri):
+        v = tri_verts[t]
+        r_tri_far[t]  = map_to_triangle(xi_far,  v[:, 0], v[:, 1], v[:, 2])
+        r_tri_near[t] = map_to_triangle(xi_near, v[:, 0], v[:, 1], v[:, 2])
+
+    # ---- Per-edge rho vectors at those points, computed ONCE per edge ----
+    # (previously recomputed for every (m,n) pair; fv_t/fv_s only depend on
+    # the edge+side, not on the pairing partner)
+    rho_plus_far   = r_tri_far[plus]   - free_plus.T[:, :, None]
+    rho_minus_far  = r_tri_far[minus]  - free_minus.T[:, :, None]
+    rho_plus_near  = r_tri_near[plus]  - free_plus.T[:, :, None]
+    rho_minus_near = r_tri_near[minus] - free_minus.T[:, :, None]
+
     # Result matrix
     matrice_z = np.zeros((E, E), dtype=complex)
 
@@ -122,10 +138,10 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
         lm = lengths[m]
         tp_m = int(plus[m]);  tm_m = int(minus[m])
 
-        # Testing triangles with their sign and free vertex
+        # Testing triangles with their sign, free vertex, and precomputed rho
         test_sides = [
-            (tp_m, +1.0, free_plus[:, m]),
-            (tm_m, -1.0, free_minus[:, m]),
+            (tp_m, +1.0, free_plus[:, m],  rho_plus_far[m],  rho_plus_near[m]),
+            (tm_m, -1.0, free_minus[:, m], rho_minus_far[m], rho_minus_near[m]),
         ]
 
         for n in range(E):
@@ -133,27 +149,23 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
             tp_n = int(plus[n]);  tm_n = int(minus[n])
 
             source_sides = [
-                (tp_n, +1.0, free_plus[:, n]),
-                (tm_n, -1.0, free_minus[:, n]),
+                (tp_n, +1.0, free_plus[:, n],  rho_plus_far[n],  rho_plus_near[n]),
+                (tm_n, -1.0, free_minus[:, n], rho_minus_far[n], rho_minus_near[n]),
             ]
 
             Z_mn = 0.0 + 0.0j
 
-            for (T_t, s_t, fv_t) in test_sides:
-                v_t = tri_verts[T_t]            # (3, 3)
+            for (T_t, s_t, fv_t, rho_t_far, rho_t_near) in test_sides:
                 tri_t_verts = tri[:, T_t]       # vertex indices of T_t
 
-                for (T_s, s_s, fv_s) in source_sides:
+                for (T_s, s_s, fv_s, rho_s_far, rho_s_near) in source_sides:
                     s_ts  = s_t * s_s
                     cat   = classify_triangle_pair(tri_t_verts, tri[:, T_s])
-                    v_s   = tri_verts[T_s]      # (3, 3)
 
                     if cat == FAR:
                         # ---- standard double Gauss ----
-                        r_t = map_to_triangle(xi_far, v_t[:, 0], v_t[:, 1], v_t[:, 2])   # (3, Nq)
-                        r_s = map_to_triangle(xi_far, v_s[:, 0], v_s[:, 1], v_s[:, 2])   # (3, Nq)
-                        rho_t = r_t - fv_t[:, None]   # (3, Nq_t)
-                        rho_s = r_s - fv_s[:, None]   # (3, Nq_s)
+                        r_t, r_s = r_tri_far[T_t], r_tri_far[T_s]
+                        rho_t, rho_s = rho_t_far, rho_s_far
 
                         # Pairwise distances (Nq_t, Nq_s); k_complex=1j*k_real
                         diff = r_t[:, :, None] - r_s[:, None, :]   # (3, Nq_t, Nq_s)
@@ -168,11 +180,11 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
 
                     elif cat == SELF:
                         # ---- outer Gauss, inner Duffy ----
-                        r_t   = map_to_triangle(xi_far, v_t[:, 0], v_t[:, 1], v_t[:, 2])  # (3, Nq_t)
-                        rho_t = r_t - fv_t[:, None]
+                        r_t, rho_t = r_tri_far[T_t], rho_t_far
+                        v_s = tri_verts[T_s]      # (3, 3) — Duffy needs raw vertices
 
                         sub = 0.0 + 0.0j
-                        for p in range(len(w_far)):
+                        for p in range(Nq_far):
                             r_sing = r_t[:, p]
                             rho_tp = rho_t[:, p]   # (3,)
 
@@ -192,10 +204,8 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
                         Z_mn += s_ts * lm * ln * sub
 
                     else:   # EDGE or VERTEX — bounded near-singularity, higher-order Gauss
-                        r_t = map_to_triangle(xi_near, v_t[:, 0], v_t[:, 1], v_t[:, 2])
-                        r_s = map_to_triangle(xi_near, v_s[:, 0], v_s[:, 1], v_s[:, 2])
-                        rho_t = r_t - fv_t[:, None]
-                        rho_s = r_s - fv_s[:, None]
+                        r_t, r_s = r_tri_near[T_t], r_tri_near[T_s]
+                        rho_t, rho_s = rho_t_near, rho_s_near
 
                         diff = r_t[:, :, None] - r_s[:, None, :]
                         R    = np.sqrt(np.einsum('ijk,ijk->jk', diff, diff))

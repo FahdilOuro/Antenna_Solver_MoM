@@ -136,6 +136,11 @@ Analyse.md
 CLAUDE.md
 
 # =============================================
+# Local working notes (not part of the shared repo)
+# =============================================
+workflow.md
+
+# =============================================
 # Performance profiling and analysis
 # =============================================
 *.prof
