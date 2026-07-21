@@ -1,6 +1,7 @@
 from scipy.io import savemat
 from backend.utils.impmet import *
 from backend.utils.mesh_io import MeshDataError, load_matfile_or_raise, read_mesh_fingerprint
+from backend.utils.compute_backend import GPU_AVAILABLE
 
 def calculate_z_matrice(points, triangles, edges, frequency):
     """
@@ -32,7 +33,7 @@ def calculate_z_matrice(points, triangles, edges, frequency):
     return omega, mu, epsilon, light_speed_c, eta, matrice_z
 
 
-def calculate_z_matrice_sweep(points, triangles, edges, frequencies):
+def calculate_z_matrice_sweep(points, triangles, edges, frequencies, use_gpu=None):
     """
     Calculate the electromagnetic impedance matrix at MULTIPLE frequencies in
     a single pass, for use by a frequency sweep.
@@ -44,12 +45,28 @@ def calculate_z_matrice_sweep(points, triangles, edges, frequencies):
     backend.utils.impmet.impedance_matrix_z_sweep and workflow.md,
     "frequency_sweep one-time precompute".
 
+    When a usable CUDA GPU is present on this machine (or use_gpu=True is
+    forced), the assembly additionally runs through
+    impedance_matrix_z_sweep_gpu, which batches the dominant FAR/EDGE/VERTEX
+    pair categories into large tensor operations on the GPU (measured ~10x
+    faster than CPU on the reference T600 benchmark in workflow.md, "GPU
+    acceleration (CuPy)"). On CPU-only machines (or use_gpu=False), this
+    calls the plain impedance_matrix_z_sweep instead: that batched
+    restructuring's payoff comes specifically from amortising GPU kernel-
+    launch overhead across large batches, and was measured SLOWER than the
+    original per-pair loop when actually run on CPU -- so CPU execution
+    keeps using the already-optimised per-pair implementation rather than
+    the GPU-oriented one.
+
     Parameters
     ----------
     points    : Points object  (physical vertex coordinates)
     triangles : Triangles object
     edges     : Edges object
     frequencies : array-like (N_freq,)  sweep frequencies in Hz
+    use_gpu   : bool or None  None (default) = auto-detect: use the GPU if
+                this machine has a usable CUDA device, else CPU. True forces
+                GPU (raises if none is available); False forces CPU.
 
     Returns
     -------
@@ -63,7 +80,12 @@ def calculate_z_matrice_sweep(points, triangles, edges, frequencies):
     frequencies   = np.atleast_1d(np.asarray(frequencies, dtype=np.float64))
     omega         = 2.0 * np.pi * frequencies
 
-    matrice_z = impedance_matrix_z_sweep(edges, triangles, points, frequencies, mu, epsilon)
+    run_on_gpu = (use_gpu is True) or (use_gpu is None and GPU_AVAILABLE)
+    if run_on_gpu:
+        matrice_z = impedance_matrix_z_sweep_gpu(edges, triangles, points, frequencies, mu, epsilon,
+                                                  use_gpu=True)
+    else:
+        matrice_z = impedance_matrix_z_sweep(edges, triangles, points, frequencies, mu, epsilon)
 
     return omega, mu, epsilon, light_speed_c, eta, matrice_z
 

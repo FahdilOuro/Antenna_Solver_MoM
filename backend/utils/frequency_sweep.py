@@ -14,6 +14,7 @@ from backend.utils.gap_source import multiple_gap_sources
 from backend.utils.gmsh_function import extract_msh_to_mat
 from backend.utils.impmet import rwg_gram_matrix
 from backend.utils.lossy_electric_conductor import calculate_normal_surface_impedance
+from backend.utils.compute_backend import describe_backend
 from backend.src.radiation_algorithm.radiation_algorithm import radiation_algorithm
 from backend.efield.efield2 import load_gain_power_data, radiation_intensity_distribution_over_sphere_surface
 
@@ -71,7 +72,7 @@ def frequency_sweep(path, freq_start, freq_stop, feed_point, n_points=41, voltag
                     compute_radiation_intensity=False,
                     load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None,
                     lossy_conductor=False, conductivity_conductor=None,
-                    Z0=50, show=False):
+                    use_gpu=None, Z0=50, show=False):
     """
     Performs a frequency sweep and calculates multi-port parameters (Zin, Snn, Power).
 
@@ -107,6 +108,11 @@ def frequency_sweep(path, freq_start, freq_stop, feed_point, n_points=41, voltag
         n_points : int, number of frequency points between freq_start and
                    freq_stop, inclusive (default 41). The step size is
                    derived from this, not requested directly.
+        use_gpu : bool or None, passed to calculate_z_matrice_sweep. None
+                  (default) auto-detects a usable CUDA GPU on this machine
+                  and uses it, falling back to CPU (NumPy) if there isn't
+                  one. True/False force GPU/CPU (True raises if no GPU is
+                  available). See backend.utils.compute_backend.
         Z0 : float, reference impedance for S-parameter calculation (default 50 Ohm).
         (Other parameters same as radiation_algorithm)
 
@@ -188,12 +194,14 @@ def frequency_sweep(path, freq_start, freq_stop, feed_point, n_points=41, voltag
 
     # 5. Assemble Z(f) for every sweep frequency in a single batched pass,
     #    reusing all triangle-pair geometry across the whole sweep instead of
-    #    recomputing it from scratch at each frequency.
-    print(f"Assembling Z(f) for {nPoints} frequencies ({E}x{E} edges) -- "
-          f"geometry reused across the whole sweep...")
+    #    recomputing it from scratch at each frequency, on whichever compute
+    #    backend this machine actually has (GPU if usable, CPU otherwise --
+    #    see backend.utils.compute_backend).
+    print(f"Assembling Z(f) for {nPoints} frequencies ({E}x{E} edges) on "
+          f"{describe_backend()} -- geometry reused across the whole sweep...")
     t0 = time.time()
     omega_arr, mu, epsilon, light_speed_c, eta, Z_all = calculate_z_matrice_sweep(
-        points, triangles, edges, frequencies)
+        points, triangles, edges, frequencies, use_gpu=use_gpu)
     dt = time.time() - t0
     print(f"Z(f) assembly done in {dt:.1f} s ({dt/nPoints:.3f} s/frequency amortised)\n")
 

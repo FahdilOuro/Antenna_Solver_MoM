@@ -406,6 +406,242 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
 
 
 # ---------------------------------------------------------------------------
+# Batched, GPU-capable multi-frequency sweep (bucket pairs by category)
+# ---------------------------------------------------------------------------
+
+def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, frequencies, mu, epsilon,
+                                  quad_order: int = 6, duffy_order: int = 7,
+                                  use_gpu=None, chunk_size: int = 20000) -> np.ndarray:
+    """
+    Same result as impedance_matrix_z_sweep, restructured so the FAR and
+    EDGE/VERTEX categories -- which dominate the pair COUNT for any mesh of
+    practical size -- are assembled as a handful of large batched tensor
+    operations instead of a Python-level loop over every (m,n) pair. This is
+    the prerequisite identified in workflow.md ("frequency_sweep one-time
+    precompute" / GPU audit) before GPU acceleration can help at all: the
+    original per-pair loop does tiny (~12x12 or 49x49 element) work per
+    iteration, so replacing numpy with cupy INSIDE that loop would be slower
+    than the CPU version -- GPU kernel-launch/PCIe overhead would dominate
+    over up to 4*E^2 sub-pair iterations. Batching first, then running the
+    batches on whichever array backend is active, is what actually pays off.
+
+    Categorisation (SELF/EDGE/VERTEX/FAR) is computed for all 4*E^2 sub-pairs
+    at once via vertex-index comparison (vectorised equivalent of
+    classify_triangle_pair), then:
+      - FAR and EDGE+VERTEX pairs (identical maths, EDGE/VERTEX only using a
+        higher-order quadrature rule -- see impedance_matrix_z) are each
+        assembled in chunks of `chunk_size` pairs as batched tensor
+        contractions, on `xp` = cupy if a usable GPU was detected
+        (backend.utils.compute_backend), else numpy.
+      - SELF pairs keep the original per-pair Duffy quadrature on CPU: they
+        number O(N_tri), a small fraction of the O(E^2) total, and Duffy's
+        node count varies per pair (irregular work), which does not batch as
+        cleanly as the regular categories. Batching the 90%+ of pairs that
+        ARE regular already captures most of the available speedup.
+
+    Every Z_all[i] matches impedance_matrix_z_sweep(frequencies)[i] to
+    numerical precision (float64/complex128 arithmetic reordering only --
+    see workflow.md for the measured CPU-restructure and GPU benchmarks).
+
+    Parameters
+    ----------
+    edges_data, triangles_data, points_data : as in impedance_matrix_z
+    frequencies : array-like (N_freq,)  sweep frequencies in Hz
+    mu, epsilon : float  free-space permeability / permittivity
+    quad_order, duffy_order : int  as in impedance_matrix_z
+    use_gpu : bool or None  None=auto-detect (GPU if available, else CPU),
+              True=force GPU (raises if unavailable), False=force CPU.
+    chunk_size : int  number of FAR-category pairs processed per batch (the
+              EDGE/VERTEX bucket scales this down automatically since its
+              quadrature rule has more points per pair, to keep per-chunk
+              memory comparable). Lower this if you hit an out-of-memory
+              error on a large mesh / long sweep on a small GPU.
+
+    Returns
+    -------
+    matrice_z : complex (N_freq, E, E)  (always a host/NumPy array)
+    """
+    from backend.utils.compute_backend import get_array_module, to_numpy
+    xp = get_array_module(use_gpu)
+
+    frequencies = np.atleast_1d(np.asarray(frequencies, dtype=np.float64))
+    N_freq = frequencies.shape[0]
+
+    light_speed_c = 1.0 / np.sqrt(mu * epsilon)
+    omega_arr    = 2.0 * np.pi * frequencies
+    k_complex_np = 1j * (omega_arr / light_speed_c)
+    pref_A_np    = 1j * omega_arr * mu / (4.0 * np.pi)
+    pref_Phi_np  = 1.0 / (1j * omega_arr * epsilon * 4.0 * np.pi)
+
+    E      = edges_data.total_number_of_edges
+    N_tri  = triangles_data.total_of_triangles
+    tri    = triangles_data.triangles[:3, :]
+    pts    = points_data.points
+    plus   = triangles_data.triangles_plus
+    minus  = triangles_data.triangles_minus
+    lengths_np = edges_data.edges_length
+    first_pts  = edges_data.first_points
+    second_pts = edges_data.second_points
+
+    # --- Frequency-independent geometry: identical to impedance_matrix_z_sweep ---
+    tri_verts = np.transpose(pts[:, tri], (2, 0, 1))
+
+    free_plus  = np.empty((3, E), dtype=np.float64)
+    free_minus = np.empty((3, E), dtype=np.float64)
+    for m in range(E):
+        ev = {int(first_pts[m]), int(second_pts[m])}
+        tp = int(plus[m]);  tm = int(minus[m])
+        for vi in range(3):
+            if int(tri[vi, tp]) not in ev:
+                free_plus[:, m] = pts[:, tri[vi, tp]];  break
+        for vi in range(3):
+            if int(tri[vi, tm]) not in ev:
+                free_minus[:, m] = pts[:, tri[vi, tm]]; break
+
+    xi_far,  w_far_np  = dunavant_rule(quad_order)
+    xi_near, w_near_np = dunavant_rule(min(quad_order + 5, 11))
+    Nq_far, Nq_near = len(w_far_np), len(w_near_np)
+
+    r_tri_far  = np.empty((N_tri, 3, Nq_far),  dtype=np.float64)
+    r_tri_near = np.empty((N_tri, 3, Nq_near), dtype=np.float64)
+    for t in range(N_tri):
+        v = tri_verts[t]
+        r_tri_far[t]  = map_to_triangle(xi_far,  v[:, 0], v[:, 1], v[:, 2])
+        r_tri_near[t] = map_to_triangle(xi_near, v[:, 0], v[:, 1], v[:, 2])
+
+    rho_plus_far_np   = r_tri_far[plus]   - free_plus.T[:, :, None]
+    rho_minus_far_np  = r_tri_far[minus]  - free_minus.T[:, :, None]
+    rho_plus_near_np  = r_tri_near[plus]  - free_plus.T[:, :, None]
+    rho_minus_near_np = r_tri_near[minus] - free_minus.T[:, :, None]
+
+    # --- Move frequency-dependent scalars and the shared regular-pair tables
+    #     onto the active backend once ---
+    k_complex = xp.asarray(k_complex_np)
+    pref_A    = xp.asarray(pref_A_np)
+    pref_Phi  = xp.asarray(pref_Phi_np)
+    w_far     = xp.asarray(w_far_np)
+    w_near    = xp.asarray(w_near_np)
+    r_tri_far_x  = xp.asarray(r_tri_far)
+    r_tri_near_x = xp.asarray(r_tri_near)
+    rho_far_x  = {'+': xp.asarray(rho_plus_far_np),  '-': xp.asarray(rho_minus_far_np)}
+    rho_near_x = {'+': xp.asarray(rho_plus_near_np), '-': xp.asarray(rho_minus_near_np)}
+    lengths_x  = xp.asarray(lengths_np)
+
+    Z_batched = xp.zeros((N_freq, E, E), dtype=complex)
+    Z_self_np = np.zeros((N_freq, E, E), dtype=complex)
+
+    # Keep per-chunk memory roughly comparable between FAR (Nq_far^2 points
+    # per pair) and EDGE/VERTEX (Nq_near^2, typically several times larger).
+    chunk_size_near = max(1, int(chunk_size * (Nq_far / Nq_near) ** 2))
+
+    def _process_regular_bucket(m_idx, n_idx, T_t_idx, T_s_idx, sign_scalar,
+                                 r_tri_x, rho_t_table, rho_s_table, w, bucket_chunk):
+        """Batched assembly for one (test_side, source_side, category) bucket."""
+        P = m_idx.shape[0]
+        if P == 0:
+            return
+        m_idx_x = xp.asarray(m_idx); n_idx_x = xp.asarray(n_idx)
+        T_t_x = xp.asarray(T_t_idx); T_s_x = xp.asarray(T_s_idx)
+        lm_all = lengths_x[m_idx_x]
+        ln_all = lengths_x[n_idx_x]
+
+        for start in range(0, P, bucket_chunk):
+            sl = slice(start, min(start + bucket_chunk, P))
+            r_t = r_tri_x[T_t_x[sl]]           # (chunk, 3, Nq)
+            r_s = r_tri_x[T_s_x[sl]]           # (chunk, 3, Nq)
+            rho_t = rho_t_table[m_idx_x[sl]]   # (chunk, 3, Nq)
+            rho_s = rho_s_table[n_idx_x[sl]]   # (chunk, 3, Nq)
+
+            diff = r_t[:, :, :, None] - r_s[:, :, None, :]           # (chunk,3,Nq,Nq)
+            R = xp.sqrt(xp.einsum('cijk,cijk->cjk', diff, diff, optimize=True))   # (chunk,Nq,Nq)
+            rho_dot = xp.einsum('cip,ciq->cpq', rho_t, rho_s, optimize=True)      # (chunk,Nq,Nq)
+
+            G = xp.exp(-k_complex[:, None, None, None] * R[None, :, :, :]) / R[None, :, :, :]
+            integrand = (pref_A[:, None, None, None] * rho_dot[None, :, :, :]
+                         + 4.0 * pref_Phi[:, None, None, None]) * G      # (Nf,chunk,Nq,Nq)
+            # Contract the two quadrature-weight vectors sequentially (matrix-
+            # vector products) rather than as one 4-operand einsum: einsum's
+            # generic evaluator is much slower than BLAS-backed matmul for
+            # this shape, and the difference is what makes this batched
+            # CPU path actually faster than the old per-pair loop (see
+            # workflow.md, "GPU acceleration (CuPy)").
+            sub = (integrand @ w) @ w                                    # (Nf,chunk,Nq)@(Nq,) -> (Nf,chunk)
+
+            contrib = (sign_scalar * lm_all[sl][None, :] * ln_all[sl][None, :]) * sub
+            Z_batched[:, m_idx_x[sl], n_idx_x[sl]] += contrib
+
+    m_grid, n_grid = np.meshgrid(np.arange(E), np.arange(E), indexing='ij')
+    side_key = ['+', '-']
+    side_tri = [plus, minus]
+    side_sign = [1.0, -1.0]
+
+    for ts in range(2):        # test_side:   0='+', 1='-'
+        for ss in range(2):    # source_side: 0='+', 1='-'
+            T_t_grid = np.broadcast_to(side_tri[ts][:, None], (E, E))
+            T_s_grid = np.broadcast_to(side_tri[ss][None, :], (E, E))
+            s_ts = side_sign[ts] * side_sign[ss]
+
+            # Vectorised equivalent of classify_triangle_pair for the whole grid:
+            # count shared vertex indices between T_t and T_s at every (m,n).
+            tri_t_verts = tri[:, T_t_grid]   # (3, E, E)
+            tri_s_verts = tri[:, T_s_grid]   # (3, E, E)
+            n_shared = (tri_t_verts[:, None, :, :] == tri_s_verts[None, :, :, :]).sum(axis=(0, 1))
+
+            is_far  = n_shared == 0
+            is_near = (n_shared == 1) | (n_shared == 2)
+            is_self = n_shared == 3
+
+            _process_regular_bucket(
+                m_grid[is_far], n_grid[is_far], T_t_grid[is_far], T_s_grid[is_far],
+                s_ts, r_tri_far_x, rho_far_x[side_key[ts]], rho_far_x[side_key[ss]],
+                w_far, chunk_size,
+            )
+            _process_regular_bucket(
+                m_grid[is_near], n_grid[is_near], T_t_grid[is_near], T_s_grid[is_near],
+                s_ts, r_tri_near_x, rho_near_x[side_key[ts]], rho_near_x[side_key[ss]],
+                w_near, chunk_size_near,
+            )
+
+            # SELF pairs: CPU, per-pair Duffy quadrature (unchanged maths).
+            m_self, n_self = m_grid[is_self], n_grid[is_self]
+            T_t_self, T_s_self = T_t_grid[is_self], T_s_grid[is_self]
+            fv_s_table = free_plus if ss == 0 else free_minus
+            rho_t_table_np = rho_plus_far_np if ts == 0 else rho_minus_far_np
+
+            for pi in range(m_self.shape[0]):
+                m = int(m_self[pi]); n = int(n_self[pi])
+                T_t = int(T_t_self[pi]); T_s = int(T_s_self[pi])
+                lm = lengths_np[m]; ln = lengths_np[n]
+                fv_s = fv_s_table[:, n]
+                r_t = r_tri_far[T_t]
+                rho_t = rho_t_table_np[m]
+                v_s = tri_verts[T_s]
+
+                sub = np.zeros(N_freq, dtype=complex)
+                for p in range(Nq_far):
+                    r_sing = r_t[:, p]
+                    rho_tp = rho_t[:, p]
+                    d_pts, d_w = duffy_source_nodes(
+                        r_sing, v_s[:, 0], v_s[:, 1], v_s[:, 2], order=duffy_order,
+                    )
+                    rho_sp = d_pts.T - fv_s[:, None]
+                    diff_p = r_sing[:, None] - d_pts.T
+                    R_p = np.sqrt(np.einsum('id,id->d', diff_p, diff_p))
+                    rho_dot_p = np.einsum('i,id->d', rho_tp, rho_sp)
+                    R_p_safe = np.where(R_p > 1e-300, R_p, 1.0)
+                    G_p = np.exp(-k_complex_np[:, None] * R_p_safe[None, :]) / R_p_safe[None, :]
+                    G_p = np.where((R_p > 1e-300)[None, :], G_p, 0.0)
+                    integrand_p = (pref_A_np[:, None] * rho_dot_p[None, :]
+                                   + 4.0 * pref_Phi_np[:, None]) * G_p
+                    inner = integrand_p @ d_w
+                    sub += w_far_np[p] * inner
+
+                Z_self_np[:, m, n] += s_ts * lm * ln * sub
+
+    return to_numpy(Z_batched) + Z_self_np
+
+
+# ---------------------------------------------------------------------------
 # RWG Gram matrix (surface-impedance boundary condition term)
 # ---------------------------------------------------------------------------
 
