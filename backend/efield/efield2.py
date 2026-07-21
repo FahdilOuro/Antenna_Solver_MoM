@@ -463,18 +463,22 @@ def polar_circular_gain_distribution_over_sphere(path, polar_type='RHCP', mode='
     pdf_filename = f"{polar_type}_pattern_{path.name}.pdf"
     render_and_save_pattern(show, save_image, sphere_points_update, sphere_triangles, gain_db, plot_title, pdf_filename)
 
-def display_rhcp_gain(path, mode='radiation'):
+def display_rhcp_gain(path, mode='radiation', show=True, save_image=False):
     """Alias to quickly display the RHCP gain."""
     return polar_circular_gain_distribution_over_sphere(
-        path, 
-        polar_type='RHCP', 
-        mode=mode
+        path,
+        polar_type='RHCP',
+        mode=mode,
+        show=show,
+        save_image=save_image
         )
 
-def display_lhcp_gain(path, mode='radiation'):
+def display_lhcp_gain(path, mode='radiation', show=True, save_image=False):
     """Alias to quickly display the LHCP gain."""
     return polar_circular_gain_distribution_over_sphere(
-        path, 
-        polar_type='LHCP', 
-        mode=mode
+        path,
+        polar_type='LHCP',
+        mode=mode,
+        show=show,
+        save_image=save_image
         )
