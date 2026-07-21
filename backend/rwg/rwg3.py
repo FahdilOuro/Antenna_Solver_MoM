@@ -1,11 +1,21 @@
 from scipy.io import savemat
 from backend.utils.impmet import *
 from backend.utils.mesh_io import MeshDataError, load_matfile_or_raise, read_mesh_fingerprint
-from backend.utils.compute_backend import GPU_AVAILABLE
+from backend.utils.compute_backend import should_use_gpu, describe_backend
 
-def calculate_z_matrice(points, triangles, edges, frequency):
+def calculate_z_matrice(points, triangles, edges, frequency, use_gpu=None):
     """
     Calculate the electromagnetic impedance matrix for a given mesh.
+
+    For a large enough mesh, this dispatches to the batched, GPU-capable
+    impedance_matrix_z_sweep_gpu (as a one-frequency "sweep") instead of the
+    plain per-pair impedance_matrix_z: the O(E^2) fill is the dominant cost
+    of a single simulation too once E is large, not just for a frequency
+    sweep. Below backend.utils.compute_backend.DEFAULT_GPU_EDGE_THRESHOLD
+    RWG edges, the batched path's fixed overhead outweighs its benefit and
+    is measured SLOWER than the plain loop, so small meshes keep using it --
+    see workflow.md, "GPU acceleration (CuPy)" for the measured crossover
+    (loses at E=39, wins from E=57 up through E=1007, 1.6-5.3x).
 
     Parameters
     ----------
@@ -13,6 +23,11 @@ def calculate_z_matrice(points, triangles, edges, frequency):
     triangles : Triangles object
     edges     : Edges object
     frequency : float  (Hz)
+    use_gpu   : bool or None  None (default) = auto: GPU only if available
+                AND the mesh is above the size threshold. True forces GPU
+                regardless of size (raises if no GPU is available); False
+                forces the plain CPU per-pair implementation regardless of
+                size.
 
     Returns
     -------
@@ -28,7 +43,14 @@ def calculate_z_matrice(points, triangles, edges, frequency):
     k             = omega / light_speed_c
     k_complex     = 1j * k   # used as exp(-k_complex * R) = exp(-jkR)
 
-    matrice_z = impedance_matrix_z(edges, triangles, points, k_complex, omega, mu, epsilon)
+    E = edges.total_number_of_edges
+    if should_use_gpu(E, use_gpu):
+        print(f"[calculate_z_matrice] Using {describe_backend()} for the impedance matrix "
+              f"assembly ({E}x{E} edges).")
+        matrice_z = impedance_matrix_z_sweep_gpu(edges, triangles, points, [frequency], mu, epsilon,
+                                                  use_gpu=True)[0]
+    else:
+        matrice_z = impedance_matrix_z(edges, triangles, points, k_complex, omega, mu, epsilon)
 
     return omega, mu, epsilon, light_speed_c, eta, matrice_z
 
@@ -45,18 +67,19 @@ def calculate_z_matrice_sweep(points, triangles, edges, frequencies, use_gpu=Non
     backend.utils.impmet.impedance_matrix_z_sweep and workflow.md,
     "frequency_sweep one-time precompute".
 
-    When a usable CUDA GPU is present on this machine (or use_gpu=True is
-    forced), the assembly additionally runs through
+    For a large enough mesh (same threshold and rationale as
+    calculate_z_matrice -- a sweep only ever has MORE total work to
+    amortise GPU overhead against, never less), the assembly runs through
     impedance_matrix_z_sweep_gpu, which batches the dominant FAR/EDGE/VERTEX
     pair categories into large tensor operations on the GPU (measured ~10x
     faster than CPU on the reference T600 benchmark in workflow.md, "GPU
-    acceleration (CuPy)"). On CPU-only machines (or use_gpu=False), this
-    calls the plain impedance_matrix_z_sweep instead: that batched
+    acceleration (CuPy)"). Below the threshold (or with use_gpu=False), this
+    calls the plain impedance_matrix_z_sweep instead: the batched
     restructuring's payoff comes specifically from amortising GPU kernel-
     launch overhead across large batches, and was measured SLOWER than the
-    original per-pair loop when actually run on CPU -- so CPU execution
-    keeps using the already-optimised per-pair implementation rather than
-    the GPU-oriented one.
+    original per-pair loop for small meshes -- so those keep using the
+    already-optimised per-pair implementation rather than the GPU-oriented
+    one.
 
     Parameters
     ----------
@@ -64,9 +87,11 @@ def calculate_z_matrice_sweep(points, triangles, edges, frequencies, use_gpu=Non
     triangles : Triangles object
     edges     : Edges object
     frequencies : array-like (N_freq,)  sweep frequencies in Hz
-    use_gpu   : bool or None  None (default) = auto-detect: use the GPU if
-                this machine has a usable CUDA device, else CPU. True forces
-                GPU (raises if none is available); False forces CPU.
+    use_gpu   : bool or None  None (default) = auto: GPU only if available
+                AND the mesh is above the size threshold
+                (backend.utils.compute_backend.DEFAULT_GPU_EDGE_THRESHOLD).
+                True forces GPU regardless of size (raises if unavailable);
+                False forces CPU regardless of size.
 
     Returns
     -------
@@ -80,8 +105,10 @@ def calculate_z_matrice_sweep(points, triangles, edges, frequencies, use_gpu=Non
     frequencies   = np.atleast_1d(np.asarray(frequencies, dtype=np.float64))
     omega         = 2.0 * np.pi * frequencies
 
-    run_on_gpu = (use_gpu is True) or (use_gpu is None and GPU_AVAILABLE)
-    if run_on_gpu:
+    E = edges.total_number_of_edges
+    if should_use_gpu(E, use_gpu):
+        print(f"[calculate_z_matrice_sweep] Using {describe_backend()} for the impedance matrix "
+              f"assembly ({E}x{E} edges, {len(frequencies)} frequencies).")
         matrice_z = impedance_matrix_z_sweep_gpu(edges, triangles, points, frequencies, mu, epsilon,
                                                   use_gpu=True)
     else:
@@ -134,7 +161,8 @@ def compute_lumped_impedance(load_values, omega):
 
     return DeltaZ
 
-def calculate_z_matrice_lumped_elements(points, triangles, edges, frequency, LoadPoint, LoadValue, LoadDir):
+def calculate_z_matrice_lumped_elements(points, triangles, edges, frequency, LoadPoint, LoadValue, LoadDir,
+                                        use_gpu=None):
     """
         Computes the electromagnetic impedance matrix for a given system with lumped elements.
 
@@ -147,6 +175,11 @@ def calculate_z_matrice_lumped_elements(points, triangles, edges, frequency, Loa
             * LoadPoint : Locations of lumped elements.
             * LoadValue : Values of L, C, R for lumped elements (3, LNumber).
             * LoadDir : Directions of the lumped elements (3, LNumber).
+            * use_gpu : bool or None -- same size-thresholded GPU/CPU dispatch
+                as calculate_z_matrice (None=auto, True/False force); the base
+                EFIE assembly is the same O(E^2) bottleneck here, the lumped-
+                element terms are a cheap O(LNumber) patch applied afterwards
+                regardless of which implementation built the base matrix.
 
         Returns:
             * omega : Angular frequency (rad/s).
@@ -169,8 +202,16 @@ def calculate_z_matrice_lumped_elements(points, triangles, edges, frequency, Loa
     k = omega / light_speed_c                  # Wavenumber (rad/m)
     complexe_k = 1j * k                        # Complex wavenumber for calculations
 
-    # Compute impedance matrix
-    matrice_z = impedance_matrix_z(edges, triangles, points, complexe_k, omega, mu, epsilon)
+    # Compute impedance matrix (same size-thresholded GPU/CPU dispatch as
+    # calculate_z_matrice -- see workflow.md, "GPU acceleration (CuPy)")
+    E = edges.total_number_of_edges
+    if should_use_gpu(E, use_gpu):
+        print(f"[calculate_z_matrice_lumped_elements] Using {describe_backend()} for the "
+              f"impedance matrix assembly ({E}x{E} edges).")
+        matrice_z = impedance_matrix_z_sweep_gpu(edges, triangles, points, [frequency], mu, epsilon,
+                                                  use_gpu=True)[0]
+    else:
+        matrice_z = impedance_matrix_z(edges, triangles, points, complexe_k, omega, mu, epsilon)
 
     # Lumped impedance implementation
     LoadPoint = LoadPoint.T  # (3, LNumber)

@@ -96,6 +96,49 @@ def get_array_module(use_gpu=None):
     return _cupy if GPU_AVAILABLE else np
 
 
+# Empirically calibrated on the reference NVIDIA T600 (see workflow.md, "GPU
+# acceleration (CuPy)" threshold benchmark): for a single-frequency Z-matrix
+# assembly, the batched implementation (impedance_matrix_z_sweep_gpu) beats
+# the original per-pair loop (impedance_matrix_z) somewhere between E=39
+# (batched loses, 0.21x -- fixed overhead: categorisation, chunked
+# gather/scatter, and a fresh process's CUDA context/kernel warm-up) and
+# E=57 (batched wins, 1.74x), then wins comfortably (1.6-5.3x) at every
+# larger size tested up to E=1007. 100 sits safely above the observed
+# crossover with margin for mesh-shape-dependent variation (the FAR/EDGE/
+# VERTEX pair mix differs between e.g. a thin strip and a plate).
+DEFAULT_GPU_EDGE_THRESHOLD = 100
+
+
+def should_use_gpu(num_edges, use_gpu=None, threshold=DEFAULT_GPU_EDGE_THRESHOLD):
+    """
+    Decide whether a Z-matrix assembly of this size should run on GPU.
+
+    Below `threshold` RWG edges, the batched assembly's fixed overhead
+    outweighs its benefit and the original per-pair CPU loop is faster in
+    practice -- see DEFAULT_GPU_EDGE_THRESHOLD's derivation above and
+    workflow.md for the measured crossover.
+
+    Parameters
+    ----------
+    num_edges : int  E, the mesh's RWG edge count.
+    use_gpu   : bool or None  None (default) = auto: use the GPU only if one
+                is available AND num_edges >= threshold. True forces GPU
+                regardless of size (still subject to get_array_module's
+                "raise if unavailable" check wherever the caller applies
+                it); False forces CPU regardless of size.
+    threshold : int  edge-count cutoff for the auto mode.
+
+    Returns
+    -------
+    bool
+    """
+    if use_gpu is True:
+        return True
+    if use_gpu is False:
+        return False
+    return GPU_AVAILABLE and num_edges >= threshold
+
+
 def to_numpy(array):
     """Bring an array back to host (NumPy) memory, whichever backend produced it."""
     if GPU_AVAILABLE and isinstance(array, _cupy.ndarray):

@@ -10,7 +10,7 @@ from backend.utils.lossy_electric_conductor import calculate_normal_surface_impe
 
 def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excitation_unit_vector=None, gap_width=0.05, voltage_phase=None,
                         show=True, save_image=False, lossy_conductor=False, conductivity_conductor=None,
-                        load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None):
+                        load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None, use_gpu=None):
     
     if (not load_lumped_elements and (LoadPoint is not None or LoadValue is not None or LoadDir is not None)) or \
         (load_lumped_elements and (LoadPoint is None or LoadValue is None or LoadDir is None)):
@@ -53,10 +53,10 @@ def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excita
     # Calculation of electromagnetic constants and impedance matrix Z
     if load_lumped_elements:
         omega, mu, epsilon, light_speed_c, eta, matrice_z, _ = calculate_z_matrice_lumped_elements(
-            points, triangles, edges, frequency, LoadPoint, LoadValue, LoadDir)
+            points, triangles, edges, frequency, LoadPoint, LoadValue, LoadDir, use_gpu=use_gpu)
     else:
         omega, mu, epsilon, light_speed_c, eta, matrice_z = calculate_z_matrice(
-            points, triangles, edges, frequency)
+            points, triangles, edges, frequency, use_gpu=use_gpu)
 
     # Save impedance data
     DataManager_rwg3.save_data(path, frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z)
