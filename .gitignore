@@ -140,6 +140,11 @@ CLAUDE.md
 # =============================================
 workflow.md
 
+# Local assistant configuration: kept out of the shared repo entirely.
+# Only .claude/settings.local.json is ignored by default, so .claude/settings.json
+# would otherwise be tracked and published.
+.claude/
+
 # =============================================
 # Performance profiling and analysis
 # =============================================
