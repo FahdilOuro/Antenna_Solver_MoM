@@ -1,7 +1,65 @@
 from scipy.io import savemat
 from backend.utils.impmet import *
 from backend.utils.mesh_io import MeshDataError, load_matfile_or_raise, read_mesh_fingerprint
-from backend.utils.compute_backend import should_use_gpu, describe_backend
+from backend.utils.compute_backend import (
+    should_use_gpu, describe_backend, gpu_has_headroom_for, gpu_free_memory_bytes,
+    gpu_runtime_errors,
+)
+
+
+def _gpu_is_worth_trying(E, n_freq, label):
+    """
+    Check the device still has room before dispatching an assembly to it, and
+    say so plainly when it does not.
+
+    The GPU is shared with whatever else is running -- on a laptop it also
+    drives the display, so a video or a browser can be holding most of a 4 GB
+    card by the time a long script reaches this point. Announcing the switch to
+    CPU here, BEFORE the work starts, is the whole point: the alternative is a
+    run that silently takes minutes instead of seconds with nothing to explain
+    why, and no chance to free the device and retry.
+
+    `Z` alone is n_freq * E^2 complex128; the assembly also builds chunked
+    intermediates on top of that, which gpu_has_headroom_for's safety factor
+    accounts for.
+    """
+    required = n_freq * E * E * 16          # complex128 bytes for Z itself
+    if gpu_has_headroom_for(required):
+        return True
+
+    free = gpu_free_memory_bytes()
+    free_txt = f"{free / 2**30:.2f} GB free" if free is not None else "free memory unknown"
+    print(f"[{label}] GPU skipped: needs room for a {required / 2**30:.2f} GB Z matrix "
+          f"(plus working space) but the device reports {free_txt} -- another "
+          f"application is probably using it. Falling back to CPU, which is correct "
+          f"but will be noticeably slower for this mesh. Free the GPU and re-run to "
+          f"use it.")
+    return False
+
+
+def _run_gpu_assembly(label, fn, *args, **kwargs):
+    """
+    Run a GPU assembly, turning a CUDA failure into an explicit, actionable
+    error instead of a silent CPU fallback.
+
+    A fallback here would be the wrong kindness: the caller has already been
+    told the run is on GPU, and quietly redoing it on CPU turns seconds into
+    minutes with no explanation. Better to stop and say what happened so the
+    device can be freed, or use_gpu=False chosen deliberately.
+    """
+    try:
+        return fn(*args, **kwargs)
+    except gpu_runtime_errors() as exc:
+        free = gpu_free_memory_bytes()
+        free_txt = f"{free / 2**30:.2f} GB free" if free is not None else "free memory unknown"
+        raise RuntimeError(
+            f"[{label}] the GPU assembly failed part-way through "
+            f"({type(exc).__name__}: {exc}). The device reports {free_txt}. It is shared "
+            f"with the rest of the system, so another application (a video, a browser, a "
+            f"second CUDA job) can take memory while a run is in progress. Free it and "
+            f"re-run, or pass use_gpu=False to assemble on CPU instead -- that is equally "
+            f"correct, just substantially slower for this mesh."
+        ) from exc
 
 def calculate_z_matrice(points, triangles, edges, frequency, use_gpu=None):
     """
@@ -44,11 +102,12 @@ def calculate_z_matrice(points, triangles, edges, frequency, use_gpu=None):
     k_complex     = 1j * k   # used as exp(-k_complex * R) = exp(-jkR)
 
     E = edges.total_number_of_edges
-    if should_use_gpu(E, use_gpu):
+    if should_use_gpu(E, use_gpu) and _gpu_is_worth_trying(E, 1, "calculate_z_matrice"):
         print(f"[calculate_z_matrice] Using {describe_backend()} for the impedance matrix "
               f"assembly ({E}x{E} edges).")
-        matrice_z = impedance_matrix_z_sweep_gpu(edges, triangles, points, [frequency], mu, epsilon,
-                                                  use_gpu=True)[0]
+        matrice_z = _run_gpu_assembly(
+            "calculate_z_matrice", impedance_matrix_z_sweep_gpu,
+            edges, triangles, points, [frequency], mu, epsilon, use_gpu=True)[0]
     else:
         matrice_z = impedance_matrix_z(edges, triangles, points, k_complex, omega, mu, epsilon)
 
@@ -106,11 +165,13 @@ def calculate_z_matrice_sweep(points, triangles, edges, frequencies, use_gpu=Non
     omega         = 2.0 * np.pi * frequencies
 
     E = edges.total_number_of_edges
-    if should_use_gpu(E, use_gpu):
+    if should_use_gpu(E, use_gpu) and _gpu_is_worth_trying(E, len(frequencies),
+                                                            "calculate_z_matrice_sweep"):
         print(f"[calculate_z_matrice_sweep] Using {describe_backend()} for the impedance matrix "
               f"assembly ({E}x{E} edges, {len(frequencies)} frequencies).")
-        matrice_z = impedance_matrix_z_sweep_gpu(edges, triangles, points, frequencies, mu, epsilon,
-                                                  use_gpu=True)
+        matrice_z = _run_gpu_assembly(
+            "calculate_z_matrice_sweep", impedance_matrix_z_sweep_gpu,
+            edges, triangles, points, frequencies, mu, epsilon, use_gpu=True)
     else:
         matrice_z = impedance_matrix_z_sweep(edges, triangles, points, frequencies, mu, epsilon)
 
@@ -205,11 +266,13 @@ def calculate_z_matrice_lumped_elements(points, triangles, edges, frequency, Loa
     # Compute impedance matrix (same size-thresholded GPU/CPU dispatch as
     # calculate_z_matrice -- see workflow.md, "GPU acceleration (CuPy)")
     E = edges.total_number_of_edges
-    if should_use_gpu(E, use_gpu):
+    if should_use_gpu(E, use_gpu) and _gpu_is_worth_trying(E, 1,
+                                                            "calculate_z_matrice_lumped_elements"):
         print(f"[calculate_z_matrice_lumped_elements] Using {describe_backend()} for the "
               f"impedance matrix assembly ({E}x{E} edges).")
-        matrice_z = impedance_matrix_z_sweep_gpu(edges, triangles, points, [frequency], mu, epsilon,
-                                                  use_gpu=True)[0]
+        matrice_z = _run_gpu_assembly(
+            "calculate_z_matrice_lumped_elements", impedance_matrix_z_sweep_gpu,
+            edges, triangles, points, [frequency], mu, epsilon, use_gpu=True)[0]
     else:
         matrice_z = impedance_matrix_z(edges, triangles, points, complexe_k, omega, mu, epsilon)
 

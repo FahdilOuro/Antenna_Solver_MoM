@@ -139,6 +139,62 @@ def should_use_gpu(num_edges, use_gpu=None, threshold=DEFAULT_GPU_EDGE_THRESHOLD
     return GPU_AVAILABLE and num_edges >= threshold
 
 
+def gpu_free_memory_bytes():
+    """
+    Free memory on the active CUDA device, in bytes, or None if there is no
+    usable GPU (or the driver will not answer).
+    """
+    if not GPU_AVAILABLE:
+        return None
+    try:
+        free, _total = _cupy.cuda.Device().mem_info
+        return int(free)
+    except Exception:
+        return None
+
+
+def gpu_has_headroom_for(required_bytes, safety_factor=3.0):
+    """
+    Whether the GPU currently has room for an allocation of `required_bytes`.
+
+    The card is usually not ours alone: on a laptop it also drives the display,
+    so a video player, a browser or a second CUDA process can hold a large
+    slice of a 4 GB device, and how much was free when this process started
+    says nothing about how much is free now. `safety_factor` covers the
+    assembly's transient allocations on top of the array being sized (the
+    chunked intermediates, plus CuPy's pool, which does not hand freed blocks
+    straight back to the driver).
+
+    Returns True when there is no GPU to interrogate or the driver will not
+    report memory, so this can only ever veto the GPU, never force it.
+    """
+    free = gpu_free_memory_bytes()
+    if free is None:
+        return True
+    return free >= required_bytes * safety_factor
+
+
+def gpu_runtime_errors():
+    """
+    Exception types meaning "the GPU run failed" -- out of device memory, or a
+    CUDA runtime/driver error.
+
+    Returned as a tuple so callers can write `except gpu_runtime_errors():`
+    and report the failure precisely, WITHOUT swallowing ordinary Python bugs
+    the way a bare `except Exception` would.
+
+    Deliberately paired with a raised error rather than a silent CPU fallback:
+    quietly re-running a 10-second GPU assembly on the CPU turns it into
+    minutes with no explanation, which is worse than being told what happened.
+    """
+    if not GPU_AVAILABLE:
+        return ()
+    try:
+        return (_cupy.cuda.memory.OutOfMemoryError, _cupy.cuda.runtime.CUDARuntimeError)
+    except Exception:
+        return ()
+
+
 def to_numpy(array):
     """Bring an array back to host (NumPy) memory, whichever backend produced it."""
     if GPU_AVAILABLE and isinstance(array, _cupy.ndarray):
