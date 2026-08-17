@@ -15,7 +15,8 @@ class ModalVisualizer:
     """Plotly/matplotlib visualisation of characteristic mode currents, far fields and spectra."""
 
     @staticmethod
-    def plot_mode(points, triangles, surface_current, mode_index, eigenvalue, title_prefix="CMA"):
+    def plot_mode(points, triangles, surface_current, mode_index, eigenvalue, title_prefix="CMA",
+                  current_vector=None):
         """
         Plot the surface current of a single characteristic mode.
 
@@ -26,16 +27,20 @@ class ModalVisualizer:
         mode_index              — 0-based mode index (displayed as mode_index+1)
         eigenvalue              — λ_n for this mode
         title_prefix            — string prefix for the figure title
+        current_vector          — complex (3, N_triangles) from ModalCurrent.reconstruct,
+                                  or None. When given, black arrows show the direction the
+                                  modal current flows in (see rwg5.visualize_surface_current).
 
         Returns
         -------
         plotly.graph_objects.Figure
         """
         title = f"{title_prefix} — Mode {mode_index + 1},  λ = {eigenvalue:.4f}"
-        return visualize_surface_current(points, triangles, surface_current, feed_point=None, title=title)
+        return visualize_surface_current(points, triangles, surface_current, feed_point=None,
+                                         title=title, current_vector=current_vector)
 
     @staticmethod
-    def plot_all_modes(points, triangles, edges, vecteurs_rho, modal_data):
+    def plot_all_modes(points, triangles, edges, vecteurs_rho, modal_data, show_current_arrows=True):
         """
         Reconstruct and plot every mode stored in modal_data.
 
@@ -46,14 +51,16 @@ class ModalVisualizer:
         figures = []
         for n in range(modal_data.n_modes):
             J_n = modal_data.eigenvectors[:, n]
-            J_surface = ModalCurrent.reconstruct(J_n, triangles, edges, vecteurs_rho)
-            fig = ModalVisualizer.plot_mode(points, triangles, J_surface, n, modal_data.eigenvalues[n])
+            J_surface, J_vector = ModalCurrent.reconstruct(J_n, triangles, edges, vecteurs_rho)
+            fig = ModalVisualizer.plot_mode(points, triangles, J_surface, n, modal_data.eigenvalues[n],
+                                            current_vector=J_vector if show_current_arrows else None)
             figures.append(fig)
         return figures
 
     @staticmethod
     def plot_mode_farfield(sphere_points, sphere_triangles, gain_db, mode_index, eigenvalue,
-                           title_prefix="CMA", dynamic_range=20):
+                           title_prefix="CMA", dynamic_range=20,
+                           save_image=False, save_folder=None, antenna_name=""):
         """
         Plot the 3D far-field directivity pattern radiated by a single characteristic mode,
         using the same deformed-sphere rendering as the physical-antenna gain patterns
@@ -65,6 +72,10 @@ class ModalVisualizer:
         mode_index, eigenvalue, title_prefix     — see plot_mode()
         dynamic_range                            — dB range shown before clipping (see
                                                     deform_sphere_for_radiation_pattern)
+        save_image                               — also write the figure to
+                                                    cma_mode<n>_farfield_<antenna_name>.pdf
+        save_folder                              — destination (defaults to 'data/fig_image/')
+        antenna_name                             — used in the saved filename
 
         Returns
         -------
@@ -73,7 +84,26 @@ class ModalVisualizer:
         sphere_points_deformed = deform_sphere_for_radiation_pattern(sphere_points, gain_db, dynamic_range)
         gain_faces_db = np.mean(gain_db[sphere_triangles], axis=0)
         title = f"{title_prefix} — Mode {mode_index + 1} far field,  λ = {eigenvalue:.4f}"
-        return visualize_sphere_gain(sphere_points_deformed, sphere_triangles, gain_faces_db, title)
+        fig = visualize_sphere_gain(sphere_points_deformed, sphere_triangles, gain_faces_db, title)
+
+        if save_image:
+            if save_folder is None:
+                save_folder = "data/fig_image/"
+            os.makedirs(save_folder, exist_ok=True)
+            pdf_name = f"cma_mode{mode_index + 1}_farfield_{antenna_name}.pdf".replace(" ", "_")
+            pdf_path = os.path.join(save_folder, pdf_name)
+            # t=0 here, unlike the modal-current export: efield2's renderer
+            # forces title='', so there is no title to clip and the tighter
+            # crop is free. Which mode this is lives in the filename.
+            fig.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(l=0, r=0, t=0, b=0),
+            )
+            fig.write_image(pdf_path, format="pdf")
+            print(f"Image saved in PDF format: {pdf_path}")
+
+        return fig
 
     @staticmethod
     def plot_eigenvalues_vs_frequency(sweep_data, n_modes_to_plot=None, freq_unit='MHz',

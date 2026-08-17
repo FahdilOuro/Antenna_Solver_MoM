@@ -11,6 +11,7 @@ def cma_algorithm(
     sort_by: str = 'magnitude',
     show: bool = True,
     save_image: bool = False,
+    show_current_arrows: bool = True,
     use_gpu: bool = None,
 ) -> ModalData:
     """
@@ -37,7 +38,10 @@ def cma_algorithm(
     sort_by                 : 'magnitude'  →  modes nearest resonance first (|λ| ascending)
                               'value'      →  algebraic sort (most negative first)
     show                    : display Plotly figures for each mode
-    save_image              : reserved for V2 (PDF export)
+    save_image              : also write each mode's current plot to
+                              data/fig_image/ as cma_mode<n>_current_<name>.pdf
+    show_current_arrows     : overlay black arrows along the modal current
+                              direction on each mode plot (default True)
     use_gpu                 : bool or None, passed to calculate_z_matrice
                               (None = auto-detect, see backend.utils.compute_backend)
 
@@ -60,7 +64,10 @@ def cma_algorithm(
     solver = CharacteristicModeSolver(path, params, frequency=frequency, use_gpu=use_gpu)
     modal_data = solver.solve()
 
-    if show:
-        solver.visualize(modal_data, show=True)
+    # `show or save_image`, not just `show`: exporting the mode plots without
+    # popping them up is a legitimate (and headless-friendly) combination.
+    if show or save_image:
+        solver.visualize(modal_data, show=show, save_image=save_image,
+                         show_current_arrows=show_current_arrows)
 
     return modal_data

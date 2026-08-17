@@ -20,7 +20,7 @@ class ModalCurrent:
         triangles,
         edges,
         vecteurs_rho,
-    ) -> np.ndarray:
+    ):
         """
         Parameters
         ----------
@@ -29,7 +29,11 @@ class ModalCurrent:
 
         Returns
         -------
-        float64 (N_triangles,)  — |J_surface| per triangle in A/m
+        surface_current_density : float64 (N_triangles,)     — |J_surface| per triangle in A/m
+        surface_current_vector  : complex (3, N_triangles)   — J_surface before taking its
+            norm, so callers can draw current-direction arrows. Characteristic
+            eigenvectors are real (eigh on real symmetric R, X), so this vector
+            is real up to dtype: its direction is the mode's standing-wave
+            current pattern, with no phase to disambiguate.
         """
-        surface_current_density, _ = calculate_current_density(modal_coefficient, triangles, edges, vecteurs_rho)
-        return surface_current_density
+        return calculate_current_density(modal_coefficient, triangles, edges, vecteurs_rho)

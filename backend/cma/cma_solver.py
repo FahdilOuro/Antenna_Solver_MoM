@@ -134,44 +134,84 @@ class CharacteristicModeSolver:
         )
         DataManager_cma.save_data(self.path, modal_data)
         print(f"CMA: {self.params.n_modes} modes computed at f = {float(frequency)/1e9:.4f} GHz")
-        print(f"  λ range: [{eigenvalues.min():.4f}, {eigenvalues.max():.4f}]")
+        # ASCII only: a bare Windows console is cp1252 and raises
+        # UnicodeEncodeError on 'lambda' as a Greek letter (same trap as the
+        # 'Ohm' fix in rwg4.compute_port_results).
+        print(f"  lambda range: [{eigenvalues.min():.4f}, {eigenvalues.max():.4f}]")
 
         return modal_data
 
-    def reconstruct_modal_currents(self, modal_data: ModalData) -> list:
+    def reconstruct_modal_currents(self, modal_data: ModalData):
         """
-        Reconstruct surface current density |J| on each triangle for every mode.
+        Reconstruct the surface current on each triangle for every mode.
 
         Returns
         -------
-        list of float64 arrays, each (N_triangles,)
+        surface_currents : list of float64 (N_triangles,)   — |J| per mode
+        current_vectors  : list of complex (3, N_triangles) — J per mode, before
+            taking the norm, for the current-direction arrows
         """
         self._load_mesh()
         surface_currents = []
+        current_vectors = []
         for n in range(modal_data.n_modes):
             J_n = modal_data.eigenvectors[:, n]
-            J_surface = ModalCurrent.reconstruct(J_n, self._triangles, self._edges, self._vecteurs_rho)
+            J_surface, J_vector = ModalCurrent.reconstruct(
+                J_n, self._triangles, self._edges, self._vecteurs_rho)
             surface_currents.append(J_surface)
-        return surface_currents
+            current_vectors.append(J_vector)
+        return surface_currents, current_vectors
 
-    def visualize(self, modal_data: ModalData, show: bool = True) -> list:
+    def visualize(self, modal_data: ModalData, show: bool = True, save_image: bool = False,
+                  show_current_arrows: bool = True) -> list:
         """
         Plot each characteristic mode current on the mesh.
+
+        Parameters
+        ----------
+        modal_data          : ModalData from solve()
+        show                : display each figure
+        save_image          : also write each mode to data/fig_image/ as PDF
+        show_current_arrows : overlay black arrows along the modal current
+                              direction (see rwg5.visualize_surface_current)
 
         Returns
         -------
         list of plotly.graph_objects.Figure
         """
         self._load_mesh()
-        surface_currents = self.reconstruct_modal_currents(modal_data)
+        surface_currents, current_vectors = self.reconstruct_modal_currents(modal_data)
+
+        if save_image:
+            output_dir_fig_image = "data/fig_image/"
+            os.makedirs(output_dir_fig_image, exist_ok=True)
+
         figures = []
         for n, J_surface in enumerate(surface_currents):
             fig = ModalVisualizer.plot_mode(
                 self._points, self._triangles, J_surface,
                 mode_index=n, eigenvalue=modal_data.eigenvalues[n],
+                current_vector=current_vectors[n] if show_current_arrows else None,
             )
             if show:
                 fig.show()
+
+            if save_image:
+                pdf_name = f"cma_mode{n + 1}_current_{self.path.name}.pdf".replace(" ", "_")
+                pdf_path = os.path.join(output_dir_fig_image, pdf_name)
+                # Transparent background and trimmed margins, as in
+                # radiation_algorithm(), so the figure drops cleanly into a
+                # report -- but keeping a top margin here, unlike there: the
+                # title is what says which mode and which lambda this is, and
+                # t=0 clips it off the canvas.
+                fig.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(l=0, r=0, t=40, b=0),
+                )
+                fig.write_image(pdf_path, format="pdf")
+                print(f"Image saved in PDF format: {pdf_path}")
+
             figures.append(fig)
         return figures
 
