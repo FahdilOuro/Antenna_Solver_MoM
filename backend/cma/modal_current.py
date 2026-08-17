@@ -31,4 +31,5 @@ class ModalCurrent:
         -------
         float64 (N_triangles,)  — |J_surface| per triangle in A/m
         """
-        return calculate_current_density(modal_coefficient, triangles, edges, vecteurs_rho)
+        surface_current_density, _ = calculate_current_density(modal_coefficient, triangles, edges, vecteurs_rho)
+        return surface_current_density

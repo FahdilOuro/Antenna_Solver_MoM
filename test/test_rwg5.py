@@ -12,7 +12,7 @@ filename_current_plate = 'data/antennas_current/plate_current.mat'
 points_plate, triangles_plate, edges_plate, vecteurs_rho_plate = DataManager_rwg2.load_data(filename_plate_to_load)
 
 print("Calcul des courants de surfaces")
-surface_current_density_plate = calculate_current_density(filename_current_plate, triangles_plate, edges_plate, vecteurs_rho_plate)
+surface_current_density_plate, surface_current_vector_plate = calculate_current_density(filename_current_plate, triangles_plate, edges_plate, vecteurs_rho_plate)
 
 antennas_name = os.path.splitext(os.path.basename(filename_plate_to_load))[0].replace('_mesh2', ' antennas surface in receiving mode')
 print(f"{antennas_name} is successfully created")

@@ -35,6 +35,9 @@ def calculate_current_density(current, triangles, edges, vecteurs_rho):
 
         Returns:
         surface_current_density : n-d-array, norms of the current density for each triangle (A/m).
+        surface_current_density_vector : complex n-d-array, shape (3, total_of_triangles), the
+            per-triangle current density vector (before taking its norm) -- used by
+            visualize_surface_current() to draw current-direction arrows.
 
         Example:
         For a given mesh, this function allows analyzing the distribution of current over the surface of the triangles.
@@ -74,7 +77,7 @@ def calculate_current_density(current, triangles, edges, vecteurs_rho):
     # Find the maximum value and its index
     j_max_index = np.argmax(surface_current_density_norm)
 
-    return surface_current_density_abs_norm
+    return surface_current_density_abs_norm, surface_current_density_vector
 
 
 def compute_aspect_ratios(points):
@@ -111,32 +114,42 @@ def compute_aspect_ratios(points):
         "z": 0.3,
     }
 
-def visualize_surface_current(points_data, triangles_data, surface_current_density, feed_point=None, title="Antennas Surface Current"):
+def visualize_surface_current(points_data, triangles_data, surface_current_density, feed_point=None,
+                              title="Antennas Surface Current", current_vector=None, arrow_scale=1.0):
     """
     Visualizes the surface current density on a triangulated 3D surface using Plotly.
 
-    This function renders a 3D mesh (trisurf) where each triangle's color represents 
-    its surface current density. It automatically handles cases with uniform data 
-    (to prevent Plotly errors) and adjusts the scene's aspect ratio for 
+    This function renders a 3D mesh (trisurf) where each triangle's color represents
+    its surface current density. It automatically handles cases with uniform data
+    (to prevent Plotly errors) and adjusts the scene's aspect ratio for
     accurate physical proportions.
 
     Parameters
     ----------
     points_data : object
-        An object or dataclass containing the mesh vertices. 
+        An object or dataclass containing the mesh vertices.
         Must have a `.points` attribute with shape (3, N) or (N, 3).
     triangles_data : object
-        An object or dataclass containing the connectivity matrix. 
-        Must have a `.triangles` attribute where the first 3 rows contain 
+        An object or dataclass containing the connectivity matrix.
+        Must have a `.triangles` attribute where the first 3 rows contain
         the vertex indices for each triangle.
     surface_current_density : array-like
-        A 1D array of shape (n_triangles,) containing the magnitude of the 
+        A 1D array of shape (n_triangles,) containing the magnitude of the
         surface current density for each face.
     feed_point : array-like, optional
-        Coordinates of the excitation point(s). Can be a single point (3,) 
+        Coordinates of the excitation point(s). Can be a single point (3,)
         or multiple points (N, 3). If provided, they are rendered as red markers.
     title : str, optional
         The title of the generated Plotly figure. Defaults to "Antennas Surface Current".
+    current_vector : complex array-like, optional
+        Shape (3, n_triangles), the per-triangle current density vector returned
+        by calculate_current_density(). When provided, a black arrow is drawn at
+        each triangle's centroid along Re(current_vector) -- the instantaneous
+        current direction at the excitation's reference phase -- with length
+        proportional to that triangle's share of the peak current magnitude.
+    arrow_scale : float, optional
+        Multiplier on the (auto-computed) arrow length, to shrink/grow the arrows
+        without touching the underlying data. Defaults to 1.0.
 
     Returns
     -------
@@ -145,10 +158,10 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
 
     Notes
     -----
-    - The function includes a safety check for `vmin >= vmax`. If the current 
-      density is uniform (e.g., all zeros), a micro-epsilon (1e-15) is added 
+    - The function includes a safety check for `vmin >= vmax`. If the current
+      density is uniform (e.g., all zeros), a micro-epsilon (1e-15) is added
       to the data range to prevent a PlotlyError.
-    - Aspect ratios are calculated based on the bounding box of the mesh to 
+    - Aspect ratios are calculated based on the bounding box of the mesh to
       ensure the antenna geometry is not distorted visually.
 
     Example
@@ -197,7 +210,39 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
         aspectratio=aspect_ratios,
     )
 
-    # 4. Highlight feed point(s)
+    # 4. Current-direction arrows (optional)
+    if current_vector is not None:
+        current_vector = np.asarray(current_vector)
+        tri_vertex_idx = triangles_data.triangles[:3, :].astype(int)
+        centroids = points_data.points[:, tri_vertex_idx].mean(axis=1)  # (3, n_triangles)
+
+        directions = np.real(current_vector)              # instantaneous direction at t=0
+        direction_norms = np.linalg.norm(directions, axis=0)
+        safe_norms = np.where(direction_norms > 0, direction_norms, 1.0)
+        unit_directions = directions / safe_norms
+
+        # Arrow length: proportional to this triangle's share of the peak current
+        # magnitude (the same quantity driving the surface color), so length and
+        # color agree on where the current is strongest.
+        peak_density = np.max(scd) if np.max(scd) > 0 else 1.0
+        bbox_scale = max(x_.max() - x_.min(), y_.max() - y_.min(), z_.max() - z_.min())
+        max_arrow_length = 0.08 * bbox_scale * arrow_scale
+        arrow_lengths = (scd / peak_density) * max_arrow_length
+
+        arrow_vectors = unit_directions * arrow_lengths
+
+        fig.add_trace(go.Cone(
+            x=centroids[0], y=centroids[1], z=centroids[2],
+            u=arrow_vectors[0], v=arrow_vectors[1], w=arrow_vectors[2],
+            colorscale=[[0, 'black'], [1, 'black']],
+            showscale=False,
+            sizemode='absolute',
+            sizeref=max(max_arrow_length, 1e-12) * 0.5,
+            anchor='tail',
+            name='Current direction'
+        ))
+
+    # 5. Highlight feed point(s)
     if feed_point is not None:
         feed_point = np.atleast_2d(feed_point)
         fig.add_trace(go.Scatter3d(
@@ -209,7 +254,7 @@ def visualize_surface_current(points_data, triangles_data, surface_current_densi
             name='Feed Point(s)'
         ))
 
-    # 5. Layout configuration
+    # 6. Layout configuration
     fig.update_layout(
         scene=dict(
             camera=dict(eye=dict(x=0.65, y=0.65, z=0.65))

@@ -23,7 +23,7 @@ from backend.rwg.rwg3 import *
 from backend.rwg.rwg4 import *
 from backend.rwg.rwg5 import *
 
-def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization, show=True):
+def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization, show=True, show_current_arrows=True):
     """
         Implements the electromagnetic scattering algorithm for an antenna.
     """
@@ -89,13 +89,14 @@ def scattering_algorithm(mesh, frequency, wave_incident_direction, polarization,
                                                         polarization, voltage, current)
 
     # Compute surface currents from the total current
-    surface_current_density = calculate_current_density(current, triangles, edges, vecteurs_rho)
+    surface_current_density, surface_current_vector = calculate_current_density(current, triangles, edges, vecteurs_rho)
 
     # Visualize surface currents if requested
     if show:
         antennas_name = os.path.splitext(os.path.basename(filename_mesh2_to_load))[0].replace('_mesh2', ' antenna surface current in receiving mode')
         print(f"\n{antennas_name} view is successfully created at frequency {frequency} Hz")
-        fig = visualize_surface_current(points, triangles, surface_current_density, title=antennas_name)
+        arrows = surface_current_vector if show_current_arrows else None
+        fig = visualize_surface_current(points, triangles, surface_current_density, title=antennas_name, current_vector=arrows)
         fig.show()
 
     return matrice_z, voltage, current, surface_current_density

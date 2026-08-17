@@ -37,14 +37,34 @@ class GeneralizedEigenSolver:
         X_sym = (X + X.T) * 0.5
 
         # --- 2. Adaptive regularization of R ---
+        # R = Re(Z) is only guaranteed positive SEMI-definite (radiated power
+        # P_rad = 0.5*I^H*R*I >= 0), and at low electrical size (small ka) most
+        # RWG basis functions correspond to current distributions that barely
+        # radiate at all -- so most of R's true eigenvalues are already close
+        # to zero there. That is a physical fact about the structure, not a
+        # quadrature error: even a perfectly-integrated Z (Duffy for the
+        # singular SELF pairs, Gauss-Dunavant for FAR/EDGE/VERTEX -- see
+        # impmet.py) still yields a near-singular R at low ka. Floating-point
+        # roundoff in forming R then just as easily pushes one of those
+        # already-tiny eigenvalues slightly NEGATIVE. A blind relative bump
+        # (eps ~ epsilon * ||R||_F / N) can be smaller than that negative
+        # excursion and still leave R_reg non-positive-definite -- exactly the
+        # `eigh` Cholesky failure this guards against. Instead, measure R's
+        # actual smallest eigenvalue and shift by exactly enough to clear it.
         frob_R = np.linalg.norm(R_sym, 'fro')
-        eps_adapt = params.regularization_epsilon * frob_R / N
+        floor_eps = params.regularization_epsilon * frob_R / N
+
+        min_eig_R = eigh(R_sym, eigvals_only=True, subset_by_index=[0, 0])[0]
+        eps_adapt = max(floor_eps, floor_eps - min_eig_R)
         R_reg = R_sym + eps_adapt * np.eye(N)
 
         if eps_adapt > 1e-4 * frob_R / N:
             warnings.warn(
-                f"CMA: large regularization eps_adapt={eps_adapt:.2e}. "
-                "R may be poorly conditioned — check mesh quality or increase frequency.",
+                f"CMA: large regularization eps_adapt={eps_adapt:.2e} "
+                f"(R's smallest eigenvalue was {min_eig_R:.2e}). R may be poorly "
+                "conditioned -- check mesh quality, or the structure may be too "
+                "electrically small at this frequency for a meaningful CMA "
+                "(most basis functions barely radiate at low ka).",
                 UserWarning,
                 stacklevel=2,
             )

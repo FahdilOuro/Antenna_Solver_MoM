@@ -9,7 +9,7 @@ from backend.utils.lossy_electric_conductor import calculate_normal_surface_impe
 
 
 def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excitation_unit_vector=None, gap_width=0.05, voltage_phase=None,
-                        show=True, save_image=False, lossy_conductor=False, conductivity_conductor=None,
+                        show=True, save_image=False, show_current_arrows=True, lossy_conductor=False, conductivity_conductor=None,
                         load_lumped_elements=False, LoadPoint=None, LoadValue=None, LoadDir=None, use_gpu=None):
     
     if (not load_lumped_elements and (LoadPoint is not None or LoadValue is not None or LoadDir is not None)) or \
@@ -85,11 +85,12 @@ def radiation_algorithm(path, frequency, feed_point, voltage_amplitude=1, excita
                                              voltage, current, gap_currents, gap_voltages, impedances, feed_powers)
 
     # Compute surface currents from the total current
-    surface_current_density = calculate_current_density(current, triangles, edges, vecteurs_rho)
+    surface_current_density, surface_current_vector = calculate_current_density(current, triangles, edges, vecteurs_rho)
 
     # Visualization of surface currents
     if show:
-        fig = visualize_surface_current(points, triangles, surface_current_density, feed_point, path.name)
+        arrows = surface_current_vector if show_current_arrows else None
+        fig = visualize_surface_current(points, triangles, surface_current_density, feed_point, path.name, current_vector=arrows)
         fig.show()
 
         if save_image:
