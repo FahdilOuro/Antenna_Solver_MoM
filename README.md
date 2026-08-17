@@ -43,8 +43,6 @@ flowchart LR
 
 Note the CMA branch leaves the pipeline at the impedance matrix, *before* any excitation: characteristic modes depend on the geometry alone, so no feed or port is needed to compute them.
 
-See the Module Map in `CLAUDE.md` for which file implements each stage.
-
 ### Data Files
 
 The antenna mesh data files should be placed in the data/antennas_mesh/ directory.

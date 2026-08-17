@@ -24,6 +24,7 @@ from backend.utils.quadrature.gauss_dunavant import (
     dunavant_rule, map_to_triangle,
 )
 from backend.utils.quadrature.duffy import duffy_source_nodes
+from backend.utils.quadrature.analytic_singular import inv_R_over_triangle_batch
 from backend.utils.quadrature.singularity_classifier import (
     classify_triangle_pair, SELF, EDGE, VERTEX, FAR,
 )
@@ -213,6 +214,21 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
 
                     elif cat == SELF:
                         # ---- outer Gauss, inner Duffy ----
+                        # The outer rule stays the FAR (lower-order) one on purpose.
+                        # Accuracy here is limited by the OUTER order -- the inner
+                        # Duffy integration leaves int_Ts dS'/R, which is continuous
+                        # but has log-slope kinks at the edges (measured 0.22% at
+                        # order 6, 0.02% at order 11 on a 40 mm cell). Raising the
+                        # outer order looks tempting, but it pushes outer nodes close
+                        # to the triangle's edges, and there Duffy's subdivision from
+                        # the singular point degenerates into slivers: convergence in
+                        # duffy_order then stops being monotone (measured, order-11
+                        # outer: 2.05% at duffy 7, 0.008% at 10, 0.275% at 14, 0.005%
+                        # at 25). Order 6 keeps every outer node well inside, where
+                        # Duffy is stable. Lifting this ceiling means replacing the
+                        # inner Duffy with the closed form in
+                        # backend.utils.quadrature.analytic_singular, as the
+                        # EDGE/VERTEX branch below does.
                         r_t, rho_t = r_tri_far[T_t], rho_t_far
                         v_s = tri_verts[T_s]      # (3, 3) — Duffy needs raw vertices
                         duffy_scale = _duffy_weight_scale(triangles_data.triangles_area[T_s])
@@ -237,18 +253,38 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
 
                         Z_mn += s_ts * lm * ln * sub
 
-                    else:   # EDGE or VERTEX — bounded near-singularity, higher-order Gauss
+                    else:   # EDGE or VERTEX — near-singular, singularity extracted
                         r_t, r_s = r_tri_near[T_t], r_tri_near[T_s]
                         rho_t, rho_s = rho_t_near, rho_s_near
 
                         diff = r_t[:, :, None] - r_s[:, None, :]
                         R    = np.sqrt(np.einsum('ijk,ijk->jk', diff, diff))
                         G    = np.exp(-k_complex * R) / R
+                        rho_dot = np.einsum('ip,iq->pq', rho_t, rho_s)
 
-                        rho_dot   = np.einsum('ip,iq->pq', rho_t, rho_s)
-                        integrand = (pref_A * rho_dot + 4.0 * pref_Phi) * G
+                        # The scalar-potential term dominates the integrand (its
+                        # weight 4*pref_Phi outweighs pref_A*rho.rho by ~4/(k*h)^2)
+                        # and carries the whole 1/R blow-up, so it is the half worth
+                        # extracting: G = (exp(-jkR) - 1)/R + 1/R. The remainder is
+                        # bounded (-> -jk as R -> 0) and plain Gauss resolves it; the
+                        # 1/R half is integrated in closed form over the source
+                        # triangle. Measured on an edge-adjacent pair, this takes the
+                        # error from +1.15% (plain Gauss, order 11) to -0.008%.
+                        # The vector term keeps the plain-Gauss treatment: it is
+                        # smaller by (k*h)^2/4, so its residual error is negligible.
+                        G_smooth = (np.exp(-k_complex * R) - 1.0) / R
+                        sub = np.einsum('p,q,pq->', w_near, w_near,
+                                        pref_A * rho_dot * G + 4.0 * pref_Phi * G_smooth)
 
-                        sub = np.einsum('p,q,pq->', w_near, w_near, integrand)
+                        inner_static = inv_R_over_triangle_batch(
+                            r_t,
+                            np.repeat(tri_verts[T_s][:, 0:1], Nq_near, axis=1),
+                            np.repeat(tri_verts[T_s][:, 1:2], Nq_near, axis=1),
+                            np.repeat(tri_verts[T_s][:, 2:3], Nq_near, axis=1),
+                        )
+                        sub += 4.0 * pref_Phi * np.dot(w_near, inner_static) \
+                            * _duffy_weight_scale(triangles_data.triangles_area[T_s])
+
                         Z_mn += s_ts * lm * ln * sub
 
             matrice_z[m, n] = Z_mn
@@ -422,7 +458,7 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
 
                         Z_mn += s_ts * lm * ln * sub
 
-                    else:   # EDGE or VERTEX
+                    else:   # EDGE or VERTEX — near-singular, singularity extracted
                         r_t, r_s = r_tri_near[T_t], r_tri_near[T_s]
                         rho_t, rho_s = rho_t_near, rho_s_near
 
@@ -430,10 +466,29 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
                         R       = np.sqrt(np.einsum('ijk,ijk->jk', diff, diff))
                         rho_dot = np.einsum('ip,iq->pq', rho_t, rho_s)
 
+                        # Same singularity extraction as impedance_matrix_z: the
+                        # scalar-potential half of the kernel is split as
+                        # G = (exp(-jkR) - 1)/R + 1/R, with the 1/R part integrated
+                        # in closed form over the source triangle. See that function
+                        # for the measured accuracy gain.
                         G = np.exp(-k_complex_arr[:, None, None] * R[None, :, :]) / R[None, :, :]
-                        integrand = (pref_A_arr[:, None, None] * rho_dot[None, :, :]
-                                     + 4.0 * pref_Phi_arr[:, None, None]) * G
+                        G_smooth = (np.exp(-k_complex_arr[:, None, None] * R[None, :, :]) - 1.0) \
+                            / R[None, :, :]
+                        integrand = (pref_A_arr[:, None, None] * rho_dot[None, :, :] * G
+                                     + 4.0 * pref_Phi_arr[:, None, None] * G_smooth)
                         sub = np.einsum('p,q,fpq->f', w_near, w_near, integrand)
+
+                        # 1/R half: frequency-independent geometry, so it is computed
+                        # once and only scaled by pref_Phi(f).
+                        inner_static = inv_R_over_triangle_batch(
+                            r_t,
+                            np.repeat(tri_verts[T_s][:, 0:1], Nq_near, axis=1),
+                            np.repeat(tri_verts[T_s][:, 1:2], Nq_near, axis=1),
+                            np.repeat(tri_verts[T_s][:, 2:3], Nq_near, axis=1),
+                        )
+                        sub = sub + 4.0 * pref_Phi_arr * np.dot(w_near, inner_static) \
+                            * _duffy_weight_scale(triangles_data.triangles_area[T_s])
+
                         Z_mn += s_ts * lm * ln * sub
 
             matrice_z[:, m, n] = Z_mn
@@ -571,11 +626,21 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
     chunk_size_near = max(1, int(chunk_size * (Nq_far / Nq_near) ** 2))
 
     def _process_regular_bucket(m_idx, n_idx, T_t_idx, T_s_idx, sign_scalar,
-                                 r_tri_x, rho_t_table, rho_s_table, w, bucket_chunk):
-        """Batched assembly for one (test_side, source_side, category) bucket."""
+                                 r_tri_x, rho_t_table, rho_s_table, w, bucket_chunk,
+                                 extract_singularity=False):
+        """
+        Batched assembly for one (test_side, source_side, category) bucket.
+
+        extract_singularity: for the near (EDGE/VERTEX) bucket, split the
+        scalar-potential kernel as G = (exp(-jkR) - 1)/R + 1/R and integrate
+        the 1/R half in closed form -- same treatment, and the same measured
+        accuracy gain, as in impedance_matrix_z.
+        """
         P = m_idx.shape[0]
         if P == 0:
             return
+        Nq = w.shape[0]
+        w_np = to_numpy(w)
         m_idx_x = xp.asarray(m_idx); n_idx_x = xp.asarray(n_idx)
         T_t_x = xp.asarray(T_t_idx); T_s_x = xp.asarray(T_s_idx)
         lm_all = lengths_x[m_idx_x]
@@ -593,8 +658,14 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
             rho_dot = xp.einsum('cip,ciq->cpq', rho_t, rho_s, optimize=True)      # (chunk,Nq,Nq)
 
             G = xp.exp(-k_complex[:, None, None, None] * R[None, :, :, :]) / R[None, :, :, :]
-            integrand = (pref_A[:, None, None, None] * rho_dot[None, :, :, :]
-                         + 4.0 * pref_Phi[:, None, None, None]) * G      # (Nf,chunk,Nq,Nq)
+            if extract_singularity:
+                G_smooth = (xp.exp(-k_complex[:, None, None, None] * R[None, :, :, :]) - 1.0) \
+                    / R[None, :, :, :]
+                integrand = (pref_A[:, None, None, None] * rho_dot[None, :, :, :] * G
+                             + 4.0 * pref_Phi[:, None, None, None] * G_smooth)
+            else:
+                integrand = (pref_A[:, None, None, None] * rho_dot[None, :, :, :]
+                             + 4.0 * pref_Phi[:, None, None, None]) * G  # (Nf,chunk,Nq,Nq)
             # Contract the two quadrature-weight vectors sequentially (matrix-
             # vector products) rather than as one 4-operand einsum: einsum's
             # generic evaluator is much slower than BLAS-backed matmul for
@@ -602,6 +673,25 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
             # CPU path actually faster than the old per-pair loop (see
             # workflow.md, "GPU acceleration (CuPy)").
             sub = (integrand @ w) @ w                                    # (Nf,chunk,Nq)@(Nq,) -> (Nf,chunk)
+
+            if extract_singularity:
+                # 1/R half, in closed form over the source triangle. Pure
+                # geometry, so it is evaluated once and only scaled by
+                # pref_Phi(f). Done in numpy: it is O(chunk*Nq) logarithms,
+                # negligible next to the (Nf, chunk, Nq, Nq) tensor above.
+                Ts_np = np.asarray(to_numpy(T_s_x[sl]))
+                c = Ts_np.shape[0]
+                verts = tri_verts[Ts_np]                       # (chunk, 3, 3)
+                r_t_np = to_numpy(r_t).transpose(1, 0, 2).reshape(3, c * Nq)
+                static = inv_R_over_triangle_batch(
+                    r_t_np,
+                    np.repeat(verts[:, :, 0].T, Nq, axis=1),
+                    np.repeat(verts[:, :, 1].T, Nq, axis=1),
+                    np.repeat(verts[:, :, 2].T, Nq, axis=1),
+                ).reshape(c, Nq)
+                scale = 1.0 / (2.0 * triangles_data.triangles_area[Ts_np])
+                inner = (static @ w_np) * scale                # (chunk,)
+                sub = sub + xp.asarray(4.0 * pref_Phi_np[:, None] * inner[None, :])
 
             contrib = (sign_scalar * lm_all[sl][None, :] * ln_all[sl][None, :]) * sub
             Z_batched[:, m_idx_x[sl], n_idx_x[sl]] += contrib
@@ -635,7 +725,7 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
             _process_regular_bucket(
                 m_grid[is_near], n_grid[is_near], T_t_grid[is_near], T_s_grid[is_near],
                 s_ts, r_tri_near_x, rho_near_x[side_key[ts]], rho_near_x[side_key[ss]],
-                w_near, chunk_size_near,
+                w_near, chunk_size_near, extract_singularity=True,
             )
 
             # SELF pairs: CPU, per-pair Duffy quadrature (unchanged maths).
