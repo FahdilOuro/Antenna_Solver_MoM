@@ -29,6 +29,40 @@ from backend.utils.quadrature.singularity_classifier import (
 )
 
 
+def _duffy_weight_scale(area_source: float) -> float:
+    """
+    Rescale Duffy weights into the same convention as the Dunavant weights.
+
+    The two quadrature helpers used by the SELF branch normalise differently:
+
+      * dunavant_rule(...) returns weights summing to 1/2 -- the area of the
+        REFERENCE triangle. Turning those into a physical surface integral
+        needs the mapping Jacobian 2*A:  int_T g dS = 2*A * sum_p w_p g(r_p).
+      * duffy_source_nodes(...) returns weights summing to A, the PHYSICAL
+        triangle area, i.e. sum_d w_d g(r_d) is already int_T g dS.
+
+    That difference is invisible in the FAR/EDGE/VERTEX branches (Dunavant on
+    both triangles), where the 2*A_t * 2*A_s Jacobians cancel exactly against
+    the RWG basis normalisation l/(2A) on each side -- which is precisely why
+    those branches carry no explicit area factor and why the assembled term
+    reads (pref_A * rho_t.rho_s + 4 * pref_Phi).
+
+    The SELF branch mixes the two (Dunavant outside, Duffy inside), so the
+    inner integral arrives carrying a physical 1/(2*A_s) too many. Left
+    uncorrected, SELF contributions come out scaled by 2*A_s -- for a
+    millimetre-scale mesh cell that is ~1e-3, i.e. effectively deleting them.
+
+    That is far worse than it sounds for R = Re(Z): on the diagonal, the four
+    (T+-,T+-) sub-pairs must cancel (sum of s_ts = 0) for the O(1/k) scalar-
+    potential term to vanish and leave the true O(k) radiated power. Dropping
+    the two SELF sub-pairs breaks that cancellation, so R keeps a large
+    spurious near-diagonal residue: it becomes numerically full-rank and
+    loses positive semi-definiteness, instead of the low-rank PSD radiation
+    operator it must be. CMA (which solves X*J = lambda*R*J) is then junk.
+    """
+    return 1.0 / (2.0 * area_source)
+
+
 # ---------------------------------------------------------------------------
 # New correct impedance matrix (Phase 4)
 # ---------------------------------------------------------------------------
@@ -181,6 +215,7 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
                         # ---- outer Gauss, inner Duffy ----
                         r_t, rho_t = r_tri_far[T_t], rho_t_far
                         v_s = tri_verts[T_s]      # (3, 3) — Duffy needs raw vertices
+                        duffy_scale = _duffy_weight_scale(triangles_data.triangles_area[T_s])
 
                         sub = 0.0 + 0.0j
                         for p in range(Nq_far):
@@ -198,7 +233,7 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
                             rho_dot_p = np.einsum('i,id->d', rho_tp, rho_sp)  # (Nq_d,)
 
                             inner = np.dot(d_w, (pref_A * rho_dot_p + 4.0 * pref_Phi) * G_p)
-                            sub  += w_far[p] * inner
+                            sub  += w_far[p] * inner * duffy_scale
 
                         Z_mn += s_ts * lm * ln * sub
 
@@ -359,6 +394,7 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
                     elif cat == SELF:
                         r_t, rho_t = r_tri_far[T_t], rho_t_far
                         v_s = tri_verts[T_s]
+                        duffy_scale = _duffy_weight_scale(triangles_data.triangles_area[T_s])
 
                         sub = np.zeros(N_freq, dtype=complex)
                         for p in range(Nq_far):
@@ -382,7 +418,7 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
                             integrand_p = (pref_A_arr[:, None] * rho_dot_p[None, :]
                                            + 4.0 * pref_Phi_arr[:, None]) * G_p
                             inner = integrand_p @ d_w                            # (Nf,)
-                            sub  += w_far[p] * inner
+                            sub  += w_far[p] * inner * duffy_scale
 
                         Z_mn += s_ts * lm * ln * sub
 
@@ -616,6 +652,7 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
                 r_t = r_tri_far[T_t]
                 rho_t = rho_t_table_np[m]
                 v_s = tri_verts[T_s]
+                duffy_scale = _duffy_weight_scale(triangles_data.triangles_area[T_s])
 
                 sub = np.zeros(N_freq, dtype=complex)
                 for p in range(Nq_far):
@@ -634,7 +671,7 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
                     integrand_p = (pref_A_np[:, None] * rho_dot_p[None, :]
                                    + 4.0 * pref_Phi_np[:, None]) * G_p
                     inner = integrand_p @ d_w
-                    sub += w_far_np[p] * inner
+                    sub += w_far_np[p] * inner * duffy_scale
 
                 Z_self_np[:, m, n] += s_ts * lm * ln * sub
 
