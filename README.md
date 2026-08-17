@@ -16,6 +16,8 @@ This project aims to develop a Python-based solver for the Method of Moments (Mo
 - Modular and class-based implementation for easy extensibility.
 - Support for triangular meshing and memory-efficient computation.
 - Tools to perform antenna design, simulation, and analysis.
+- **Characteristic Mode Analysis (CMA)** — see the dedicated section below.
+- Optional GPU acceleration (CuPy) for the impedance-matrix assembly, enabled automatically when a usable CUDA device is present and the mesh is large enough to benefit.
 
 ### Inspirations and References
 
@@ -35,7 +37,11 @@ flowchart LR
     E --> F["rwg4<br/>Solve Z*I = V -> current I"]
     F --> G["rwg5<br/>Surface current density J"]
     G --> H["efield1-4<br/>Far/near fields, gain, RCS, S-parameters"]
+    D --> I["cma<br/>Z = R + jX<br/>solve X*J = lambda*R*J"]
+    I --> J["Modal currents, characteristic angle,<br/>modal significance, modal far field"]
 ```
+
+Note the CMA branch leaves the pipeline at the impedance matrix, *before* any excitation: characteristic modes depend on the geometry alone, so no feed or port is needed to compute them.
 
 See the Module Map in `CLAUDE.md` for which file implements each stage.
 
@@ -131,6 +137,63 @@ Notebook: [`backend/antenna_simulation/radiation_antenna/loop4_antenna.ipynb`](b
 <p align="center">
 <img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/loop4_directivity_polar.png" width=40%>
 </p>
+
+## Characteristic Mode Analysis (CMA)
+
+Beyond driven simulations, the solver performs **Characteristic Mode Analysis**: it splits the impedance matrix into `Z = R + jX` and solves the generalised eigenvalue problem
+
+$$X \, J_n = \lambda_n \, R \, J_n$$
+
+The characteristic currents `J_n` are properties of the **geometry alone** — no feed, no excitation. They tell you *how a shape wants to radiate* before you decide where to put a port, which is what makes CMA a design tool rather than just an analysis one. A mode is resonant where `λ_n = 0`.
+
+Available from `backend/cma/`:
+
+| Quantity | Function |
+|---|---|
+| Eigenvalues / eigenvectors at one frequency | `cma_algorithm()` |
+| Eigenvalues across a frequency sweep | `cma_frequency_sweep()` |
+| Characteristic angle `δ_n = 180° − arctan(λ_n)` | `characteristic_angle()` |
+| Modal significance `MS_n = 1/√(1+λ_n²)` | `modal_significance()` |
+| Modal surface currents | `ModalCurrent.reconstruct()` |
+| Modal far-field directivity | `compute_modal_farfield()` |
+| Plots for all of the above | `ModalVisualizer` |
+
+Validation: on a rectangular loop, the eigenvalue spectrum, the PSD structure of `R` and the resonant frequencies were checked against a MATLAB/**AToM** run of the same structure — `R` matches to 0.02 %, and the two resonances land at 247.0 / 266.7 MHz versus AToM's 247.5 / 266.1 MHz.
+
+### Rectangular loop antenna
+
+Notebook: [`backend/antenna_simulation/cma_implementation/loop_antenna.ipynb`](backend/antenna_simulation/cma_implementation/loop_antenna.ipynb) — a 480 × 240 mm rectangular loop (40 mm strip), analysed over 100–300 MHz.
+
+Characteristic currents of the first three modes. Black arrows show the direction the modal current flows in; colour is its magnitude.
+
+<p align="center">
+<img src="backend/antenna_simulation/plot_figures/cma_loop_mode1_current.png" width=32%>
+<img src="backend/antenna_simulation/plot_figures/cma_loop_mode2_current.png" width=32%>
+<img src="backend/antenna_simulation/plot_figures/cma_loop_mode3_current.png" width=32%>
+</p>
+
+The far field each of those modes radiates on its own:
+
+<p align="center">
+<img src="backend/antenna_simulation/plot_figures/cma_loop_mode1_farfield.png" width=32%>
+<img src="backend/antenna_simulation/plot_figures/cma_loop_mode2_farfield.png" width=32%>
+<img src="backend/antenna_simulation/plot_figures/cma_loop_mode3_farfield.png" width=32%>
+</p>
+
+### Rectangular plate
+
+Notebook: [`backend/antenna_simulation/cma_implementation/plate_cma.ipynb`](backend/antenna_simulation/cma_implementation/plate_cma.ipynb) — an 80 × 40 mm plate at 1 GHz.
+
+<p align="center">
+<img src="backend/antenna_simulation/plot_figures/cma_plate_mode1_current.png" width=48%>
+<img src="backend/antenna_simulation/plot_figures/cma_plate_mode2_current.png" width=48%>
+</p>
+<p align="center">
+<img src="backend/antenna_simulation/plot_figures/cma_plate_mode1_farfield.png" width=48%>
+<img src="backend/antenna_simulation/plot_figures/cma_plate_mode2_farfield.png" width=48%>
+</p>
+
+*Mode 1 concentrates its current along the two long edges, flowing in the same direction — the plate's dipole-like mode, and its far field is the matching donut, with the null along the current axis.*
 
 ## Jupyter Notebooks
 
