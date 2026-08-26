@@ -7,6 +7,17 @@ from backend.utils.compute_backend import (
 )
 
 
+def _fmt_bytes(n):
+    """Byte count with a unit that keeps small matrices from printing as '0.00 GB'."""
+    if n is None:
+        return "unknown"
+    if n >= 2 ** 30:
+        return f"{n / 2 ** 30:.2f} GB"
+    if n >= 2 ** 20:
+        return f"{n / 2 ** 20:.1f} MB"
+    return f"{n / 2 ** 10:.1f} kB"
+
+
 def _gpu_is_worth_trying(E, n_freq, label):
     """
     Check the device still has room before dispatching an assembly to it, and
@@ -27,13 +38,11 @@ def _gpu_is_worth_trying(E, n_freq, label):
     if gpu_has_headroom_for(required):
         return True
 
-    free = gpu_free_memory_bytes()
-    free_txt = f"{free / 2**30:.2f} GB free" if free is not None else "free memory unknown"
-    print(f"[{label}] GPU skipped: needs room for a {required / 2**30:.2f} GB Z matrix "
-          f"(plus working space) but the device reports {free_txt} -- another "
-          f"application is probably using it. Falling back to CPU, which is correct "
-          f"but will be noticeably slower for this mesh. Free the GPU and re-run to "
-          f"use it.")
+    print(f"[{label}] GPU skipped: needs room for a {_fmt_bytes(required)} Z matrix "
+          f"(plus working space) but only {_fmt_bytes(gpu_free_memory_bytes())} is "
+          f"available -- another application is probably using the device. Falling back "
+          f"to CPU, which is correct but will be noticeably slower for this mesh. Free "
+          f"the GPU and re-run to use it.")
     return False
 
 
@@ -50,11 +59,9 @@ def _run_gpu_assembly(label, fn, *args, **kwargs):
     try:
         return fn(*args, **kwargs)
     except gpu_runtime_errors() as exc:
-        free = gpu_free_memory_bytes()
-        free_txt = f"{free / 2**30:.2f} GB free" if free is not None else "free memory unknown"
         raise RuntimeError(
             f"[{label}] the GPU assembly failed part-way through "
-            f"({type(exc).__name__}: {exc}). The device reports {free_txt}. It is shared "
+            f"({type(exc).__name__}: {exc}). {_fmt_bytes(gpu_free_memory_bytes())} available. It is shared "
             f"with the rest of the system, so another application (a video, a browser, a "
             f"second CUDA job) can take memory while a run is in progress. Free it and "
             f"re-run, or pass use_gpu=False to assemble on CPU instead -- that is equally "

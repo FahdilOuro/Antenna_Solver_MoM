@@ -7,6 +7,7 @@ from backend.rwg.rwg3 import calculate_z_matrice, DataManager_rwg3
 from backend.utils.mesh_io import MeshDataError
 from backend.cma.cma_mesh import prepare_cma_mesh
 from backend.cma.cma_parameters import CMAParameters
+from backend.cma.cma_report import write_single_frequency_report
 from backend.cma.eigen_solver import GeneralizedEigenSolver
 from backend.cma.modal_data import ModalData, DataManager_cma
 from backend.cma.modal_current import ModalCurrent
@@ -50,16 +51,18 @@ class CharacteristicModeSolver:
     makes that mismatch structurally impossible instead of merely detected.
     """
 
-    def __init__(self, path, params: CMAParameters, frequency: float = None, use_gpu: bool = None):
+    def __init__(self, path, params: CMAParameters, frequency: float = None, use_gpu: bool = None,
+                 write_report: bool = True):
         # Extend the path namespace with the CMA output path (no modification of file_path.py)
         cma_dir = 'data/antennas_cma'
         os.makedirs(cma_dir, exist_ok=True)
         path.mat_cma = os.path.join(cma_dir, f"{path.name}_cma.mat")
 
-        self.path      = path
-        self.params    = params
-        self.frequency = frequency
-        self.use_gpu   = use_gpu
+        self.path         = path
+        self.params       = params
+        self.frequency    = frequency
+        self.use_gpu      = use_gpu
+        self.write_report = write_report
 
         # Cached mesh objects (loaded once on first use)
         self._points      = None
@@ -133,6 +136,15 @@ class CharacteristicModeSolver:
             sort_order=sort_order,
         )
         DataManager_cma.save_data(self.path, modal_data)
+        if self.write_report:
+            # The .mat holds eigenvalues and eigenvectors, which say little on
+            # their own; the report turns them into modal significance,
+            # characteristic angle, a plain-language reading and the health
+            # checks, so the run can be interpreted later without re-deriving
+            # any of it. Z is passed so the checks run on the actual matrix.
+            write_single_frequency_report(
+                self.path, modal_data, self._points, self._triangles, self._edges,
+                Z=Z, params=self.params)
         print(f"CMA: {self.params.n_modes} modes computed at f = {float(frequency)/1e9:.4f} GHz")
         # ASCII only: a bare Windows console is cp1252 and raises
         # UnicodeEncodeError on 'lambda' as a Greek letter (same trap as the

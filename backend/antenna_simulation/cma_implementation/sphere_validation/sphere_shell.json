@@ -1,0 +1,39 @@
+{
+  "description": "PEC spherical shell, frozen FIXTURE for CMA external validation",
+  "reference": "Capek, Losenicky, Jelinek, Gustafsson, 'Validating the Characteristic Modes Solvers', IEEE TAP 65(8):4134-4145, 2017",
+  "file": "sphere_shell.msh",
+  "sha256": "34b674813594c5e8b2e4eea038a3d0e3e0e5a4822637da57349cb32effeb1ca5",
+  "generated_utc": "2026-08-20T12:30:35+00:00",
+  "generator": "generate_sphere_mesh.py",
+  "gmsh_version": "4.13.1",
+  "generation_parameters": {
+    "radius_m": 0.1,
+    "target_triangles": 460,
+    "characteristic_length_m": 0.025117458776433076,
+    "mesh_algorithm": 6,
+    "mesh_algorithm_name": "Frontal-Delaunay",
+    "mesh_size_from_curvature": 0,
+    "mesh_size_extend_from_boundary": 0,
+    "optimize": "Laplace2D"
+  },
+  "mesh": {
+    "n_points": 253,
+    "n_triangles": 502,
+    "n_edges_total": 753,
+    "n_rwg_edges": 753,
+    "n_boundary_edges": 0,
+    "n_nonmanifold_edges": 0,
+    "euler_characteristic": 2,
+    "edge_length_min": 0.015234096879124491,
+    "edge_length_max": 0.04579827872058614,
+    "edge_length_mean": 0.02405942513422387,
+    "edge_length_std_over_mean": 0.11249853150114039,
+    "edge_length_max_over_min": 3.0063008712609802,
+    "triangle_area_max_over_min": 4.516509861064897,
+    "triangle_quality_min": 0.5410604339216718,
+    "triangle_quality_mean": 0.9755519125183142,
+    "node_radius_max_deviation_rel": 2.7755575615628914e-16,
+    "total_area": 0.12411172610303371,
+    "exact_sphere_area": 0.12566370614359174
+  }
+}

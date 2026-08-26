@@ -19,8 +19,17 @@ For a *physical* triangle T with area A:
 
 or equivalently: sum_q (w_q * 2 * A) * f(r_q).
 
-Supported polynomial degrees: 1, 3, 4, 6, 7, 11.
+Supported polynomial degrees: 1, 3, 4, 5, 6, 7, 11, 16, 20, 24.
 The degree-d rule integrates every polynomial of total degree <= d exactly.
+
+Degrees 7 and above are Gauss-Legendre PRODUCT rules built through the Duffy
+map (see _rule_product_gl), not symmetric Dunavant orbits: published symmetric
+coefficients above degree 6 cannot be transcribed to full double precision, and
+a rule that is only 5e-7-exact is useless for a convergence study. The product
+rules are generated from numpy.polynomial.legendre.leggauss, so their only
+error is roundoff. The price is that their nodes are not invariant under
+permutation of the triangle's vertices; that costs nothing here, because every
+use integrates a function that has no such symmetry either.
 """
 
 import numpy as np
@@ -240,6 +249,31 @@ def _rule_degree11():
     return _rule_product_gl(7)
 
 
+# --- Degrees above 11 -------------------------------------------------------
+#
+# Degree 11 used to be the top of this table, and impedance_matrix_z's near
+# (EDGE/VERTEX) rule is min(quad_order + 5, 11) -- i.e. already pinned at the
+# ceiling for every default call. Any convergence study of the OUTER order for
+# the singular branches therefore had nowhere to go, which makes a truncation
+# error indistinguishable from a stagnating one. These three rules exist to
+# lift that ceiling so the distinction can actually be measured. See
+# backend/utils/quadrature/outer_order_study.py.
+
+def _rule_degree16():
+    """81-point, degree-16-exact rule via Duffy-GL product (n=9)."""
+    return _rule_product_gl(9)
+
+
+def _rule_degree20():
+    """121-point, degree-20-exact rule via Duffy-GL product (n=11)."""
+    return _rule_product_gl(11)
+
+
+def _rule_degree24():
+    """169-point, degree-24-exact rule via Duffy-GL product (n=13)."""
+    return _rule_product_gl(13)
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -252,6 +286,9 @@ _RULES = {
     6:  _rule_degree6,
     7:  _rule_degree7,
     11: _rule_degree11,
+    16: _rule_degree16,
+    20: _rule_degree20,
+    24: _rule_degree24,
 }
 
 
@@ -268,7 +305,8 @@ def dunavant_rule(order: int) -> tuple:
     ----------
     order : int
         Polynomial degree that the rule integrates exactly.
-        Supported: 1, 3, 4, 5, 6, 7, 11.
+        Supported: 1, 3, 4, 5, 6, 7, 11, 16, 20, 24
+        (point counts 1, 4, 6, 7, 12, 25, 49, 81, 121, 169).
 
     Returns
     -------

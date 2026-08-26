@@ -10,17 +10,66 @@ from backend.utils.compute_backend import describe_backend
 from backend.utils.frequency_sweep import generate_freq_points
 from backend.cma.cma_mesh import prepare_cma_mesh
 from backend.cma.cma_parameters import CMAParameters
+from backend.cma.cma_report import write_sweep_report
 from backend.cma.eigen_solver import GeneralizedEigenSolver
+from backend.cma.mode_tracking import ModeTracker, ModeTrackingResult, TrackingParameters
+
+# How many tracking events the console prints before summarising the rest.
+_MAX_EVENTS_PRINTED = 12
 
 
 @dataclass
 class CMASweepData:
-    """Container for CMA results across a frequency sweep."""
+    """
+    Container for CMA results across a frequency sweep.
+
+    `eigenvalues` / `eigenvectors` are always stored in the eigensolver's own
+    per-frequency ordering (sorted by `|lambda|` at each point independently),
+    whether or not tracking ran. `tracking`, when present, is the permutation
+    that turns those labels into mode identities that hold across the sweep;
+    `tracked()` applies it. Keeping the raw arrays as the stored form means a
+    saved sweep reads the same as it always did, and the untracked view stays
+    available for comparison.
+    """
 
     frequencies:  np.ndarray   # float64, (n_freq,)             — Hz
     eigenvalues:  np.ndarray   # float64, (n_freq, n_modes)      — lambda_n(f)
     eigenvectors: np.ndarray   # float64, (n_freq, n_edges, n_modes) — J_n(f) as columns
     n_modes:      int
+    # ModeTrackingResult or None — see backend.cma.mode_tracking
+    tracking:     object = None
+
+    def tracked(self) -> 'CMASweepData':
+        """
+        The same sweep with the modes re-indexed so that column `k` is one
+        physical mode from end to end.
+
+        Returns a NEW container; this one is left in raw solver order. Every
+        plotter and report takes a CMASweepData, so the tracked view is used by
+        passing `sweep_data.tracked()` wherever `sweep_data` went before.
+        Idempotent: the returned object carries a consumed permutation, so
+        calling `tracked()` on it again changes nothing.
+
+        Raises
+        ------
+        RuntimeError if the sweep was computed with track=False, since there is
+        then no permutation to apply.
+        """
+        if self.tracking is None:
+            raise RuntimeError(
+                "tracked(): this sweep carries no tracking data. Re-run "
+                "cma_frequency_sweep(..., track=True) (the default), or track a saved "
+                "sweep with backend.cma.mode_tracking.track_sweep() -- which needs "
+                "Re(Z) per frequency, not stored in the .mat.")
+        if self.tracking.is_applied:
+            return self
+        return CMASweepData(
+            frequencies=self.frequencies,
+            eigenvalues=self.tracking.reorder(self.eigenvalues),
+            eigenvectors=self.tracking.reorder_eigenvectors(self.eigenvectors),
+            n_modes=self.n_modes,
+            tracking=self.tracking.applied(),
+        )
 
 
 class DataManager_cma_sweep:
@@ -28,28 +77,71 @@ class DataManager_cma_sweep:
 
     @staticmethod
     def save_data(path, sweep_data: CMASweepData) -> None:
-        savemat(path.mat_cma_sweep, {
+        data = {
             'frequencies':  sweep_data.frequencies,
             'eigenvalues':  sweep_data.eigenvalues,
             'eigenvectors': sweep_data.eigenvectors,
             'n_modes':      int(sweep_data.n_modes),
-        })
+        }
+        track = sweep_data.tracking
+        if track is not None:
+            # Flat arrays plus one JSON blob for the events: savemat has no
+            # natural representation for a list of records with a string field,
+            # and a struct array of them would come back needing more unpacking
+            # than it saves.
+            data.update({
+                'track_order':       np.asarray(track.order, dtype=np.int32),
+                'track_sign':        np.asarray(track.sign, dtype=np.float64),
+                'track_correlation': np.asarray(track.correlation, dtype=np.float64),
+                'track_margin':      np.asarray(track.margin, dtype=np.float64),
+                'track_metric':      str(track.metric),
+                'track_correction':  str(track.correction),
+                'track_events':      track.events_json(),
+            })
+            if track.corrected_eigenvalues is not None:
+                data['track_corrected_eigenvalues'] = np.asarray(
+                    track.corrected_eigenvalues, dtype=np.float64)
+        savemat(path.mat_cma_sweep, data)
 
     @staticmethod
     def load_data(filename: str) -> CMASweepData:
         if not os.path.isfile(filename):
             raise FileNotFoundError(f"CMA sweep file '{filename}' does not exist.")
         data = loadmat(filename)
+        frequencies = data['frequencies'].squeeze()
+
+        tracking = None
+        if 'track_order' in data:
+            def _text(key):
+                return str(np.atleast_1d(data[key]).ravel()[0])
+
+            corrected = data.get('track_corrected_eigenvalues')
+            tracking = ModeTrackingResult(
+                frequencies=np.asarray(frequencies, dtype=float),
+                order=np.asarray(data['track_order'], dtype=int),
+                sign=np.asarray(data['track_sign'], dtype=float),
+                correlation=np.asarray(data['track_correlation'], dtype=float),
+                margin=np.asarray(data['track_margin'], dtype=float),
+                events=ModeTrackingResult.events_from_json(_text('track_events')),
+                metric=_text('track_metric'),
+                correction=_text('track_correction'),
+                corrected_eigenvalues=None if corrected is None else np.asarray(
+                    corrected, dtype=float),
+            )
+
         return CMASweepData(
-            frequencies=data['frequencies'].squeeze(),
+            frequencies=frequencies,
             eigenvalues=data['eigenvalues'],
             eigenvectors=data['eigenvectors'],
             n_modes=int(data['n_modes'].squeeze()),
+            tracking=tracking,
         )
 
 
 def cma_frequency_sweep(path, freq_start, freq_stop, n_points=41, n_modes=6,
-                        regularization_epsilon=1e-10, sort_by='magnitude', use_gpu=None):
+                        regularization_epsilon=1e-10, sort_by='magnitude',
+                        cma_solver='regularized', rank_tol=1e-6, use_gpu=None,
+                        write_report=True, track=True, tracking_params=None):
     """
     Compute characteristic mode eigenvalues AND eigenvectors across a
     frequency sweep, reusing calculate_z_matrice_sweep's batched Z(f)
@@ -61,14 +153,30 @@ def cma_frequency_sweep(path, freq_start, freq_stop, n_points=41, n_modes=6,
     the "surface current for a given frequency and eigenvalue" step never
     needs a second solve: just index eigenvectors[freq_idx, :, mode_idx].
 
-    Mode-ordering caveat
-    --------------------
+    Mode ordering and tracking
+    --------------------------
     At each frequency, modes are selected/sorted independently by |lambda_n|
-    (see GeneralizedEigenSolver.solve) -- there is no cross-frequency mode
-    tracking/correlation here. So "mode index n" is not guaranteed to follow
-    the same physical mode across the sweep when two eigenvalue curves
-    cross; reading the lambda_n(f) plot by proximity to resonance
-    (lambda_n = 0) is fine, but curve identity can swap at a crossing.
+    (see GeneralizedEigenSolver.solve), so "mode index n" in the returned
+    arrays is a per-frequency label, not a mode identity: where two
+    eigenvalue curves cross, the label follows whichever mode happens to be
+    n-th closest to resonance there, and swaps.
+
+    With track=True (the default) the sweep is additionally correlated
+    across adjacent frequencies (backend.cma.mode_tracking) and the
+    permutation that restores mode identity is attached to the result as
+    `sweep_data.tracking`. The stored eigenvalues/eigenvectors stay in raw
+    solver order -- applying the permutation is `sweep_data.tracked()`,
+    which returns a second CMASweepData that every plotter and the report
+    accept unchanged:
+
+        sweep = cma_frequency_sweep(path, f1, f2)
+        ModalVisualizer.plot_eigenvalues_vs_frequency(sweep.tracked())
+        print(sweep.tracking.summary())
+
+    Tracking reports what it cannot decide rather than hiding it: quasi-
+    degenerate pairs, avoided crossings and steps where the correlation is
+    weak come back as `sweep.tracking.events`. See the mode_tracking module
+    docstring.
 
     Mesh freshness
     --------------
@@ -99,7 +207,26 @@ def cma_frequency_sweep(path, freq_start, freq_stop, n_points=41, n_modes=6,
     n_modes                 : int, number of characteristic modes to track per frequency
     regularization_epsilon  : float, relative perturbation applied to R before eigh
     sort_by                 : 'magnitude' | 'value', see GeneralizedEigenSolver
+    cma_solver              : 'regularized' (default) or 'rank_truncated' -- see
+                              CMAParameters. Truncation returns only rank(R) modes,
+                              and rank(R) varies across the sweep, so n_modes must
+                              stay below the rank at the LOWEST frequency; the loop
+                              raises with that number if it does not.
+    rank_tol                : null-space threshold for 'rank_truncated' (default 1e-6)
     use_gpu                 : bool or None, passed to calculate_z_matrice_sweep
+    write_report            : also write a human-readable Markdown report next
+                              to the .mat (resonances, modal Q, bandwidths,
+                              health checks) -- see backend.cma.cma_report
+    track                   : correlate the modes across adjacent frequencies and
+                              attach the resulting permutation as
+                              sweep_data.tracking (default True). Costs one
+                              (n_modes x n_modes) correlation per step -- negligible
+                              next to the Z(f) assembly -- and does not alter the
+                              stored arrays; see "Mode ordering and tracking" above.
+    tracking_params         : TrackingParameters, if the defaults need changing
+                              (correlation metric, degeneracy tolerance, the TECA
+                              -style correction hook) -- see
+                              backend.cma.mode_tracking
 
     Returns
     -------
@@ -128,26 +255,68 @@ def cma_frequency_sweep(path, freq_start, freq_stop, n_points=41, n_modes=6,
         n_modes=n_modes_eff,
         regularization_epsilon=regularization_epsilon,
         sort_by=sort_by,
+        solver=cma_solver,
+        rank_tol=rank_tol,
     )
 
     eigenvalues_arr  = np.zeros((n_freq, n_modes_eff))
     eigenvectors_arr = np.zeros((n_freq, n_dof, n_modes_eff))
 
+    # Tracking runs inside this loop rather than as a pass over the finished
+    # arrays because it needs R(f), and R(f) is only conveniently available here
+    # -- the saved .mat holds modes, not the operator they came from. The
+    # tracker keeps just two frequencies at a time, so this adds nothing to peak
+    # memory beyond what Z_all already costs.
+    tracker = ModeTracker(tracking_params or TrackingParameters()) if track else None
+
     for idx in range(n_freq):
         R = np.real(Z_all[idx])
         X = np.imag(Z_all[idx])
         eigenvalues, eigenvectors, _sort_order = GeneralizedEigenSolver.solve(R, X, params)
+
+        # 'rank_truncated' returns at most rank(R) modes, and rank(R) grows with
+        # frequency (measured on the CubeSat mesh: 41 at 233 MHz, 64 at 440,
+        # 71 at 500). The sweep arrays are sized once, so a frequency whose rank
+        # falls below n_modes cannot be stored -- and silently padding it with
+        # zeros would put fictitious modes into every downstream plot. Say so
+        # instead, and name the fix.
+        if eigenvalues.shape[0] < n_modes_eff:
+            raise RuntimeError(
+                f"CMA sweep: at {frequencies[idx]/1e6:.3f} MHz, R has numerical rank "
+                f"{eigenvalues.shape[0]}, so only that many characteristic modes exist "
+                f"there -- fewer than the {n_modes_eff} this sweep is collecting. Lower "
+                f"n_modes to {eigenvalues.shape[0]} or below, raise the lower frequency "
+                f"bound, or refine the mesh (rank(R) grows with electrical size)."
+            )
+
         eigenvalues_arr[idx, :]  = eigenvalues
         eigenvectors_arr[idx, :, :] = eigenvectors
 
+        if tracker is not None:
+            tracker.push(frequencies[idx], eigenvalues, eigenvectors, R=R, X=X)
+
         modes_str = ", ".join(f"{lam:.3f}" for lam in eigenvalues)
         print(f"Step {idx+1}/{n_freq} | {frequencies[idx]/1e6:8.2f} MHz | lambda: {modes_str}")
+
+    tracking = tracker.finalize() if tracker is not None else None
+    if tracking is not None:
+        print()
+        print(tracking.summary())
+        # A degenerate band flags the same pair at every step inside it, so the
+        # list can run long; the console gets the head of it and the report and
+        # sweep_data.tracking.events keep all of it.
+        for event in tracking.events[:_MAX_EVENTS_PRINTED]:
+            print(f"  {event.describe()}")
+        if len(tracking.events) > _MAX_EVENTS_PRINTED:
+            print(f"  ... {len(tracking.events) - _MAX_EVENTS_PRINTED} more "
+                  "(see sweep_data.tracking.events and the report)")
 
     sweep_data = CMASweepData(
         frequencies=frequencies,
         eigenvalues=eigenvalues_arr,
         eigenvectors=eigenvectors_arr,
         n_modes=n_modes_eff,
+        tracking=tracking,
     )
 
     cma_dir = 'data/antennas_cma'
@@ -155,5 +324,18 @@ def cma_frequency_sweep(path, freq_start, freq_stop, n_points=41, n_modes=6,
     path.mat_cma_sweep = os.path.join(cma_dir, f"{path.name}_cma_sweep.mat")
     DataManager_cma_sweep.save_data(path, sweep_data)
     print(f"\nSweep complete. CMA results for {n_modes_eff} modes saved to: {path.mat_cma_sweep}")
+
+    if write_report:
+        # The .mat holds eigenvalues and eigenvectors, which say little on their
+        # own; the report turns them into resonances, Q, bandwidths and the
+        # sanity checks, so a run can be interpreted later without re-deriving
+        # any of it. Z_all lets it check the matrix the modes came from.
+        #
+        # The report gets the TRACKED view when there is one: its tables are
+        # read by a human as mode curves, and a column that changes mode
+        # halfway down is exactly what tracking exists to remove. It says which
+        # order it is in, and the .mat beside it keeps the raw one.
+        write_sweep_report(path, sweep_data.tracked() if tracking is not None else sweep_data,
+                           points, triangles, edges, Z_all=Z_all, params=params)
 
     return sweep_data

@@ -141,14 +141,24 @@ def should_use_gpu(num_edges, use_gpu=None, threshold=DEFAULT_GPU_EDGE_THRESHOLD
 
 def gpu_free_memory_bytes():
     """
-    Free memory on the active CUDA device, in bytes, or None if there is no
-    usable GPU (or the driver will not answer).
+    Memory available for the next CuPy allocation, in bytes, or None if there
+    is no usable GPU (or the driver will not answer).
+
+    This is NOT just the driver's free figure. CuPy allocates through a memory
+    pool that holds on to blocks after they are released, so the driver keeps
+    reporting them as used even though CuPy can hand them straight back out.
+    Right after a large sweep the driver can therefore say ~0 bytes free while
+    the next assembly would allocate without trouble -- and a guard built on
+    that number alone would send every subsequent run to the CPU for nothing.
+    Adding back the pool's own free bytes gives what the next allocation can
+    actually draw on.
     """
     if not GPU_AVAILABLE:
         return None
     try:
-        free, _total = _cupy.cuda.Device().mem_info
-        return int(free)
+        driver_free, _total = _cupy.cuda.Device().mem_info
+        pool_free = _cupy.get_default_memory_pool().free_bytes()
+        return int(driver_free) + int(pool_free)
     except Exception:
         return None
 

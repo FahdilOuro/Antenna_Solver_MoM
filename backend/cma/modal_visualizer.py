@@ -60,7 +60,8 @@ class ModalVisualizer:
     @staticmethod
     def plot_mode_farfield(sphere_points, sphere_triangles, gain_db, mode_index, eigenvalue,
                            title_prefix="CMA", dynamic_range=20,
-                           save_image=False, save_folder=None, antenna_name=""):
+                           save_image=False, save_folder=None, antenna_name="",
+                           directivity_max_db=None, show_annotation=True):
         """
         Plot the 3D far-field directivity pattern radiated by a single characteristic mode,
         using the same deformed-sphere rendering as the physical-antenna gain patterns
@@ -76,6 +77,11 @@ class ModalVisualizer:
                                                     cma_mode<n>_farfield_<antenna_name>.pdf
         save_folder                              — destination (defaults to 'data/fig_image/')
         antenna_name                             — used in the saved filename
+        directivity_max_db                       — peak directivity in dBi shown in the in-figure
+                                                    annotation; defaults to max(gain_db)
+        show_annotation                          — draw the mode number, λ and peak directivity
+                                                    inside the figure body (survives the PDF export,
+                                                    unlike the title)
 
         Returns
         -------
@@ -83,8 +89,25 @@ class ModalVisualizer:
         """
         sphere_points_deformed = deform_sphere_for_radiation_pattern(sphere_points, gain_db, dynamic_range)
         gain_faces_db = np.mean(gain_db[sphere_triangles], axis=0)
+        if directivity_max_db is None:
+            directivity_max_db = float(np.max(gain_db))
         title = f"{title_prefix} — Mode {mode_index + 1} far field,  λ = {eigenvalue:.4f}"
         fig = visualize_sphere_gain(sphere_points_deformed, sphere_triangles, gain_faces_db, title)
+
+        if show_annotation:
+            # efield2's renderer forces title='', so the mode identity has to be written
+            # into the figure body to be readable interactively and in the PDF export
+            # below, which crops the top margin away.
+            fig.add_annotation(
+                xref="paper", yref="paper", x=0.02, y=0.98,
+                xanchor="left", yanchor="top", align="left", showarrow=False,
+                text=(f"Mode {mode_index + 1}<br>"
+                      f"λ = {eigenvalue:.4f}<br>"
+                      f"Peak directivity = {directivity_max_db:.2f} dBi"),
+                font=dict(size=14, color="black"),
+                bgcolor="rgba(255,255,255,0.7)",
+                bordercolor="black", borderwidth=1, borderpad=4,
+            )
 
         if save_image:
             if save_folder is None:
@@ -94,7 +117,8 @@ class ModalVisualizer:
             pdf_path = os.path.join(save_folder, pdf_name)
             # t=0 here, unlike the modal-current export: efield2's renderer
             # forces title='', so there is no title to clip and the tighter
-            # crop is free. Which mode this is lives in the filename.
+            # crop is free. The mode, λ and peak directivity are carried by the
+            # in-figure annotation above (and the mode also by the filename).
             fig.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
@@ -114,7 +138,15 @@ class ModalVisualizer:
         across a CMA frequency sweep (backend.cma.cma_frequency_sweep.cma_frequency_sweep).
 
         A mode is resonant where its curve crosses lambda_n = 0 (dashed reference line).
-        See cma_frequency_sweep()'s docstring for the mode-tracking/crossing caveat.
+        Mode identity across the sweep
+        ------------------------------
+        `sweep_data` straight out of cma_frequency_sweep() is in the solver's
+        per-frequency order, so a curve here can jump from one physical mode to
+        another where two eigenvalues cross. Pass `sweep_data.tracked()`
+        instead -- same object type, modes followed across the sweep by the
+        R-weighted correlation -- and read `sweep_data.tracking.events` for the
+        bands where that identity is not decidable (see
+        backend.cma.mode_tracking). The same applies to every plotter below.
 
         Why the default y axis is symlog
         --------------------------------

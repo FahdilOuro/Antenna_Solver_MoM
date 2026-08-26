@@ -1,0 +1,34 @@
+{
+  "description": "PEC spherical shell, geodesic CONTROL mesh -- used to attribute a degraded degeneracy to the mesh or to the solver, and to separate discretisation error from solver error by refinement; not the fixture",
+  "reference": "Capek, Losenicky, Jelinek, Gustafsson, 'Validating the Characteristic Modes Solvers', IEEE TAP 65(8):4134-4145, 2017",
+  "file": "sphere_shell_icosphere_f10.msh",
+  "sha256": "a3229b301b70b10fa34094e8dc279f6fd6c4d954375a224380e0e6742418a554",
+  "generated_utc": "2026-08-20T12:41:00+00:00",
+  "generator": "generate_sphere_mesh.py",
+  "gmsh_version": "4.13.1",
+  "generation_parameters": {
+    "radius_m": 0.1,
+    "construction": "class-I geodesic (subdivided icosahedron, projected)",
+    "frequency": 10
+  },
+  "mesh": {
+    "n_points": 1002,
+    "n_triangles": 2000,
+    "n_edges_total": 3000,
+    "n_rwg_edges": 3000,
+    "n_boundary_edges": 0,
+    "n_nonmanifold_edges": 0,
+    "euler_characteristic": 2,
+    "edge_length_min": 0.009435988575131395,
+    "edge_length_max": 0.013193249385736178,
+    "edge_length_mean": 0.012015536565908922,
+    "edge_length_std_over_mean": 0.07129264611939037,
+    "edge_length_max_over_min": 1.3981841203694403,
+    "triangle_area_max_over_min": 1.7810738868598754,
+    "triangle_quality_min": 0.9745273179889777,
+    "triangle_quality_mean": 0.9963427239433627,
+    "node_radius_max_deviation_rel": 2.7755575615628914e-16,
+    "total_area": 0.12527777313541916,
+    "exact_sphere_area": 0.12566370614359174
+  }
+}

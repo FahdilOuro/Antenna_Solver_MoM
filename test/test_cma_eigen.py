@@ -6,6 +6,7 @@ The diagonal system provides exact analytical ground-truth eigenvalues.
 """
 
 import numpy as np
+import pytest
 
 from backend.cma.cma_parameters import CMAParameters
 from backend.cma.eigen_solver import GeneralizedEigenSolver
@@ -194,3 +195,55 @@ class TestNearSingularR:
             # *unregularized* R is not expected -- this only checks the
             # solve is self-consistent and finite, not exact recovery.
             assert np.all(np.isfinite(lhs)) and np.all(np.isfinite(rhs))
+
+
+class TestAsymmetryIsRefusedNotSymmetrisedAway:
+    """
+    solve() averages R and X with their transposes. That is correct for
+    quadrature-level asymmetry and dangerous beyond it: a genuinely broken
+    matrix becomes a plausible one and the analysis proceeds on it silently.
+
+    This is not hypothetical. A closed-form 1/R integral that assumed the
+    observation point was coplanar with the source triangle left Im(Z)
+    asymmetric by a factor of ~1 on a CubeSat mesh (panels meeting the chassis
+    at right angles); the solver symmetrised it and returned a full set of
+    modes for a matrix that did not exist.
+    """
+
+    def test_grossly_asymmetric_X_raises(self):
+        n = 8
+        rng = np.random.default_rng(11)
+        A = rng.random((n, n))
+        R = A @ A.T + np.eye(n)                      # symmetric, SPD
+        X = rng.random((n, n))                       # NOT symmetric
+        assert np.max(np.abs(X - X.T)) / np.max(np.abs(X)) > 1e-2
+
+        with pytest.raises(ValueError, match="not symmetric"):
+            GeneralizedEigenSolver.solve(R, X, CMAParameters(n_modes=2))
+
+    def test_grossly_asymmetric_R_raises(self):
+        n = 8
+        rng = np.random.default_rng(12)
+        R = rng.random((n, n)) + np.eye(n) * 5       # NOT symmetric
+        B = rng.random((n, n))
+        X = B + B.T
+
+        with pytest.raises(ValueError, match="not symmetric"):
+            GeneralizedEigenSolver.solve(R, X, CMAParameters(n_modes=2))
+
+    def test_quadrature_level_asymmetry_is_still_accepted(self):
+        """
+        The guard must not fire on the asymmetry the assembly legitimately
+        produces (~1e-3 on a 3D junction mesh), or every real run would fail.
+        """
+        n = 8
+        rng = np.random.default_rng(13)
+        A = rng.random((n, n))
+        R = A @ A.T + np.eye(n)
+        B = rng.random((n, n))
+        X = B + B.T
+        X = X + 1e-4 * np.max(np.abs(X)) * np.triu(rng.random((n, n)), 1)   # small, one-sided
+
+        eigenvalues, _vectors, _order = GeneralizedEigenSolver.solve(R, X, CMAParameters(n_modes=3))
+        assert eigenvalues.shape == (3,)
+        assert np.all(np.isfinite(eigenvalues))

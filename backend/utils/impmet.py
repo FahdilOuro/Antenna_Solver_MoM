@@ -64,11 +64,140 @@ def _duffy_weight_scale(area_source: float) -> float:
     return 1.0 / (2.0 * area_source)
 
 
+
+def _mirror_upper_triangle(matrice_z):
+    """
+    Complete a Z filled only on m <= n by reflecting it across the diagonal.
+
+    The EFIE operator is symmetric (NOT Hermitian): Z_mn = Z_nm, because the
+    Green's function depends on |r_t - r_s| alone and Galerkin testing uses the
+    same RWG space on both sides. The assembled matrix nevertheless comes out
+    slightly asymmetric, and that is a property of the QUADRATURE, not of a bug:
+
+      * FAR pairs use the same Dunavant rule on both triangles, so their double
+        sum sum_p sum_q w_p w_q f(r_p, r_q) is symmetric to machine precision.
+      * SELF pairs put Dunavant on the test triangle and Duffy on the source,
+        anchored at the current outer node.
+      * EDGE/VERTEX pairs put Dunavant on the test triangle and a closed form on
+        the source.
+
+    The last two treat test and source differently by construction, so swapping
+    (m, n) changes the answer at the quadrature-error level. Measured on the
+    CubeSat mesh at 440 MHz: max|Z-Z^T|/max|Z| = 5.2e-4 at the current
+    NEAR_ORDER_DEFAULT (1.26e-3 at the degree-11 rule that preceded it), and
+    entirely in Im(Z) -- Re(Z) comes out symmetric to ~1e-15 at every order,
+    because the closed-form 1/R integral is REAL and its prefactor 4*pref_Phi is
+    purely IMAGINARY, so the singular half cannot reach Re(Z) at all. What Re(Z)
+    does see is the bounded sin(kR)/R remainder, which both schemes integrate
+    identically.
+
+    Broken down by branch on that mesh, EDGE alone accounts for essentially the
+    whole residual (5.2e-4 of the 5.2e-4 total at degree 16); VERTEX contributes
+    1.8e-5 and SELF 8e-7. Note what that last number does NOT mean: SELF is
+    nearly symmetric under (m,n) swap by construction -- the two triangles are
+    the same triangle -- so this measurement is blind to its error, which is
+    separately known to be much larger. Reciprocity bounds the EDGE/VERTEX
+    branches and nothing else.
+
+    Since the two halves differ only by quadrature error, computing both and
+    keeping one is wasted work: fill m <= n and mirror. That makes Z exactly
+    symmetric by construction (max|Z-Z^T| = 0, not merely small), removes the
+    need for the eigensolver to symmetrise anything, and halves the fill.
+
+    Accepts (E, E) or (N_freq, E, E). The diagonal is subtracted once so it is
+    not doubled.
+    """
+    zt = matrice_z.swapaxes(-1, -2)
+    diag = np.zeros_like(matrice_z)
+    idx = np.arange(matrice_z.shape[-1])
+    diag[..., idx, idx] = matrice_z[..., idx, idx]
+    return matrice_z + zt - diag
+
+
 # ---------------------------------------------------------------------------
 # New correct impedance matrix (Phase 4)
 # ---------------------------------------------------------------------------
 
-def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega, mu, epsilon, quad_order: int = 6, duffy_order: int = 7) -> np.ndarray:
+#: Gauss-Dunavant degree used on EDGE/VERTEX pairs (81 points).
+#:
+#: Measured, not chosen by taste. The EDGE/VERTEX branch integrates the 1/R half
+#: of the scalar potential in closed form over the SOURCE triangle and
+#: numerically over the TEST one, so its error shows up directly as
+#: max|Z-Z^T|/max|Z| on an independently-filled matrix. Sweeping this order on
+#: the CubeSat mesh at 440 MHz (E = 760) gives:
+#:
+#:     degree      6      7     11     16     20     24
+#:     points     12     25     49     81    121    169
+#:     err_T   5.2e-3 3.9e-3 1.3e-3 5.2e-4 2.5e-4 1.3e-4
+#:
+#: a clean algebraic decrease over eight orders with no plateau -- truncation
+#: error, not a defect. 16 is the lowest degree that brings err_T under 1e-3,
+#: which is z_matrix_diagnostics.RECIPROCITY_TOL. It was 11 before, which was
+#: also the largest rule gauss_dunavant offered, so the previous default sat on
+#: the table's ceiling and no amount of raising quad_order could move it.
+#:
+#: The cost is nil on the path that matters: EDGE/VERTEX pairs number O(N_tri)
+#: against the FAR bucket's O(E^2), so a production fill of that same mesh
+#: through impedance_matrix_z_sweep_gpu measures 13.3 s at degree 11 and 13.0 s
+#: at 16 -- the difference is noise. Degree 24 would cost 23 s, and buys another
+#: factor 4; raise it deliberately if a mesh ever needs that.
+#:
+#: See backend/utils/quadrature/outer_order_study.py to reproduce.
+NEAR_ORDER_DEFAULT = 16
+
+
+def _default_near_order(quad_order: int) -> int:
+    """
+    Gauss-Dunavant order used on EDGE/VERTEX pairs when the caller does not
+    choose one.
+
+    A floor rather than a function of quad_order. What limits this branch is the
+    log-slope kink the source triangle's potential has along the shared edge, and
+    that kink does not get any gentler because the caller asked for a cheaper FAR
+    rule -- while the cost of resolving it is, as measured above, invisible next
+    to the O(E^2) FAR fill. So a caller who lowers quad_order for speed still
+    gets a reciprocal matrix; one who raises it past NEAR_ORDER_DEFAULT gets at
+    least as much accuracy on the singular pairs as on the smooth ones.
+
+    Defined in one place because THREE assemblers must agree on it exactly --
+    impedance_matrix_z, impedance_matrix_z_sweep and
+    impedance_matrix_z_sweep_gpu -- and their regression tests cross-check each
+    against the previous one to 1e-10. A default that drifted between them would
+    surface as an unexplained sweep/single-frequency mismatch rather than as the
+    deliberate change it was.
+    """
+    return max(quad_order, NEAR_ORDER_DEFAULT)
+
+
+def _outer_rule_tables(order, tri_verts, N_tri, plus, minus, free_plus, free_minus, _cache):
+    """
+    Per-triangle quadrature points and per-edge rho vectors for one Dunavant order.
+
+    Memoised on `order` so that callers which leave the three outer orders
+    (far / near / self) at values that coincide -- the default does, since the
+    SELF branch reuses the FAR rule -- share one set of arrays and pay for it
+    once, exactly as before these orders became independently settable.
+
+    Returns (r_tri, rho_plus, rho_minus, w).
+    """
+    if order not in _cache:
+        xi, w = dunavant_rule(order)
+        Nq = len(w)
+        r_tri = np.empty((N_tri, 3, Nq), dtype=np.float64)
+        for t in range(N_tri):
+            v = tri_verts[t]
+            r_tri[t] = map_to_triangle(xi, v[:, 0], v[:, 1], v[:, 2])
+        _cache[order] = (r_tri,
+                         r_tri[plus] - free_plus.T[:, :, None],
+                         r_tri[minus] - free_minus.T[:, :, None],
+                         w)
+    return _cache[order]
+
+
+def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega, mu, epsilon,
+                       quad_order: int = 6, duffy_order: int = 7,
+                       near_order: int = None, self_outer_order: int = None,
+                       full_fill: bool = False, only_categories=None) -> np.ndarray:
     """
     Assemble the RWG EFIE impedance matrix using proper double surface quadrature.
 
@@ -85,11 +214,20 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
 
     Quadrature strategy per sub-triangle-pair category:
         FAR            → Gauss-Dunavant(quad_order) on both T_t and T_s
-        SELF           → Gauss-Dunavant(quad_order) on T_t;
+        SELF           → Gauss-Dunavant(self_outer_order) on T_t;
                          Duffy(duffy_order) on T_s with r_sing = test point
-        EDGE / VERTEX  → Gauss-Dunavant(quad_order+5) on both (higher-order
-                         Gauss compensates for near-singularity; integrand is
-                         bounded since Gauss nodes lie strictly in the interior)
+        EDGE / VERTEX  → Gauss-Dunavant(near_order) on both, with the 1/R half
+                         of the scalar-potential kernel integrated in closed
+                         form over T_s (higher-order Gauss carries the bounded
+                         remainder; Gauss nodes lie strictly in the interior)
+
+    Only the FAR branch uses the same rule on both triangles, so only the FAR
+    branch is symmetric under (m,n) -> (n,m) to machine precision. SELF and
+    EDGE/VERTEX are numerical on the TEST triangle and analytic (or Duffy) on
+    the SOURCE one, so their asymmetry is their own outer-quadrature error --
+    which is why `near_order` and `self_outer_order` are settable separately
+    from `quad_order`: they are the two knobs that error responds to. See
+    backend/utils/quadrature/outer_order_study.py for the measured convergence.
 
     Parameters
     ----------
@@ -105,11 +243,47 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
     epsilon         : float  free-space permittivity (F/m)
     quad_order      : int    Gauss-Dunavant order for FAR pairs (default 6)
     duffy_order     : int    GL order for Duffy inner integral (default 7)
+    near_order      : int or None  Gauss-Dunavant order on BOTH triangles of an
+                      EDGE/VERTEX pair. None (default) = min(quad_order + 5, 11),
+                      the historical setting. Note that with the default
+                      quad_order this lands exactly on 11, which was the largest
+                      rule available until degrees 16/20/24 were added -- so
+                      raising quad_order alone never moved it.
+    self_outer_order : int or None  Gauss-Dunavant order on the TEST triangle of
+                      a SELF pair. None (default) = quad_order, i.e. the SELF
+                      branch reuses the FAR rule, as it always has.
+    full_fill       : bool   DIAGNOSTIC ONLY. By default only m <= n is computed
+                      and the rest mirrored (see _mirror_upper_triangle), so the
+                      result is exactly symmetric whatever the kernel does.
+                      That is correct but it also silences max|Z-Z^T|/max|Z|,
+                      which is the cheapest global health check the assembly
+                      has -- it is what caught a closed-form 1/R integral that
+                      assumed coplanarity (it read 0.994 instead of ~1e-3).
+                      Setting full_fill=True computes both halves
+                      independently, at twice the cost, so that check can still
+                      be run. Never needed for a production solve.
+    only_categories : iterable of category constants, or None. DIAGNOSTIC ONLY.
+                      When given, sub-triangle pairs outside the listed
+                      categories (SELF / EDGE / VERTEX / FAR, from
+                      quadrature.singularity_classifier) contribute nothing, so
+                      the returned matrix holds one branch's share of Z in
+                      isolation. Combined with full_fill=True this is what lets
+                      max|Z-Z^T| be attributed to a specific quadrature scheme
+                      instead of the assembly as a whole. None (default) sums
+                      all four, i.e. the real matrix.
 
     Returns
     -------
-    matrice_z : complex (E, E)  impedance matrix
+    matrice_z : complex (E, E)  impedance matrix -- exactly symmetric unless
+                full_fill=True, in which case the two halves are independent
     """
+    if near_order is None:
+        near_order = _default_near_order(quad_order)
+    if self_outer_order is None:
+        self_outer_order = quad_order
+    if only_categories is not None:
+        only_categories = frozenset(int(c) for c in only_categories)
+
     E      = edges_data.total_number_of_edges
     N_tri  = triangles_data.total_of_triangles
     tri    = triangles_data.triangles[:3, :]   # (3, N_tri) vertex indices (int)
@@ -142,28 +316,22 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
             if int(tri[vi, tm]) not in ev:
                 free_minus[:, m] = pts[:, tri[vi, tm]]; break
 
-    # Quadrature rules
-    xi_far,  w_far  = dunavant_rule(quad_order)       # far pairs
-    xi_near, w_near = dunavant_rule(min(quad_order + 5, 11))  # adjacent pairs
+    # ---- Quadrature rules, with per-triangle points and per-edge rho vectors
+    #      computed ONCE per triangle / per edge ----
+    # (previously map_to_triangle and the rho subtraction were re-evaluated for
+    # every (m,n) pair that touched a given triangle, i.e. up to O(E) times
+    # instead of once). The three categories ask for their own order, and
+    # _outer_rule_tables memoises so equal orders -- the default case, where
+    # SELF reuses the FAR rule -- still build one table, not two.
+    _rule_cache = {}
+    r_tri_far, rho_plus_far, rho_minus_far, w_far = _outer_rule_tables(
+        quad_order, tri_verts, N_tri, plus, minus, free_plus, free_minus, _rule_cache)
+    r_tri_near, rho_plus_near, rho_minus_near, w_near = _outer_rule_tables(
+        near_order, tri_verts, N_tri, plus, minus, free_plus, free_minus, _rule_cache)
+    r_tri_self, rho_plus_self, rho_minus_self, w_self = _outer_rule_tables(
+        self_outer_order, tri_verts, N_tri, plus, minus, free_plus, free_minus, _rule_cache)
 
-    # ---- Per-triangle quadrature points, computed ONCE per triangle ----
-    # (previously map_to_triangle was re-evaluated for every (m,n) pair that
-    # touched a given triangle, i.e. up to O(E) times instead of once)
-    Nq_far, Nq_near = len(w_far), len(w_near)
-    r_tri_far  = np.empty((N_tri, 3, Nq_far),  dtype=np.float64)
-    r_tri_near = np.empty((N_tri, 3, Nq_near), dtype=np.float64)
-    for t in range(N_tri):
-        v = tri_verts[t]
-        r_tri_far[t]  = map_to_triangle(xi_far,  v[:, 0], v[:, 1], v[:, 2])
-        r_tri_near[t] = map_to_triangle(xi_near, v[:, 0], v[:, 1], v[:, 2])
-
-    # ---- Per-edge rho vectors at those points, computed ONCE per edge ----
-    # (previously recomputed for every (m,n) pair; fv_t/fv_s only depend on
-    # the edge+side, not on the pairing partner)
-    rho_plus_far   = r_tri_far[plus]   - free_plus.T[:, :, None]
-    rho_minus_far  = r_tri_far[minus]  - free_minus.T[:, :, None]
-    rho_plus_near  = r_tri_near[plus]  - free_plus.T[:, :, None]
-    rho_minus_near = r_tri_near[minus] - free_minus.T[:, :, None]
+    Nq_near, Nq_self = len(w_near), len(w_self)
 
     # Result matrix
     matrice_z = np.zeros((E, E), dtype=complex)
@@ -174,27 +342,32 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
 
         # Testing triangles with their sign, free vertex, and precomputed rho
         test_sides = [
-            (tp_m, +1.0, free_plus[:, m],  rho_plus_far[m],  rho_plus_near[m]),
-            (tm_m, -1.0, free_minus[:, m], rho_minus_far[m], rho_minus_near[m]),
+            (tp_m, +1.0, free_plus[:, m],  rho_plus_far[m],  rho_plus_near[m],  rho_plus_self[m]),
+            (tm_m, -1.0, free_minus[:, m], rho_minus_far[m], rho_minus_near[m], rho_minus_self[m]),
         ]
 
-        for n in range(E):
+        # Fill m <= n only; the lower half is mirrored in (see
+        # _mirror_upper_triangle for why the two halves are redundant).
+        for n in range(0 if full_fill else m, E):
             ln = lengths[n]
             tp_n = int(plus[n]);  tm_n = int(minus[n])
 
             source_sides = [
-                (tp_n, +1.0, free_plus[:, n],  rho_plus_far[n],  rho_plus_near[n]),
-                (tm_n, -1.0, free_minus[:, n], rho_minus_far[n], rho_minus_near[n]),
+                (tp_n, +1.0, free_plus[:, n],  rho_plus_far[n],  rho_plus_near[n],  rho_plus_self[n]),
+                (tm_n, -1.0, free_minus[:, n], rho_minus_far[n], rho_minus_near[n], rho_minus_self[n]),
             ]
 
             Z_mn = 0.0 + 0.0j
 
-            for (T_t, s_t, fv_t, rho_t_far, rho_t_near) in test_sides:
+            for (T_t, s_t, fv_t, rho_t_far, rho_t_near, rho_t_self) in test_sides:
                 tri_t_verts = tri[:, T_t]       # vertex indices of T_t
 
-                for (T_s, s_s, fv_s, rho_s_far, rho_s_near) in source_sides:
+                for (T_s, s_s, fv_s, rho_s_far, rho_s_near, rho_s_self) in source_sides:
                     s_ts  = s_t * s_s
                     cat   = classify_triangle_pair(tri_t_verts, tri[:, T_s])
+
+                    if only_categories is not None and int(cat) not in only_categories:
+                        continue
 
                     if cat == FAR:
                         # ---- standard double Gauss ----
@@ -214,27 +387,28 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
 
                     elif cat == SELF:
                         # ---- outer Gauss, inner Duffy ----
-                        # The outer rule stays the FAR (lower-order) one on purpose.
-                        # Accuracy here is limited by the OUTER order -- the inner
-                        # Duffy integration leaves int_Ts dS'/R, which is continuous
-                        # but has log-slope kinks at the edges (measured 0.22% at
-                        # order 6, 0.02% at order 11 on a 40 mm cell). Raising the
-                        # outer order looks tempting, but it pushes outer nodes close
-                        # to the triangle's edges, and there Duffy's subdivision from
-                        # the singular point degenerates into slivers: convergence in
-                        # duffy_order then stops being monotone (measured, order-11
+                        # The outer rule defaults to the FAR (lower-order) one on
+                        # purpose. Accuracy here is limited by the OUTER order -- the
+                        # inner Duffy integration leaves int_Ts dS'/R, which is
+                        # continuous but has log-slope kinks at the edges (measured
+                        # 0.22% at order 6, 0.02% at order 11 on a 40 mm cell). Raising
+                        # the outer order looks tempting, but it pushes outer nodes
+                        # close to the triangle's edges, and there Duffy's subdivision
+                        # from the singular point degenerates into slivers: convergence
+                        # in duffy_order then stops being monotone (measured, order-11
                         # outer: 2.05% at duffy 7, 0.008% at 10, 0.275% at 14, 0.005%
                         # at 25). Order 6 keeps every outer node well inside, where
-                        # Duffy is stable. Lifting this ceiling means replacing the
-                        # inner Duffy with the closed form in
+                        # Duffy is stable -- so self_outer_order and duffy_order must
+                        # be raised TOGETHER or not at all. Lifting the ceiling for
+                        # good means replacing the inner Duffy with the closed form in
                         # backend.utils.quadrature.analytic_singular, as the
                         # EDGE/VERTEX branch below does.
-                        r_t, rho_t = r_tri_far[T_t], rho_t_far
+                        r_t, rho_t = r_tri_self[T_t], rho_t_self
                         v_s = tri_verts[T_s]      # (3, 3) — Duffy needs raw vertices
                         duffy_scale = _duffy_weight_scale(triangles_data.triangles_area[T_s])
 
                         sub = 0.0 + 0.0j
-                        for p in range(Nq_far):
+                        for p in range(Nq_self):
                             r_sing = r_t[:, p]
                             rho_tp = rho_t[:, p]   # (3,)
 
@@ -249,7 +423,7 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
                             rho_dot_p = np.einsum('i,id->d', rho_tp, rho_sp)  # (Nq_d,)
 
                             inner = np.dot(d_w, (pref_A * rho_dot_p + 4.0 * pref_Phi) * G_p)
-                            sub  += w_far[p] * inner * duffy_scale
+                            sub  += w_self[p] * inner * duffy_scale
 
                         Z_mn += s_ts * lm * ln * sub
 
@@ -289,7 +463,7 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
 
             matrice_z[m, n] = Z_mn
 
-    return matrice_z
+    return matrice_z if full_fill else _mirror_upper_triangle(matrice_z)
 
 
 # ---------------------------------------------------------------------------
@@ -297,7 +471,8 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
 # ---------------------------------------------------------------------------
 
 def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencies, mu, epsilon,
-                              quad_order: int = 6, duffy_order: int = 7) -> np.ndarray:
+                              quad_order: int = 6, duffy_order: int = 7,
+                              near_order: int = None, self_outer_order: int = None) -> np.ndarray:
     """
     Assemble the RWG EFIE impedance matrix at MULTIPLE frequencies in one pass.
 
@@ -326,12 +501,21 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
     edges_data, triangles_data, points_data : as in impedance_matrix_z
     frequencies : array-like (N_freq,)  sweep frequencies in Hz
     mu, epsilon : float  free-space permeability / permittivity
-    quad_order, duffy_order : int  as in impedance_matrix_z
+    quad_order, duffy_order, near_order, self_outer_order : int  as in
+        impedance_matrix_z. They must be threaded through here, not just
+        available on the single-frequency assembler: a CMA run gets its Z from
+        the sweep, so pinning the quadrature only on impedance_matrix_z would
+        leave the path that actually feeds the eigenproblem untunable.
 
     Returns
     -------
     matrice_z : complex (N_freq, E, E)
     """
+    if near_order is None:
+        near_order = _default_near_order(quad_order)
+    if self_outer_order is None:
+        self_outer_order = quad_order
+
     frequencies = np.atleast_1d(np.asarray(frequencies, dtype=np.float64))
     N_freq = frequencies.shape[0]
 
@@ -366,21 +550,15 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
             if int(tri[vi, tm]) not in ev:
                 free_minus[:, m] = pts[:, tri[vi, tm]]; break
 
-    xi_far,  w_far  = dunavant_rule(quad_order)
-    xi_near, w_near = dunavant_rule(min(quad_order + 5, 11))
-    Nq_far, Nq_near = len(w_far), len(w_near)
+    _rule_cache = {}
+    r_tri_far, rho_plus_far, rho_minus_far, w_far = _outer_rule_tables(
+        quad_order, tri_verts, N_tri, plus, minus, free_plus, free_minus, _rule_cache)
+    r_tri_near, rho_plus_near, rho_minus_near, w_near = _outer_rule_tables(
+        near_order, tri_verts, N_tri, plus, minus, free_plus, free_minus, _rule_cache)
+    r_tri_self, rho_plus_self, rho_minus_self, w_self = _outer_rule_tables(
+        self_outer_order, tri_verts, N_tri, plus, minus, free_plus, free_minus, _rule_cache)
 
-    r_tri_far  = np.empty((N_tri, 3, Nq_far),  dtype=np.float64)
-    r_tri_near = np.empty((N_tri, 3, Nq_near), dtype=np.float64)
-    for t in range(N_tri):
-        v = tri_verts[t]
-        r_tri_far[t]  = map_to_triangle(xi_far,  v[:, 0], v[:, 1], v[:, 2])
-        r_tri_near[t] = map_to_triangle(xi_near, v[:, 0], v[:, 1], v[:, 2])
-
-    rho_plus_far   = r_tri_far[plus]   - free_plus.T[:, :, None]
-    rho_minus_far  = r_tri_far[minus]  - free_minus.T[:, :, None]
-    rho_plus_near  = r_tri_near[plus]  - free_plus.T[:, :, None]
-    rho_minus_near = r_tri_near[minus] - free_minus.T[:, :, None]
+    Nq_near, Nq_self = len(w_near), len(w_self)
 
     matrice_z = np.zeros((N_freq, E, E), dtype=complex)
 
@@ -389,25 +567,27 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
         tp_m = int(plus[m]);  tm_m = int(minus[m])
 
         test_sides = [
-            (tp_m, +1.0, free_plus[:, m],  rho_plus_far[m],  rho_plus_near[m]),
-            (tm_m, -1.0, free_minus[:, m], rho_minus_far[m], rho_minus_near[m]),
+            (tp_m, +1.0, free_plus[:, m],  rho_plus_far[m],  rho_plus_near[m],  rho_plus_self[m]),
+            (tm_m, -1.0, free_minus[:, m], rho_minus_far[m], rho_minus_near[m], rho_minus_self[m]),
         ]
 
-        for n in range(E):
+        # Fill m <= n only; the lower half is mirrored in (see
+        # _mirror_upper_triangle for why the two halves are redundant).
+        for n in range(m, E):
             ln = lengths[n]
             tp_n = int(plus[n]);  tm_n = int(minus[n])
 
             source_sides = [
-                (tp_n, +1.0, free_plus[:, n],  rho_plus_far[n],  rho_plus_near[n]),
-                (tm_n, -1.0, free_minus[:, n], rho_minus_far[n], rho_minus_near[n]),
+                (tp_n, +1.0, free_plus[:, n],  rho_plus_far[n],  rho_plus_near[n],  rho_plus_self[n]),
+                (tm_n, -1.0, free_minus[:, n], rho_minus_far[n], rho_minus_near[n], rho_minus_self[n]),
             ]
 
             Z_mn = np.zeros(N_freq, dtype=complex)
 
-            for (T_t, s_t, fv_t, rho_t_far, rho_t_near) in test_sides:
+            for (T_t, s_t, fv_t, rho_t_far, rho_t_near, rho_t_self) in test_sides:
                 tri_t_verts = tri[:, T_t]
 
-                for (T_s, s_s, fv_s, rho_s_far, rho_s_near) in source_sides:
+                for (T_s, s_s, fv_s, rho_s_far, rho_s_near, rho_s_self) in source_sides:
                     s_ts = s_t * s_s
                     cat  = classify_triangle_pair(tri_t_verts, tri[:, T_s])
 
@@ -428,12 +608,12 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
                         Z_mn += s_ts * lm * ln * sub
 
                     elif cat == SELF:
-                        r_t, rho_t = r_tri_far[T_t], rho_t_far
+                        r_t, rho_t = r_tri_self[T_t], rho_t_self
                         v_s = tri_verts[T_s]
                         duffy_scale = _duffy_weight_scale(triangles_data.triangles_area[T_s])
 
                         sub = np.zeros(N_freq, dtype=complex)
-                        for p in range(Nq_far):
+                        for p in range(Nq_self):
                             r_sing = r_t[:, p]
                             rho_tp = rho_t[:, p]
 
@@ -454,7 +634,7 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
                             integrand_p = (pref_A_arr[:, None] * rho_dot_p[None, :]
                                            + 4.0 * pref_Phi_arr[:, None]) * G_p
                             inner = integrand_p @ d_w                            # (Nf,)
-                            sub  += w_far[p] * inner * duffy_scale
+                            sub  += w_self[p] * inner * duffy_scale
 
                         Z_mn += s_ts * lm * ln * sub
 
@@ -493,7 +673,7 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
 
             matrice_z[:, m, n] = Z_mn
 
-    return matrice_z
+    return _mirror_upper_triangle(matrice_z)
 
 
 # ---------------------------------------------------------------------------
@@ -502,6 +682,7 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
 
 def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, frequencies, mu, epsilon,
                                   quad_order: int = 6, duffy_order: int = 7,
+                                  near_order: int = None, self_outer_order: int = None,
                                   use_gpu=None, chunk_size: int = 20000) -> np.ndarray:
     """
     Same result as impedance_matrix_z_sweep, restructured so the FAR and
@@ -539,7 +720,8 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
     edges_data, triangles_data, points_data : as in impedance_matrix_z
     frequencies : array-like (N_freq,)  sweep frequencies in Hz
     mu, epsilon : float  free-space permeability / permittivity
-    quad_order, duffy_order : int  as in impedance_matrix_z
+    quad_order, duffy_order, near_order, self_outer_order : int  as in
+              impedance_matrix_z
     use_gpu : bool or None  None=auto-detect (GPU if available, else CPU),
               True=force GPU (raises if unavailable), False=force CPU.
     chunk_size : int  number of FAR-category pairs processed per batch (the
@@ -554,6 +736,11 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
     """
     from backend.utils.compute_backend import get_array_module, to_numpy
     xp = get_array_module(use_gpu)
+
+    if near_order is None:
+        near_order = _default_near_order(quad_order)
+    if self_outer_order is None:
+        self_outer_order = quad_order
 
     frequencies = np.atleast_1d(np.asarray(frequencies, dtype=np.float64))
     N_freq = frequencies.shape[0]
@@ -589,21 +776,15 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
             if int(tri[vi, tm]) not in ev:
                 free_minus[:, m] = pts[:, tri[vi, tm]]; break
 
-    xi_far,  w_far_np  = dunavant_rule(quad_order)
-    xi_near, w_near_np = dunavant_rule(min(quad_order + 5, 11))
-    Nq_far, Nq_near = len(w_far_np), len(w_near_np)
+    _rule_cache = {}
+    r_tri_far, rho_plus_far_np, rho_minus_far_np, w_far_np = _outer_rule_tables(
+        quad_order, tri_verts, N_tri, plus, minus, free_plus, free_minus, _rule_cache)
+    r_tri_near, rho_plus_near_np, rho_minus_near_np, w_near_np = _outer_rule_tables(
+        near_order, tri_verts, N_tri, plus, minus, free_plus, free_minus, _rule_cache)
+    r_tri_self, rho_plus_self_np, rho_minus_self_np, w_self_np = _outer_rule_tables(
+        self_outer_order, tri_verts, N_tri, plus, minus, free_plus, free_minus, _rule_cache)
 
-    r_tri_far  = np.empty((N_tri, 3, Nq_far),  dtype=np.float64)
-    r_tri_near = np.empty((N_tri, 3, Nq_near), dtype=np.float64)
-    for t in range(N_tri):
-        v = tri_verts[t]
-        r_tri_far[t]  = map_to_triangle(xi_far,  v[:, 0], v[:, 1], v[:, 2])
-        r_tri_near[t] = map_to_triangle(xi_near, v[:, 0], v[:, 1], v[:, 2])
-
-    rho_plus_far_np   = r_tri_far[plus]   - free_plus.T[:, :, None]
-    rho_minus_far_np  = r_tri_far[minus]  - free_minus.T[:, :, None]
-    rho_plus_near_np  = r_tri_near[plus]  - free_plus.T[:, :, None]
-    rho_minus_near_np = r_tri_near[minus] - free_minus.T[:, :, None]
+    Nq_far, Nq_near, Nq_self = len(w_far_np), len(w_near_np), len(w_self_np)
 
     # --- Move frequency-dependent scalars and the shared regular-pair tables
     #     onto the active backend once ---
@@ -713,9 +894,13 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
             tri_s_verts = tri[:, T_s_grid]   # (3, E, E)
             n_shared = (tri_t_verts[:, None, :, :] == tri_s_verts[None, :, :, :]).sum(axis=(0, 1))
 
-            is_far  = n_shared == 0
-            is_near = (n_shared == 1) | (n_shared == 2)
-            is_self = n_shared == 3
+            # Upper triangle only: Z is symmetric and the lower half is
+            # mirrored in at the end (see _mirror_upper_triangle). This halves
+            # every bucket, hence the pair count actually assembled.
+            upper = n_grid >= m_grid
+            is_far  = (n_shared == 0) & upper
+            is_near = ((n_shared == 1) | (n_shared == 2)) & upper
+            is_self = (n_shared == 3) & upper
 
             _process_regular_bucket(
                 m_grid[is_far], n_grid[is_far], T_t_grid[is_far], T_s_grid[is_far],
@@ -732,20 +917,20 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
             m_self, n_self = m_grid[is_self], n_grid[is_self]
             T_t_self, T_s_self = T_t_grid[is_self], T_s_grid[is_self]
             fv_s_table = free_plus if ss == 0 else free_minus
-            rho_t_table_np = rho_plus_far_np if ts == 0 else rho_minus_far_np
+            rho_t_table_np = rho_plus_self_np if ts == 0 else rho_minus_self_np
 
             for pi in range(m_self.shape[0]):
                 m = int(m_self[pi]); n = int(n_self[pi])
                 T_t = int(T_t_self[pi]); T_s = int(T_s_self[pi])
                 lm = lengths_np[m]; ln = lengths_np[n]
                 fv_s = fv_s_table[:, n]
-                r_t = r_tri_far[T_t]
+                r_t = r_tri_self[T_t]
                 rho_t = rho_t_table_np[m]
                 v_s = tri_verts[T_s]
                 duffy_scale = _duffy_weight_scale(triangles_data.triangles_area[T_s])
 
                 sub = np.zeros(N_freq, dtype=complex)
-                for p in range(Nq_far):
+                for p in range(Nq_self):
                     r_sing = r_t[:, p]
                     rho_tp = rho_t[:, p]
                     d_pts, d_w = duffy_source_nodes(
@@ -761,11 +946,11 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
                     integrand_p = (pref_A_np[:, None] * rho_dot_p[None, :]
                                    + 4.0 * pref_Phi_np[:, None]) * G_p
                     inner = integrand_p @ d_w
-                    sub += w_far_np[p] * inner * duffy_scale
+                    sub += w_self_np[p] * inner * duffy_scale
 
                 Z_self_np[:, m, n] += s_ts * lm * ln * sub
 
-    return to_numpy(Z_batched) + Z_self_np
+    return _mirror_upper_triangle(to_numpy(Z_batched) + Z_self_np)
 
 
 # ---------------------------------------------------------------------------

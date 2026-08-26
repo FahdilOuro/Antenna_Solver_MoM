@@ -15,6 +15,22 @@ root causes:
 
 import numpy as np
 
+# Relative asymmetry above which Z stops looking like a quadrature artefact and
+# starts looking like a broken assembly.
+#
+# This value is NOT to be relaxed to accommodate a measurement. It was raised to
+# 5e-3 once, to make a measured 1.23e-3 on a CubeSat mesh read as acceptable;
+# that hid a real residual instead of fixing it. If a mesh cannot meet it, the
+# assembly is what needs changing.
+#
+# And that is what happened: the residual turned out to be plain truncation
+# error in the outer Gauss rule of the EDGE/VERTEX branch, whose order had been
+# pinned at the largest rule the quadrature table offered. Raising it (impmet's
+# NEAR_ORDER_DEFAULT, 11 -> 16) took the same mesh to 5.2e-4, under this
+# tolerance, at no measurable cost. See
+# backend/utils/quadrature/outer_order_study.py.
+RECIPROCITY_TOL = 1e-3
+
 
 def check_reciprocity(Z):
     """
@@ -23,20 +39,36 @@ def check_reciprocity(Z):
     free-space Green's function is symmetric in its two arguments, so nothing
     in the physics breaks Z = Z^T.
 
-    The assembled matrix is not symmetric to machine precision, though, and
-    that is expected rather than a defect: the SELF branch of impmet uses
-    Gauss-Dunavant on the TEST triangle and Duffy on the SOURCE triangle, so
-    swapping the (m,n) roles applies a different quadrature rule to the same
-    integral. The residual is pure Duffy truncation error and converges only
-    slowly with duffy_order (measured ~1.5e-7 at order 7, ~1.6e-8 at order 20).
+    Since the assembler fills only m <= n and mirrors (impmet's
+    _mirror_upper_triangle), production matrices satisfy Z = Z^T EXACTLY, and
+    this function reads 0. That is worth being explicit about: a zero here
+    confirms the mirroring ran, and nothing else. It cannot fail, so it cannot
+    warn -- a completely wrong kernel would also read 0.
 
-    That residual is harmless in practice: on the reference pixel-grid loop it
-    sits 5-6 orders of magnitude BELOW the symmetric part of the quadrature
-    error (Re(Z) ~4.5e-3, Im(Z) ~3.2e-1 relative to AToM), and symmetrising Z
-    changes the error vs that reference by less than 7 significant digits. The
-    consumers that care already symmetrise anyway (GeneralizedEigenSolver
-    forms R_sym/X_sym before solving). So this check is a coarse tripwire for
-    a genuinely broken assembly, not a precision measurement.
+    What used to make this measurement informative was that the two halves were
+    computed independently, by schemes that treat the pair's two triangles
+    differently: SELF uses Gauss-Dunavant on the TEST triangle and Duffy on the
+    SOURCE one, EDGE/VERTEX integrates the 1/R half of the kernel analytically
+    over the SOURCE only. Their disagreement was therefore a direct readout of
+    the quadrature's own error -- 5e-5 to 5e-4 when healthy, and 0.994 the one
+    time a closed-form 1/R integral silently assumed the observation point was
+    coplanar with the source triangle. That is what caught the bug.
+
+    To recover that signal, assemble with impedance_matrix_z(..., full_fill=True)
+    and pass the result here: at twice the fill cost, the two halves are
+    independent again and the number means something. See
+    test/test_impedance_non_coplanar.py, which keeps a standing 3D case.
+
+    Two limits are worth knowing before reading a small value as "Z is accurate",
+    because it does not mean that. This bounds the EDGE/VERTEX branch and, in
+    practice, nothing else: a SELF pair puts both integrals on the SAME triangle,
+    so swapping (m,n) leaves the geometry unchanged and its error very nearly
+    cancels -- measured 8e-7 here against a true SELF error around 3e-2 on the
+    same mesh. And on a small, locally symmetric mesh a vertex-permutation-
+    invariant Gauss rule can make the two halves' errors cancel outright, so this
+    reads roundoff while the branch is 1e-3 wrong. On a real mesh it does track
+    the true EDGE error closely (1.27e-3 against 1.14e-3 on the CubeSat mesh) --
+    it is a lower bound on the assembly's error, never a measure of it.
 
     Parameters
     ----------
@@ -47,9 +79,10 @@ def check_reciprocity(Z):
     dict with:
         max_abs_diff        : max|Z - Z^T|
         max_abs_z            : max|Z|
-        relative_asymmetry  : max_abs_diff / max_abs_z (expect ~1e-7 with the
-                              default duffy_order; orders of magnitude above
-                              that means something is actually wrong)
+        relative_asymmetry  : max_abs_diff / max_abs_z (expect 5e-5 to 5e-4 with
+                              the default settings, depending on mesh size;
+                              orders of magnitude above that means something is
+                              actually wrong)
     """
     Z = np.asarray(Z)
     diff = Z - Z.T
@@ -104,7 +137,8 @@ def check_r_positive_semidefinite(Z):
     }
 
 
-def diagnose_z_matrix(Z, frequency=None, label="", reciprocity_tol=1e-5, relative_min_eig_tol=-1e-6):
+def diagnose_z_matrix(Z, frequency=None, label="", reciprocity_tol=RECIPROCITY_TOL,
+                      relative_min_eig_tol=-1e-6):
     """
     Print a combined reciprocity + R-positive-semidefinite report for an
     impedance matrix, and return the underlying numbers.
@@ -115,10 +149,8 @@ def diagnose_z_matrix(Z, frequency=None, label="", reciprocity_tol=1e-5, relativ
     frequency             : float or None, Hz -- only used in the printed header
     label                 : str, prefix for the printed header (e.g. antenna name)
     reciprocity_tol       : relative_asymmetry above this prints a WARNING
-                            (default 1e-5: comfortably above the ~1e-7 that the
-                            Gauss-outer/Duffy-inner SELF branch legitimately
-                            produces -- see check_reciprocity -- and still low
-                            enough to catch a genuinely broken assembly)
+                            (defaults to RECIPROCITY_TOL -- see its derivation
+                            at the top of this module)
     relative_min_eig_tol  : relative_min_eig below this prints a WARNING
                             (default -1e-6: comfortably above floating-point
                             noise, comfortably below "clearly wrong")

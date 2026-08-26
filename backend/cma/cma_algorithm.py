@@ -9,9 +9,12 @@ def cma_algorithm(
     n_modes: int = 10,
     regularization_epsilon: float = 1e-10,
     sort_by: str = 'magnitude',
+    cma_solver: str = 'regularized',
+    rank_tol: float = 1e-6,
     show: bool = True,
     save_image: bool = False,
     show_current_arrows: bool = True,
+    write_report: bool = True,
     use_gpu: bool = None,
 ) -> ModalData:
     """
@@ -34,7 +37,18 @@ def cma_algorithm(
     frequency               : float, Hz -- analysis frequency. Optional if
                               path.mat_impedance already exists (see above).
     n_modes                 : number of characteristic modes to extract
-    regularization_epsilon  : relative perturbation applied to R  (default 1e-10)
+    regularization_epsilon  : relative perturbation applied to R  (default 1e-10);
+                              only used by cma_solver='regularized'
+    cma_solver              : 'regularized' (default) solves on the full space
+                              after shifting R by eps*I, so every basis function
+                              yields a mode -- including the many that radiate
+                              nothing, whose eigenvalue then reflects eps rather
+                              than the structure. 'rank_truncated' first projects
+                              onto the subspace R spans, returning at most
+                              rank(R) modes, all of which radiate. See
+                              CMAParameters for the full argument.
+    rank_tol                : eigenvalues of R below rank_tol * max count as
+                              null space for 'rank_truncated' (default 1e-6)
     sort_by                 : 'magnitude'  →  modes nearest resonance first (|λ| ascending)
                               'value'      →  algebraic sort (most negative first)
     show                    : display Plotly figures for each mode
@@ -42,6 +56,10 @@ def cma_algorithm(
                               data/fig_image/ as cma_mode<n>_current_<name>.pdf
     show_current_arrows     : overlay black arrows along the modal current
                               direction on each mode plot (default True)
+    write_report            : also write a human-readable Markdown report next
+                              to the .mat (per-mode significance, characteristic
+                              angle, a plain-language reading and the numerical
+                              health checks) -- see backend.cma.cma_report
     use_gpu                 : bool or None, passed to calculate_z_matrice
                               (None = auto-detect, see backend.utils.compute_backend)
 
@@ -60,14 +78,17 @@ def cma_algorithm(
         n_modes=n_modes,
         regularization_epsilon=regularization_epsilon,
         sort_by=sort_by,
+        solver=cma_solver,
+        rank_tol=rank_tol,
     )
-    solver = CharacteristicModeSolver(path, params, frequency=frequency, use_gpu=use_gpu)
-    modal_data = solver.solve()
+    mode_solver = CharacteristicModeSolver(path, params, frequency=frequency, use_gpu=use_gpu,
+                                      write_report=write_report)
+    modal_data = mode_solver.solve()
 
     # `show or save_image`, not just `show`: exporting the mode plots without
     # popping them up is a legitimate (and headless-friendly) combination.
     if show or save_image:
-        solver.visualize(modal_data, show=show, save_image=save_image,
+        mode_solver.visualize(modal_data, show=show, save_image=save_image,
                          show_current_arrows=show_current_arrows)
 
     return modal_data

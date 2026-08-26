@@ -155,3 +155,99 @@ def test_extraction_beats_plain_gauss_on_an_edge_adjacent_pair():
         f"plain Gauss ({err_plain:.2e}) should be far worse than extraction "
         f"({err_extracted:.2e}); if it is not, the branch no longer needs the closed form"
     )
+
+
+# ---------------------------------------------------------------------------
+# NON-COPLANAR guard rails.
+#
+# These exist because their absence let a real bug ship. The first version of
+# inv_R_over_triangle implemented only the in-plane Wilton form, dropping the
+# |h|*atan height term. That is exact when the observation point lies in the
+# triangle's plane -- which every mesh used for validation happened to be
+# (a flat plate, a flat pixel-grid loop) -- and badly wrong otherwise: measured
+# -64% half a cell above the plane, -34% at a 90-degree junction, and NEGATIVE
+# (for a strictly positive integral) a full cell above.
+#
+# It surfaced only on a CubeSat model, where panels meet the chassis at right
+# angles, as an impedance matrix with max|Z-Z^T|/max|Z| = 0.994 -- i.e. Z was
+# not reciprocal at all. Everything below uses geometry that is NOT planar.
+# ---------------------------------------------------------------------------
+
+def _brute_force_inv_R(r0, p1, p2, p3, levels=6):
+    """
+    Reference by subdivision, independent of the closed form under test.
+
+    Valid whenever r0 is off the surface (the integrand is then bounded), which
+    is exactly the regime these tests probe.
+    """
+    tris = [(p1, p2, p3)]
+    for _ in range(levels):
+        refined = []
+        for a, b, c in tris:
+            ab, bc, ca = (a + b) / 2, (b + c) / 2, (c + a) / 2
+            refined += [(a, ab, ca), (ab, b, bc), (ca, bc, c), (ab, bc, ca)]
+        tris = refined
+    xi, w = dunavant_rule(6)
+    total = 0.0
+    for a, b, c in tris:
+        area = 0.5 * np.linalg.norm(np.cross(b - a, c - a))
+        pts = map_to_triangle(xi, a, b, c)
+        total += 2 * area * float(np.dot(w, 1.0 / np.linalg.norm(r0[:, None] - pts, axis=0)))
+    return total
+
+
+@pytest.mark.parametrize("height_in_cells", [0.25, 0.5, 1.0, 3.0])
+def test_matches_brute_force_above_the_plane(height_in_cells):
+    """The height term is what makes this work; without it the error is tens of percent."""
+    r0 = np.array([H / 3, H / 3, height_in_cells * H])
+    got = inv_R_over_triangle(r0, V1, V2, V3)
+    expected = _brute_force_inv_R(r0, V1, V2, V3)
+    np.testing.assert_allclose(got, expected, rtol=1e-6)
+
+
+@pytest.mark.parametrize("r0", [
+    np.array([H / 2, 0.0, H / 2]),      # on the perpendicular of a shared edge
+    np.array([H / 2, 0.0, 0.1 * H]),    # very close to that shared edge, off-plane
+    np.array([0.7 * H, 0.6 * H, 0.4 * H]),  # generic oblique position
+])
+def test_matches_brute_force_at_a_right_angle_junction(r0):
+    """
+    The configuration that broke: a panel meeting a chassis at 90 degrees puts
+    the observation point off the source triangle's plane for every
+    EDGE/VERTEX pair along the seam.
+    """
+    got = inv_R_over_triangle(r0, V1, V2, V3)
+    expected = _brute_force_inv_R(r0, V1, V2, V3)
+    np.testing.assert_allclose(got, expected, rtol=1e-6)
+
+
+def test_result_is_positive_everywhere_off_plane():
+    """
+    1/R is strictly positive, so its integral is too. The in-plane-only form
+    returned negative values well above the plane -- a sign error no tolerance
+    on a planar mesh could ever reveal.
+    """
+    rng = np.random.default_rng(3)
+    pts = rng.uniform(-3 * H, 3 * H, (3, 400))
+    values = inv_R_over_triangle_batch(
+        pts,
+        np.repeat(V1[:, None], 400, axis=1),
+        np.repeat(V2[:, None], 400, axis=1),
+        np.repeat(V3[:, None], 400, axis=1),
+    )
+    assert np.all(np.isfinite(values))
+    assert np.all(values > 0), f"{int(np.sum(values <= 0))} non-positive values for a positive integrand"
+
+
+def test_batch_matches_scalar_for_fully_three_dimensional_points():
+    rng = np.random.default_rng(4)
+    n = 250
+    pts = rng.uniform(-2 * H, 2 * H, (3, n))
+    batched = inv_R_over_triangle_batch(
+        pts,
+        np.repeat(V1[:, None], n, axis=1),
+        np.repeat(V2[:, None], n, axis=1),
+        np.repeat(V3[:, None], n, axis=1),
+    )
+    scalar = np.array([inv_R_over_triangle(pts[:, i], V1, V2, V3) for i in range(n)])
+    np.testing.assert_allclose(batched, scalar, rtol=0, atol=0)
