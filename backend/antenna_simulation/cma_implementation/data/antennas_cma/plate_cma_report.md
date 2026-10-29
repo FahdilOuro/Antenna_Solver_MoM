@@ -1,22 +1,22 @@
 # Characteristic Mode Analysis — plate
 
 Single frequency: **1.0000 GHz**  
-Generated 2026-08-18 15:01
+Generated 2026-10-10 20:40
 
 ## Structure and discretisation
 
 | Quantity | Value |
 |---|---|
-| Points | 216 |
-| Triangles | 380 |
-| RWG edges (unknowns) | 545 |
-| Bounding box | 0.0800 x 0.0900 x 0.0000 m |
-| Edge length min / mean / max | 4.63 / 6.63 / 8.43 mm |
+| Points | 166 |
+| Triangles | 284 |
+| RWG edges (unknowns) | 403 |
+| Bounding box | 0.1000 x 0.0500 x 0.0000 m |
+| Edge length min / mean / max | 4.50 / 6.40 / 8.08 mm |
 | Frequency | 1.0000 GHz |
 | Wavelength | 0.2998 m |
-| Largest dimension / wavelength | 0.300 |
-| Electrical size ka (enclosing sphere) | 1.262 |
-| RWG edges per wavelength (mean) | 45.2 |
+| Largest dimension / wavelength | 0.334 |
+| Electrical size ka (enclosing sphere) | 1.172 |
+| RWG edges per wavelength (mean) | 46.9 |
 
 ## Solver settings
 
@@ -30,20 +30,28 @@ Generated 2026-08-18 15:01
 
 | Mode | lambda | MS | delta (deg) |
 |---|---|---|---|
-| 1 | -1.76215 | 0.4936 | 240.43 |
-| 2 | -2.61553 | 0.3571 | 249.08 |
-| 3 | +10.2868 | 0.0968 | 95.55 |
-| 4 | -50.8531 | 0.0197 | 268.87 |
+| 1 | -1.33145 | 0.6005 | 233.09 |
+| 2 | -9.54503 | 0.1042 | 264.02 |
+| 3 | +19.1287 | 0.0522 | 92.99 |
+| 4 | -125.745 | 0.0080 | 269.54 |
 
 ## Impedance matrix
 
 | Measurement | Value | Reference |
 |---|---|---|
-| Reciprocity, max\|Z-Z^T\|/max\|Z\| | 1.764e-04 | expected ~1e-4; above 1e-03 is suspect |
-| min eig(R) | -4.1057e-17 Ohm | should be >= 0 (R is the radiation operator) |
-| max eig(R) | 1.3536e-03 Ohm | - |
-| min eig(R) / max eig(R) | -3.033e-14 | negative only at roundoff level |
-| Numerical rank of R (> 1e-8 x max) | 27 of 545 | expected << N: only a few current distributions radiate |
+| Reciprocity, max\|Z-Z^T\|/max\|Z\| | 0.000e+00 | expected ~1e-4; above 1e-03 is suspect |
+| min eig(R) | -3.4571e-17 Ohm | should be >= 0 (R is the radiation operator) |
+| max eig(R) | 9.3525e-04 Ohm | - |
+| min eig(R) / max eig(R) | -3.696e-14 | negative only at roundoff level |
+| Numerical rank of R (> 1e-8 x max) | 26 of 403 | expected << N: only a few current distributions radiate |
+
+Reciprocity reads exactly `0.000e+00` here because the assembler computes
+only the `m <= n` half of Z and mirrors it, so `Z = Z^T` holds by
+construction rather than by agreement. It is therefore a check that the
+mirroring ran, not a check that the kernel is right -- a wrong kernel would
+read `0` too. The independent version (both halves computed separately,
+`impedance_matrix_z(..., full_fill=True)`) is what still detects a broken
+integration scheme; on a correct assembly it lands near 1e-4.
 
 ## Definitions
 

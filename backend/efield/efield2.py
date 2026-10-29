@@ -15,6 +15,7 @@ from backend.rwg.rwg2 import DataManager_rwg2
 from backend.rwg.rwg4 import DataManager_rwg4
 from backend.utils.dipole_parameters import *
 from backend.utils.gmsh_function import create_hollow_sphere, extract_msh_to_mat
+from backend.efield.radiation_gif import create_rotating_gif
 
 def compute_aspect_ratios(points_data):
     """
@@ -345,17 +346,31 @@ def compute_antenna_efficiency_metrics(total_power, feed_powers, impedances):
     print(f"  Total Efficiency     = {efficiency_rad*100:.2f} %")
     return efficiency_rad
 
-def render_and_save_pattern(show, save_image, sphere_points_update, sphere_triangles, gain_points_db, plot_title, pdf_filename):
+def render_and_save_pattern(show, save_image, sphere_points_update, sphere_triangles, gain_points_db, plot_title, pdf_filename,
+                            save_gif=False, gif_filename=None, gif_options=None):
     """
-    Handle the Plotly 3D visualization and PDF saving process.
+    Handle the Plotly 3D visualization, PDF saving and rotating GIF export.
     Converts vertex-based gain into face-based gain to prevent Plotly ValueErrors.
+
+    gif_options : dict of keyword arguments forwarded to create_rotating_gif()
+    (n_frames, fps, width, height, scale, camera_radius, camera_elevation, clockwise, ...).
+
+    Returns the Plotly figure, or None if nothing was rendered.
     """
-    if show:
+    fig = None
+    if show or save_gif:
         # Calculate mean gain per face for Plotly compatibility
         gain_faces_db = np.mean(gain_points_db[sphere_triangles], axis=0)
-        
-        # Create and display the 3D figure
+
+        # Create the 3D figure
         fig = visualize_surface_current(sphere_points_update, sphere_triangles, gain_faces_db, plot_title)
+
+    if save_gif:
+        # Exported before the PDF step, which alters the layout (background, margins)
+        gif_path = os.path.join("data/fig_image/", gif_filename or os.path.splitext(pdf_filename)[0] + ".gif")
+        create_rotating_gif(fig, gif_path, **(gif_options or {}))
+
+    if show:
         fig.show()
 
         # Save the figure to disk if requested
@@ -369,9 +384,15 @@ def render_and_save_pattern(show, save_image, sphere_points_update, sphere_trian
             fig.write_image(pdf_path, format="pdf")
             print(f"Image saved: {pdf_path}")
 
-def radiation_intensity_distribution_over_sphere_surface(path, mode='radiation', show=True, save_image=False):
+    return fig
+
+def radiation_intensity_distribution_over_sphere_surface(path, mode='radiation', show=True, save_image=False,
+                                                         save_gif=False, gif_options=None):
     """
     Calculate and visualize the total radiation intensity and gain distribution on the surface of a sphere.
+
+    save_gif : bool, also export a 360° rotating GIF to data/fig_image/radiation_pattern_<name>.gif
+    gif_options : dict forwarded to create_rotating_gif(), e.g. dict(n_frames=12, fps=2, scale=2)
     """
     # 1. Load data and setup parameters
     sphere_points, sphere_triangles, _, _, eta, complex_k, dipole_center, dipole_moment, feed_powers, impedances = load_and_prepare_antenna_data(path, mode)
@@ -408,9 +429,11 @@ def radiation_intensity_distribution_over_sphere_surface(path, mode='radiation',
     # 5. Display and Save
     plot_title = f"{path.name} - Gain Distribution (dBi)"
     pdf_filename = f"radiation_pattern_{path.name}.pdf"
-    render_and_save_pattern(show, save_image, sphere_points_update, sphere_triangles, u_points_db, plot_title, pdf_filename)
+    render_and_save_pattern(show, save_image, sphere_points_update, sphere_triangles, u_points_db, plot_title, pdf_filename,
+                            save_gif=save_gif, gif_options=gif_options)
 
-def polar_circular_gain_distribution_over_sphere(path, polar_type='RHCP', mode='radiation', show=True, save_image=False):
+def polar_circular_gain_distribution_over_sphere(path, polar_type='RHCP', mode='radiation', show=True, save_image=False,
+                                                 save_gif=False, gif_options=None):
     """
     Calculate and visualize the circular gain (RHCP or LHCP) distribution over a sphere.
     """
@@ -461,24 +484,29 @@ def polar_circular_gain_distribution_over_sphere(path, polar_type='RHCP', mode='
     
     plot_title = f"{path.name} - {polar_type} Gain (dBic)"
     pdf_filename = f"{polar_type}_pattern_{path.name}.pdf"
-    render_and_save_pattern(show, save_image, sphere_points_update, sphere_triangles, gain_db, plot_title, pdf_filename)
+    render_and_save_pattern(show, save_image, sphere_points_update, sphere_triangles, gain_db, plot_title, pdf_filename,
+                            save_gif=save_gif, gif_options=gif_options)
 
-def display_rhcp_gain(path, mode='radiation', show=True, save_image=False):
+def display_rhcp_gain(path, mode='radiation', show=True, save_image=False, save_gif=False, gif_options=None):
     """Alias to quickly display the RHCP gain."""
     return polar_circular_gain_distribution_over_sphere(
         path,
         polar_type='RHCP',
         mode=mode,
         show=show,
-        save_image=save_image
+        save_image=save_image,
+        save_gif=save_gif,
+        gif_options=gif_options
         )
 
-def display_lhcp_gain(path, mode='radiation', show=True, save_image=False):
+def display_lhcp_gain(path, mode='radiation', show=True, save_image=False, save_gif=False, gif_options=None):
     """Alias to quickly display the LHCP gain."""
     return polar_circular_gain_distribution_over_sphere(
         path,
         polar_type='LHCP',
         mode=mode,
         show=show,
-        save_image=save_image
+        save_image=save_image,
+        save_gif=save_gif,
+        gif_options=gif_options
         )
