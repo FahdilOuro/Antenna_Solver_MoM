@@ -48,22 +48,22 @@ def create_nice_cube_geometry(C, space_btw_cubesat_and_solar_panel, l_c_s):
     # point list for the solar panel
     solar_panel_A_point_1 = gmsh.model.occ.addPoint(C/2 + space_btw_cubesat_and_solar_panel, C/2, 0)            # point 9
     solar_panel_A_point_2 = gmsh.model.occ.addPoint(C/2 + space_btw_cubesat_and_solar_panel, -C/2, 0)           # point 10
-    solar_panel_A_point_3 = gmsh.model.occ.addPoint(C/2 + space_btw_cubesat_and_solar_panel + 3*C, -C/2, 0)     # point 11
-    solar_panel_A_point_4 = gmsh.model.occ.addPoint(C/2 + space_btw_cubesat_and_solar_panel + 3*C, C/2, 0)      # point 12
+    solar_panel_A_point_3 = gmsh.model.occ.addPoint(C/2 + 3*C, -C/2, 0)     # point 11
+    solar_panel_A_point_4 = gmsh.model.occ.addPoint(C/2 + 3*C, C/2, 0)      # point 12
 
     solar_panel_B_point_1 = gmsh.model.occ.addPoint(C/2, C/2 + space_btw_cubesat_and_solar_panel, 0)            # point 13
-    solar_panel_B_point_2 = gmsh.model.occ.addPoint(C/2, C/2 + space_btw_cubesat_and_solar_panel + 3*C, 0)      # point 14
-    solar_panel_B_point_3 = gmsh.model.occ.addPoint(-C/2, C/2 + space_btw_cubesat_and_solar_panel + 3*C, 0)     # point 15
+    solar_panel_B_point_2 = gmsh.model.occ.addPoint(C/2, C/2 + 3*C, 0)      # point 14
+    solar_panel_B_point_3 = gmsh.model.occ.addPoint(-C/2, C/2 + 3*C, 0)     # point 15
     solar_panel_B_point_4 = gmsh.model.occ.addPoint(-C/2, C/2 + space_btw_cubesat_and_solar_panel, 0)           # point 16
 
     solar_panel_C_point_1 = gmsh.model.occ.addPoint(-C/2 - space_btw_cubesat_and_solar_panel, C/2, 0)            # point 17
     solar_panel_C_point_2 = gmsh.model.occ.addPoint(-C/2 - space_btw_cubesat_and_solar_panel, -C/2, 0)           # point 18
-    solar_panel_C_point_3 = gmsh.model.occ.addPoint(-C/2 - space_btw_cubesat_and_solar_panel - 3*C, -C/2, 0)     # point 19
-    solar_panel_C_point_4 = gmsh.model.occ.addPoint(-C/2 - space_btw_cubesat_and_solar_panel - 3*C, C/2, 0)      # point 20
+    solar_panel_C_point_3 = gmsh.model.occ.addPoint(-C/2 - 3*C, -C/2, 0)     # point 19
+    solar_panel_C_point_4 = gmsh.model.occ.addPoint(-C/2 - 3*C, C/2, 0)      # point 20
 
     solar_panel_D_point_1 = gmsh.model.occ.addPoint(-C/2, -C/2 - space_btw_cubesat_and_solar_panel, 0)           # point 21
-    solar_panel_D_point_2 = gmsh.model.occ.addPoint(-C/2, -C/2 - space_btw_cubesat_and_solar_panel - 3*C, 0)     # point 22
-    solar_panel_D_point_3 = gmsh.model.occ.addPoint(C/2, -C/2 - space_btw_cubesat_and_solar_panel - 3*C, 0)      # point 23
+    solar_panel_D_point_2 = gmsh.model.occ.addPoint(-C/2, -C/2 - 3*C, 0)     # point 22
+    solar_panel_D_point_3 = gmsh.model.occ.addPoint(C/2, -C/2 - 3*C, 0)      # point 23
     solar_panel_D_point_4 = gmsh.model.occ.addPoint(C/2, -C/2 - space_btw_cubesat_and_solar_panel, 0)            # point 24
 
     # creating lines for the solar panel
