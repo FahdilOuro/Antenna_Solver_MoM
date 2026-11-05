@@ -68,7 +68,7 @@ def _run_gpu_assembly(label, fn, *args, **kwargs):
             f"correct, just substantially slower for this mesh."
         ) from exc
 
-def calculate_z_matrice(points, triangles, edges, frequency, use_gpu=None):
+def calculate_z_matrice(points, triangles, edges, frequency, use_gpu=None, fill_mode=None):
     """
     Calculate the electromagnetic impedance matrix for a given mesh.
 
@@ -93,6 +93,11 @@ def calculate_z_matrice(points, triangles, edges, frequency, use_gpu=None):
                 regardless of size (raises if no GPU is available); False
                 forces the plain CPU per-pair implementation regardless of
                 size.
+    fill_mode : None / "full_sym" (default), "mirror" or "full" -- see
+                backend.utils.impmet.FILL_MODES. The default fills every (m, n)
+                pair and symmetrises, which keeps the scalar-potential term
+                exactly charge-neutral on loop currents; "mirror" is the former
+                behaviour, kept for comparison only.
 
     Returns
     -------
@@ -114,14 +119,16 @@ def calculate_z_matrice(points, triangles, edges, frequency, use_gpu=None):
               f"assembly ({E}x{E} edges).")
         matrice_z = _run_gpu_assembly(
             "calculate_z_matrice", impedance_matrix_z_sweep_gpu,
-            edges, triangles, points, [frequency], mu, epsilon, use_gpu=True)[0]
+            edges, triangles, points, [frequency], mu, epsilon, use_gpu=True,
+            fill_mode=fill_mode)[0]
     else:
-        matrice_z = impedance_matrix_z(edges, triangles, points, k_complex, omega, mu, epsilon)
+        matrice_z = impedance_matrix_z(edges, triangles, points, k_complex, omega, mu, epsilon,
+                                       fill_mode=fill_mode)
 
     return omega, mu, epsilon, light_speed_c, eta, matrice_z
 
 
-def calculate_z_matrice_sweep(points, triangles, edges, frequencies, use_gpu=None):
+def calculate_z_matrice_sweep(points, triangles, edges, frequencies, use_gpu=None, fill_mode=None):
     """
     Calculate the electromagnetic impedance matrix at MULTIPLE frequencies in
     a single pass, for use by a frequency sweep.
@@ -158,6 +165,8 @@ def calculate_z_matrice_sweep(points, triangles, edges, frequencies, use_gpu=Non
                 (backend.utils.compute_backend.DEFAULT_GPU_EDGE_THRESHOLD).
                 True forces GPU regardless of size (raises if unavailable);
                 False forces CPU regardless of size.
+    fill_mode : None / "full_sym" (default), "mirror" or "full", as in
+                calculate_z_matrice.
 
     Returns
     -------
@@ -178,9 +187,11 @@ def calculate_z_matrice_sweep(points, triangles, edges, frequencies, use_gpu=Non
               f"assembly ({E}x{E} edges, {len(frequencies)} frequencies).")
         matrice_z = _run_gpu_assembly(
             "calculate_z_matrice_sweep", impedance_matrix_z_sweep_gpu,
-            edges, triangles, points, frequencies, mu, epsilon, use_gpu=True)
+            edges, triangles, points, frequencies, mu, epsilon, use_gpu=True,
+            fill_mode=fill_mode)
     else:
-        matrice_z = impedance_matrix_z_sweep(edges, triangles, points, frequencies, mu, epsilon)
+        matrice_z = impedance_matrix_z_sweep(edges, triangles, points, frequencies, mu, epsilon,
+                                             fill_mode=fill_mode)
 
     return omega, mu, epsilon, light_speed_c, eta, matrice_z
 
@@ -230,7 +241,7 @@ def compute_lumped_impedance(load_values, omega):
     return DeltaZ
 
 def calculate_z_matrice_lumped_elements(points, triangles, edges, frequency, LoadPoint, LoadValue, LoadDir,
-                                        use_gpu=None):
+                                        use_gpu=None, fill_mode=None):
     """
         Computes the electromagnetic impedance matrix for a given system with lumped elements.
 
@@ -248,6 +259,8 @@ def calculate_z_matrice_lumped_elements(points, triangles, edges, frequency, Loa
                 EFIE assembly is the same O(E^2) bottleneck here, the lumped-
                 element terms are a cheap O(LNumber) patch applied afterwards
                 regardless of which implementation built the base matrix.
+            * fill_mode : None / "full_sym" (default), "mirror" or "full", as in
+                calculate_z_matrice.
 
         Returns:
             * omega : Angular frequency (rad/s).
@@ -279,9 +292,11 @@ def calculate_z_matrice_lumped_elements(points, triangles, edges, frequency, Loa
               f"impedance matrix assembly ({E}x{E} edges).")
         matrice_z = _run_gpu_assembly(
             "calculate_z_matrice_lumped_elements", impedance_matrix_z_sweep_gpu,
-            edges, triangles, points, [frequency], mu, epsilon, use_gpu=True)[0]
+            edges, triangles, points, [frequency], mu, epsilon, use_gpu=True,
+            fill_mode=fill_mode)[0]
     else:
-        matrice_z = impedance_matrix_z(edges, triangles, points, complexe_k, omega, mu, epsilon)
+        matrice_z = impedance_matrix_z(edges, triangles, points, complexe_k, omega, mu, epsilon,
+                                       fill_mode=fill_mode)
 
     # Lumped impedance implementation
     LoadPoint = LoadPoint.T  # (3, LNumber)

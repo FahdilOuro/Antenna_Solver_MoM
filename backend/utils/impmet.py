@@ -99,10 +99,21 @@ def _mirror_upper_triangle(matrice_z):
     separately known to be much larger. Reciprocity bounds the EDGE/VERTEX
     branches and nothing else.
 
-    Since the two halves differ only by quadrature error, computing both and
-    keeping one is wasted work: fill m <= n and mirror. That makes Z exactly
-    symmetric by construction (max|Z-Z^T| = 0, not merely small), removes the
-    need for the eigensolver to symmetrise anything, and halves the fill.
+    The two halves differ only by quadrature error, so mirroring was adopted to
+    make Z exactly symmetric at half the cost. It is NO LONGER THE DEFAULT
+    (fill_mode="full_sym" is, see _finish_fill): mirroring breaks the exact
+    charge neutrality of the scalar-potential term. That term is
+        Z_Phi = D^T K D,
+    D mapping edge currents to triangle charges (div f_n = +-l_n/A on T+-) and
+    K_ts one kernel per (test, source) triangle pair, so u^H Z_Phi u = 0
+    EXACTLY for any charge-free (loop) current u, whatever the quadrature --
+    provided every entry uses the same K_ts. Mirrored entries (m > n) use K_st
+    instead, which differs from K_ts by the EDGE/VERTEX asymmetry above; since
+    Z_Phi ~ 1/(kh)^2 times Z_A, that ~1e-4 mismatch leaked ~10% of Z_A into the
+    reactance of a 20 mm loop (measured 2026-11-05: |u^H Z_Phi u| / |u^H Z_A u|
+    = 0.10 mirrored vs 5e-13 fully filled; the loop's X/w ranged from -1064 to
+    +84 nH over five meshes instead of converging to Grover's 47 nH).
+    Kept for fill_mode="mirror" (comparison only).
 
     Accepts (E, E) or (N_freq, E, E). The diagonal is subtracted once so it is
     not doubled.
@@ -112,6 +123,40 @@ def _mirror_upper_triangle(matrice_z):
     idx = np.arange(matrice_z.shape[-1])
     diag[..., idx, idx] = matrice_z[..., idx, idx]
     return matrice_z + zt - diag
+
+
+#: Fill modes of the impedance assemblers.
+#:   "full_sym" (default): every (m, n) pair computed, then Z <- (Z + Z^T)/2.
+#:       If Z_Phi = D^T K D, then (Z_Phi + Z_Phi^T)/2 = D^T [(K + K^T)/2] D keeps
+#:       that structure, so the result is exactly symmetric (reciprocity) AND
+#:       exactly charge-neutral on loop currents. Twice the cost of "mirror".
+#:   "mirror": m <= n computed, lower half mirrored (the previous default).
+#:       Exactly symmetric but NOT charge-neutral: comparison/diagnostics only.
+#:   "full": every pair computed, no symmetrisation (== the old full_fill=True):
+#:       charge-neutral, and its asymmetry measures the quadrature error.
+FILL_MODES = ("full_sym", "mirror", "full")
+DEFAULT_FILL_MODE = "full_sym"
+
+
+def _resolve_fill_mode(fill_mode=None, full_fill=False):
+    """fill_mode from the new argument and the legacy full_fill flag."""
+    if fill_mode is None:
+        return "full" if full_fill else DEFAULT_FILL_MODE
+    if fill_mode not in FILL_MODES:
+        raise ValueError(f"fill_mode must be one of {FILL_MODES}, got {fill_mode!r}.")
+    if full_fill and fill_mode != "full":
+        raise ValueError(f"full_fill=True conflicts with fill_mode={fill_mode!r} "
+                         f"(full_fill=True is fill_mode='full').")
+    return fill_mode
+
+
+def _finish_fill(matrice_z, fill_mode):
+    """Complete an assembled Z according to fill_mode. Accepts (E, E) or (N_freq, E, E)."""
+    if fill_mode == "mirror":
+        return _mirror_upper_triangle(matrice_z)
+    if fill_mode == "full_sym":
+        return 0.5 * (matrice_z + matrice_z.swapaxes(-1, -2))
+    return matrice_z
 
 
 # ---------------------------------------------------------------------------
@@ -197,7 +242,8 @@ def _outer_rule_tables(order, tri_verts, N_tri, plus, minus, free_plus, free_min
 def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega, mu, epsilon,
                        quad_order: int = 6, duffy_order: int = 7,
                        near_order: int = None, self_outer_order: int = None,
-                       full_fill: bool = False, only_categories=None) -> np.ndarray:
+                       full_fill: bool = False, only_categories=None,
+                       fill_mode: str = None) -> np.ndarray:
     """
     Assemble the RWG EFIE impedance matrix using proper double surface quadrature.
 
@@ -244,24 +290,28 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
     quad_order      : int    Gauss-Dunavant order for FAR pairs (default 6)
     duffy_order     : int    GL order for Duffy inner integral (default 7)
     near_order      : int or None  Gauss-Dunavant order on BOTH triangles of an
-                      EDGE/VERTEX pair. None (default) = min(quad_order + 5, 11),
-                      the historical setting. Note that with the default
-                      quad_order this lands exactly on 11, which was the largest
-                      rule available until degrees 16/20/24 were added -- so
-                      raising quad_order alone never moved it.
+                      EDGE/VERTEX pair. None (default) =
+                      max(quad_order, NEAR_ORDER_DEFAULT) = max(quad_order, 16)
+                      (see _default_near_order). It used to be
+                      min(quad_order + 5, 11), which with the default quad_order
+                      landed on 11, the then-largest rule.
     self_outer_order : int or None  Gauss-Dunavant order on the TEST triangle of
                       a SELF pair. None (default) = quad_order, i.e. the SELF
                       branch reuses the FAR rule, as it always has.
-    full_fill       : bool   DIAGNOSTIC ONLY. By default only m <= n is computed
-                      and the rest mirrored (see _mirror_upper_triangle), so the
-                      result is exactly symmetric whatever the kernel does.
-                      That is correct but it also silences max|Z-Z^T|/max|Z|,
-                      which is the cheapest global health check the assembly
-                      has -- it is what caught a closed-form 1/R integral that
-                      assumed coplanarity (it read 0.994 instead of ~1e-3).
-                      Setting full_fill=True computes both halves
-                      independently, at twice the cost, so that check can still
-                      be run. Never needed for a production solve.
+    full_fill       : bool   DIAGNOSTIC, legacy spelling of fill_mode="full":
+                      both halves computed independently and returned as they
+                      are, so max|Z-Z^T|/max|Z| -- the cheapest global health
+                      check of the assembly, which caught a closed-form 1/R
+                      integral that assumed coplanarity (0.994 instead of
+                      ~1e-3) -- can still be measured.
+    fill_mode       : "full_sym" (default), "mirror" or "full" -- see FILL_MODES.
+                      The default fills every (m, n) pair and returns
+                      (Z + Z^T)/2: exactly symmetric (reciprocity) AND exactly
+                      charge-neutral on loop currents, because
+                      (D^T K D + D^T K^T D)/2 = D^T [(K + K^T)/2] D keeps the
+                      Phi-term structure. "mirror" (the former default) is kept
+                      for comparison only: it breaks that structure, see
+                      _mirror_upper_triangle. Cost: twice "mirror".
     only_categories : iterable of category constants, or None. DIAGNOSTIC ONLY.
                       When given, sub-triangle pairs outside the listed
                       categories (SELF / EDGE / VERTEX / FAR, from
@@ -275,8 +325,10 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
     Returns
     -------
     matrice_z : complex (E, E)  impedance matrix -- exactly symmetric unless
-                full_fill=True, in which case the two halves are independent
+                fill_mode="full" (full_fill=True), in which case the two halves
+                are independent
     """
+    fill_mode = _resolve_fill_mode(fill_mode, full_fill)
     if near_order is None:
         near_order = _default_near_order(quad_order)
     if self_outer_order is None:
@@ -346,9 +398,9 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
             (tm_m, -1.0, free_minus[:, m], rho_minus_far[m], rho_minus_near[m], rho_minus_self[m]),
         ]
 
-        # Fill m <= n only; the lower half is mirrored in (see
-        # _mirror_upper_triangle for why the two halves are redundant).
-        for n in range(0 if full_fill else m, E):
+        # Every pair, unless fill_mode="mirror" (m <= n only, lower half
+        # mirrored in -- not charge-neutral, see _mirror_upper_triangle).
+        for n in range(m if fill_mode == "mirror" else 0, E):
             ln = lengths[n]
             tp_n = int(plus[n]);  tm_n = int(minus[n])
 
@@ -463,7 +515,7 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
 
             matrice_z[m, n] = Z_mn
 
-    return matrice_z if full_fill else _mirror_upper_triangle(matrice_z)
+    return _finish_fill(matrice_z, fill_mode)
 
 
 # ---------------------------------------------------------------------------
@@ -472,7 +524,8 @@ def impedance_matrix_z(edges_data, triangles_data, points_data, k_complex, omega
 
 def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencies, mu, epsilon,
                               quad_order: int = 6, duffy_order: int = 7,
-                              near_order: int = None, self_outer_order: int = None) -> np.ndarray:
+                              near_order: int = None, self_outer_order: int = None,
+                              fill_mode: str = None) -> np.ndarray:
     """
     Assemble the RWG EFIE impedance matrix at MULTIPLE frequencies in one pass.
 
@@ -506,11 +559,14 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
         available on the single-frequency assembler: a CMA run gets its Z from
         the sweep, so pinning the quadrature only on impedance_matrix_z would
         leave the path that actually feeds the eigenproblem untunable.
+    fill_mode : "full_sym" (default), "mirror" or "full", as in impedance_matrix_z
+        (see FILL_MODES).
 
     Returns
     -------
     matrice_z : complex (N_freq, E, E)
     """
+    fill_mode = _resolve_fill_mode(fill_mode)
     if near_order is None:
         near_order = _default_near_order(quad_order)
     if self_outer_order is None:
@@ -571,9 +627,9 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
             (tm_m, -1.0, free_minus[:, m], rho_minus_far[m], rho_minus_near[m], rho_minus_self[m]),
         ]
 
-        # Fill m <= n only; the lower half is mirrored in (see
-        # _mirror_upper_triangle for why the two halves are redundant).
-        for n in range(m, E):
+        # Every pair, unless fill_mode="mirror" (m <= n only, lower half
+        # mirrored in -- not charge-neutral, see _mirror_upper_triangle).
+        for n in range(m if fill_mode == "mirror" else 0, E):
             ln = lengths[n]
             tp_n = int(plus[n]);  tm_n = int(minus[n])
 
@@ -673,7 +729,7 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
 
             matrice_z[:, m, n] = Z_mn
 
-    return _mirror_upper_triangle(matrice_z)
+    return _finish_fill(matrice_z, fill_mode)
 
 
 # ---------------------------------------------------------------------------
@@ -683,7 +739,8 @@ def impedance_matrix_z_sweep(edges_data, triangles_data, points_data, frequencie
 def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, frequencies, mu, epsilon,
                                   quad_order: int = 6, duffy_order: int = 7,
                                   near_order: int = None, self_outer_order: int = None,
-                                  use_gpu=None, chunk_size: int = 20000) -> np.ndarray:
+                                  use_gpu=None, chunk_size: int = 20000,
+                                  fill_mode: str = None) -> np.ndarray:
     """
     Same result as impedance_matrix_z_sweep, restructured so the FAR and
     EDGE/VERTEX categories -- which dominate the pair COUNT for any mesh of
@@ -729,6 +786,10 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
               quadrature rule has more points per pair, to keep per-chunk
               memory comparable). Lower this if you hit an out-of-memory
               error on a large mesh / long sweep on a small GPU.
+    fill_mode : "full_sym" (default), "mirror" or "full", as in impedance_matrix_z
+              (see FILL_MODES). Note that the intermediates grow with the
+              number of frequencies per call, not only with chunk_size: split
+              long sweeps on small GPUs.
 
     Returns
     -------
@@ -736,6 +797,7 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
     """
     from backend.utils.compute_backend import get_array_module, to_numpy
     xp = get_array_module(use_gpu)
+    fill_mode = _resolve_fill_mode(fill_mode)
 
     if near_order is None:
         near_order = _default_near_order(quad_order)
@@ -894,10 +956,10 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
             tri_s_verts = tri[:, T_s_grid]   # (3, E, E)
             n_shared = (tri_t_verts[:, None, :, :] == tri_s_verts[None, :, :, :]).sum(axis=(0, 1))
 
-            # Upper triangle only: Z is symmetric and the lower half is
-            # mirrored in at the end (see _mirror_upper_triangle). This halves
-            # every bucket, hence the pair count actually assembled.
-            upper = n_grid >= m_grid
+            # Every pair, unless fill_mode="mirror": then the upper triangle
+            # only, the lower half being mirrored in at the end (half the
+            # pairs, but not charge-neutral -- see _mirror_upper_triangle).
+            upper = (n_grid >= m_grid) if fill_mode == "mirror" else np.ones((E, E), dtype=bool)
             is_far  = (n_shared == 0) & upper
             is_near = ((n_shared == 1) | (n_shared == 2)) & upper
             is_self = (n_shared == 3) & upper
@@ -950,7 +1012,7 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
 
                 Z_self_np[:, m, n] += s_ts * lm * ln * sub
 
-    return _mirror_upper_triangle(to_numpy(Z_batched) + Z_self_np)
+    return _finish_fill(to_numpy(Z_batched) + Z_self_np, fill_mode)
 
 
 # ---------------------------------------------------------------------------
