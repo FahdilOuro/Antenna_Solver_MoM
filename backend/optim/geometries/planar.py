@@ -258,6 +258,87 @@ def parallel_strips(length, width, spacing, n_len, n_width, edge_grading: Gradin
     return tensor_grid_mesh(xs, ys, keep, cuts=cuts, params=params)
 
 
+#: Challenge box (z = 0 plane), with the margins of step 5: 187 x 125 mm minus
+#: 3.5 mm at each end along x and 2.5 mm at each side along y.
+BOX_LENGTH = 0.180          # max strip length along x (m)
+BOX_WIDTH = 0.120           # max edge-to-edge extent along y, widths included (m)
+
+
+class BoxError(ValueError):
+    """Raised when a geometry does not fit in the challenge box."""
+
+
+def parallel_strip_array(lengths, width, spacings, n_width=4, edge_grading: Grading = "cosine",
+                         cell_length=4.5e-3, box_length=BOX_LENGTH, box_width=BOX_WIDTH) -> PlanarMesh:
+    """
+    K strips parallel to x, centred at x = 0, in z = 0, stacked along y.
+
+    lengths     : K strip lengths (m), each <= box_length
+    width       : common strip width (m)
+    spacings    : K-1 centre-to-centre distances along y (m), each > width; the array
+                  is centred on y = 0 and its edge-to-edge extent
+                  (y_last - y_first) + width must be <= box_width
+    n_width, edge_grading : cells across each strip (default: the calibrated rule of
+                  backend.optim.loss_model.MESH_RULE)
+    cell_length : target cell length along x (m); each strip gets an even number of
+                  cells so that x = 0 is a grid line
+
+    Cuts 'el1' ... 'elK' (from -y to +y) at x = 0, full width, positive direction +x.
+    Use array_ports(mesh, fed) for the Port list with the fed element first.
+    Raises BoxError if the array does not fit the box, ValueError if strips overlap.
+    """
+    lengths = [float(L) for L in np.atleast_1d(lengths)]
+    spacings = [float(d) for d in np.atleast_1d(spacings)] if len(lengths) > 1 else []
+    K = len(lengths)
+    if len(spacings) != K - 1:
+        raise ValueError(f"{K} strips need {K - 1} spacings, got {len(spacings)}.")
+    for i, L in enumerate(lengths):
+        if L > box_length + 1e-12:
+            raise BoxError(f"strip el{i + 1}: length {L * 1e3:.2f} mm exceeds the box "
+                           f"({box_length * 1e3:.1f} mm along x).")
+    for i, d in enumerate(spacings):
+        if d <= width:
+            raise ValueError(f"spacing {i + 1} ({d * 1e3:.2f} mm) <= width ({width * 1e3:.2f} mm): "
+                             f"strips overlap.")
+    yc = np.concatenate([[0.0], np.cumsum(spacings)])
+    yc -= 0.5 * (yc[0] + yc[-1])
+    extent = (yc[-1] - yc[0]) + width
+    if extent > box_width + 1e-12:
+        raise BoxError(f"array extent along y is {extent * 1e3:.2f} mm (edge to edge) > "
+                       f"{box_width * 1e3:.1f} mm.")
+
+    xs_parts, n_cells = [], []
+    for L in lengths:
+        n = max(2, 2 * int(np.ceil(L / (2 * cell_length))))
+        n_cells.append(n)
+        xs_parts += [_segment(-L / 2, 0.0, n // 2), _segment(0.0, L / 2, n // 2)]
+    xs = _merge_lines(*xs_parts)
+    ys = _merge_lines(*[_segment(c - width / 2, c + width / 2, n_width, edge_grading) for c in yc])
+
+    xm = 0.5 * (xs[:-1] + xs[1:])
+    ym = 0.5 * (ys[:-1] + ys[1:])
+    keep = np.zeros((len(xm), len(ym)), dtype=bool)
+    for c, L in zip(yc, lengths):
+        keep |= (np.abs(xm)[:, None] < L / 2) & (np.abs(ym - c)[None, :] < width / 2)
+
+    cuts = {f"el{k + 1}": _cut(0.0, c - width / 2, c + width / 2) for k, c in enumerate(yc)}
+    params = dict(geometry="parallel_strip_array", lengths=lengths, width=width,
+                  spacings=spacings, y_centers=yc.tolist(), extent_y=extent,
+                  n_len=n_cells, n_width=n_width, edge_grading=_grading_name(edge_grading),
+                  cell_length=cell_length, box=(box_length, box_width))
+    return tensor_grid_mesh(xs, ys, keep, cuts=cuts, params=params)
+
+
+def array_ports(mesh: PlanarMesh, fed: int, tol=1e-9):
+    """Ports of a parallel_strip_array mesh, fed element (0-based index, -y to +y) first,
+    the others in y order."""
+    K = len(mesh.params["y_centers"])
+    if not 0 <= fed < K:
+        raise ValueError(f"fed index {fed} out of range for {K} elements.")
+    order = [fed] + [k for k in range(K) if k != fed]
+    return [mesh.port(f"el{k + 1}", tol=tol) for k in order]
+
+
 def _grading_name(g):
     if g is None:
         return "uniform"
