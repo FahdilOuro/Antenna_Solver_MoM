@@ -1,5 +1,5 @@
 """
-Tests for backend.optim.reduced_model.ReducedMultiport.
+Tests for solver.optim.reduced_model.ReducedMultiport.
 
   V3  test_reduction_exact       reduced model == full MoM solve with the loads in Z
   V1  test_power_balance         P_in = P_rad + P_cond + P_loads ; P_avail (1-|Gamma|^2) = P_in
@@ -13,11 +13,11 @@ import time
 import numpy as np
 import pytest
 
-from backend.optim import ReducedMultiport, port_from_edge
-from backend.optim.threads import limit_blas_threads
-from backend.rwg.rwg3 import calculate_z_matrice_lumped_elements, compute_lumped_impedance
-from backend.utils.impmet import impedance_matrix_z
-from backend.utils.lossy_electric_conductor import calculate_normal_surface_impedance
+from solver.optim import ReducedMultiport, port_from_edge
+from solver.optim.threads import limit_blas_threads
+from solver.rwg.rwg3 import calculate_z_matrice_lumped_elements, compute_lumped_impedance
+from solver.utils.impmet import impedance_matrix_z
+from solver.utils.lossy_electric_conductor import calculate_normal_surface_impedance
 from conftest import FREQUENCY, X_HAT, rel_err
 
 Z0 = 50.0

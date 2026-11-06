@@ -1,6 +1,6 @@
 """
 End-to-end regression test for the fast frequency_sweep() path
-(backend/utils/frequency_sweep.py).
+(solver/utils/frequency_sweep.py).
 
 Context
 -------
@@ -27,10 +27,10 @@ import numpy as np
 import pytest
 from scipy.io import loadmat
 
-from backend.utils.file_path import setup_save_file_paths
-from backend.utils.gmsh_function import setup_performance_config, generate_and_save_mesh
-from backend.src.radiation_algorithm.radiation_algorithm import radiation_algorithm
-from backend.utils.frequency_sweep import frequency_sweep, load_freq_sweep_data, generate_freq_points
+from solver.utils.file_path import setup_save_file_paths
+from solver.utils.gmsh_function import setup_performance_config, generate_and_save_mesh
+from solver.src.radiation_algorithm.radiation_algorithm import radiation_algorithm
+from solver.utils.frequency_sweep import frequency_sweep, load_freq_sweep_data, generate_freq_points
 
 ANTENNA_NAME = "unittest_freq_sweep_strip"
 
@@ -66,7 +66,7 @@ def test_generate_freq_points_rejects_invalid_input(freq_start, freq_stop, n_poi
 
 def test_frequency_sweep_rejects_invalid_input_before_mesh_generation(monkeypatch):
     """Validation must happen before any expensive mesh/gmsh work starts."""
-    import backend.utils.frequency_sweep as fs
+    import solver.utils.frequency_sweep as fs
 
     def _boom(*args, **kwargs):
         raise AssertionError("mesh generation must not run when inputs are invalid")

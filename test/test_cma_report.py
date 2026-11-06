@@ -1,5 +1,5 @@
 """
-Tests for the CMA Markdown data sheets (backend/cma/cma_report.py).
+Tests for the CMA Markdown data sheets (solver/cma/cma_report.py).
 
 These check that the report records the run faithfully -- every mode, every
 swept frequency, the mesh it came from and the solver settings -- because the
@@ -20,12 +20,12 @@ import types
 import numpy as np
 import pytest
 
-from backend.cma.cma_parameters import CMAParameters
-from backend.cma.cma_report import write_single_frequency_report, write_sweep_report
-from backend.cma.cma_frequency_sweep import CMASweepData
-from backend.cma.mode_tracking import track_sweep
-from backend.cma.modal_data import ModalData
-from backend.rwg.rwg1 import Points, Triangles
+from solver.cma.cma_parameters import CMAParameters
+from solver.cma.cma_report import write_single_frequency_report, write_sweep_report
+from solver.cma.cma_frequency_sweep import CMASweepData
+from solver.cma.mode_tracking import track_sweep
+from solver.cma.modal_data import ModalData
+from solver.rwg.rwg1 import Points, Triangles
 
 
 @pytest.fixture

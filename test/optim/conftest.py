@@ -1,5 +1,5 @@
 """
-Shared fixtures for the backend.optim tests.
+Shared fixtures for the solver.optim tests.
 
 Z assembly dominates the run time (~5 s for the wide strip), so each mesh's
 model is built once per session and the tests derive what they need from it
@@ -9,7 +9,7 @@ model is built once per session and the tests derive what they need from it
 import numpy as np
 import pytest
 
-from backend.optim import ReducedMultiport, port_from_cut
+from solver.optim import ReducedMultiport, port_from_cut
 from optim_strip_mesh import make_strip_mesh
 
 FREQUENCY = 3e8           # Hz -- the 0.5 m strip is a half-wave dipole

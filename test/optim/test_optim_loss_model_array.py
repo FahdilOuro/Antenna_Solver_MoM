@@ -7,16 +7,16 @@ direct full solve.
 import numpy as np
 import pytest
 
-from backend.optim import ReducedMultiport
-from backend.optim.farfield import RadiationOperator
-from backend.optim.geometries import (
+from solver.optim import ReducedMultiport
+from solver.optim.farfield import RadiationOperator
+from solver.optim.geometries import (
     BOX_WIDTH, BoxError, array_ports, parallel_strip_array,
 )
-from backend.optim.inner import optimize_loads
-from backend.optim.loss_model import (
+from solver.optim.inner import optimize_loads
+from solver.optim.loss_model import (
     ALPHA_UNCERTAINTY, CALIBRATION, MESH_RULE, alpha_band, alpha_calibrated,
 )
-from backend.utils.lossy_electric_conductor import calculate_normal_surface_impedance
+from solver.utils.lossy_electric_conductor import calculate_normal_surface_impedance
 from conftest import COPPER_SIGMA
 
 DEG = np.pi / 180

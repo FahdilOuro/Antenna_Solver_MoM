@@ -1,5 +1,5 @@
 """
-Tests for backend.optim.farfield (exact radiation integral) and objectives.
+Tests for solver.optim.farfield (exact radiation integral) and objectives.
 
 Three current distributions are used throughout, all at 300 MHz (lambda = 1 m):
   short      strip of length lambda/50, centre-fed            (Hertzian-dipole limit)
@@ -15,17 +15,17 @@ Run with  python -m pytest test/optim -v -s  to see the printed measurements.
 import numpy as np
 import pytest
 
-from backend.optim import ReducedMultiport
-from backend.optim.farfield import RadiationOperator, spherical_unit_vectors
-from backend.optim.geometries import parallel_strips, strip_dipole
-from backend.optim.objectives import (
+from solver.optim import ReducedMultiport
+from solver.optim.farfield import RadiationOperator, spherical_unit_vectors
+from solver.optim.geometries import parallel_strips, strip_dipole
+from solver.optim.objectives import (
     directivity_from_R, gain, intensity_from_functional, realized_gain,
 )
-from backend.optim.threads import limit_blas_threads
-from backend.utils.dipole_parameters import (
+from solver.optim.threads import limit_blas_threads
+from solver.utils.dipole_parameters import (
     compute_dipole_center_moment, compute_e_h_field, compute_spherical_e_field,
 )
-from backend.utils.lossy_electric_conductor import calculate_normal_surface_impedance
+from solver.utils.lossy_electric_conductor import calculate_normal_surface_impedance
 from conftest import COPPER_SIGMA
 
 F0 = 3e8

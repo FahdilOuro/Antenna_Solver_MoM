@@ -1,12 +1,12 @@
 """
-Tests for backend.optim.ports: port geometry, orientation and error handling.
+Tests for solver.optim.ports: port geometry, orientation and error handling.
 No Z assembly here -- these run in milliseconds.
 """
 
 import numpy as np
 import pytest
 
-from backend.optim import (
+from solver.optim import (
     Port, PortDefinitionError, incidence_matrix, port_from_cut, port_from_edge,
 )
 from conftest import X_HAT

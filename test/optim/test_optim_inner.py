@@ -1,14 +1,15 @@
 """
-Tests for backend.optim.inner (reactive-load optimisation) and the geometry
-gain bound of backend.optim.objectives.
+Tests for solver.optim.inner (reactive-load optimisation) and the geometry
+gain bound of solver.optim.objectives.
 
 Geometry for all tests: two parallel copper strips (lambda/2 along x, width
 lambda/100), spacing d = lambda/10 along y, 300 MHz, zs_scale = 0.5; element 1
 ('feed', y = -d/2) driven, element 2 ('parasite', y = +d/2) loaded. Target:
 +y, phi polarisation (end-fire towards the parasite: a director).
 
-test_two_element_endfire also writes the MoM reference for the CST sheet V6
-to fiches_cst/resultats_V6/mom_reference.json (when that folder's parent exists).
+test_two_element_endfire also writes this two-strip case as a MoM reference for a CST
+cross-check to fiches_cst/reference_2rubans_300MHz/mom_reference_2rubans_300MHz.json (when
+fiches_cst exists). It is kept out of fiches_cst/resultats_V6/, which holds the B3 design only.
 """
 
 import datetime as _dt
@@ -19,12 +20,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from backend.optim import ReducedMultiport
-from backend.optim.farfield import RadiationOperator
-from backend.optim.geometries import parallel_strips
-from backend.optim.inner import optimize_loads
-from backend.optim.objectives import gain_from_currents, geometry_gain_bound, loss_matrix
-from backend.optim.threads import limit_blas_threads
+from solver.optim import ReducedMultiport
+from solver.optim.farfield import RadiationOperator
+from solver.optim.geometries import parallel_strips
+from solver.optim.inner import optimize_loads
+from solver.optim.objectives import gain_from_currents, geometry_gain_bound, loss_matrix
+from solver.optim.threads import limit_blas_threads
 from conftest import COPPER_SIGMA
 
 F0 = 3e8
@@ -33,8 +34,8 @@ DEG = np.pi / 180
 PLUS_Y, MINUS_Y = (90 * DEG, 90 * DEG), (90 * DEG, 270 * DEG)
 ZS_SCALE = 0.5
 GEOM = dict(length=0.5 * LAM, width=0.01 * LAM, spacing=0.1 * LAM, n_len=24, n_width=1)
-V6_JSON = Path(r"D:\PhD_Fahdilou_Leat\PUBLICATIONS\7-EurAAP Small Antenna Super-Gain Challenge"
-               r"\fiches_cst\resultats_V6\mom_reference.json")
+REF_JSON = Path(r"D:\PhD_Fahdilou_Leat\PUBLICATIONS\7-EurAAP Small Antenna Super-Gain Challenge"
+                r"\fiches_cst\reference_2rubans_300MHz\mom_reference_2rubans_300MHz.json")
 
 
 @pytest.fixture(scope="module")
@@ -127,13 +128,14 @@ def test_two_element_endfire(pair, optimum):
     assert g_dbi > 2.15                                # beats a lone half-wave dipole
     assert fb_db > 3.0
 
-    if V6_JSON.parent.parent.is_dir():
-        V6_JSON.parent.mkdir(exist_ok=True)
+    if REF_JSON.parent.parent.is_dir():
+        REF_JSON.parent.mkdir(exist_ok=True)
         ref = dict(
-            description="MoM reference for CST sheet V6: two parallel copper strips, element 1 "
-                        "fed (delta gap across the full width at x = 0), element 2 loaded by an "
-                        "ideal reactance (delta gap at x = 0). Optimised for G (ideal matching) "
-                        "towards +y, phi polarisation.",
+            description="MoM reference for a CST cross-check (test_optim_inner.py, step 3): two "
+                        "parallel copper strips at 300 MHz, element 1 fed (delta gap across the full "
+                        "width at x = 0), element 2 loaded by an ideal reactance (delta gap at x = 0). "
+                        "Optimised for G (ideal matching) towards +y, phi polarisation. NOT the B3 "
+                        "design of fiches_cst/resultats_V6/.",
             generated=_dt.datetime.now().isoformat(timespec="seconds"), git=_git(),
             frequency_Hz=F0,
             geometry=dict(strip_length_m=GEOM["length"], strip_width_m=GEOM["width"],
@@ -153,5 +155,5 @@ def test_two_element_endfire(pair, optimum):
                          front_to_back_dB=float(fb_db),
                          G_max_dBi=float(10 * np.log10(res.g_max)), G_over_G_max=res.g_ratio),
         )
-        V6_JSON.write_text(json.dumps(ref, indent=2), encoding="utf-8")
-        print(f"  wrote {V6_JSON}")
+        REF_JSON.write_text(json.dumps(ref, indent=2), encoding="utf-8")
+        print(f"  wrote {REF_JSON}")

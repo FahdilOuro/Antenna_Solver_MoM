@@ -1,5 +1,5 @@
 """
-Tests for backend.optim.geometries.planar: port cuts, conformity, closed loop.
+Tests for solver.optim.geometries.planar: port cuts, conformity, closed loop.
 No Z assembly -- fast.
 """
 
@@ -8,7 +8,7 @@ from collections import Counter
 import numpy as np
 import pytest
 
-from backend.optim.geometries import (
+from solver.optim.geometries import (
     grading_nodes, parallel_strips, square_loop, strip_dipole,
 )
 

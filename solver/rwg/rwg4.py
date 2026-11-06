@@ -1,0 +1,385 @@
+import os
+
+import numpy as np
+from scipy.io import savemat
+
+from solver.rwg.rwg2 import DataManager_rwg2
+from solver.rwg.rwg3 import DataManager_rwg3
+from solver.utils.gap_source import *
+from solver.utils.impmet import rwg_gram_matrix
+from solver.utils.mesh_io import MeshDataError, load_matfile_or_raise, verify_mesh_fingerprint
+
+
+# Definition of the incident field
+# Example: wave_incident_direction = [0, 0, -1] means the incident field comes from the "-z" direction
+# Example: polarization = [1, 0, 0] means the incident field is polarized in the "x" direction
+
+def calculate_current_scattering(filename_mesh_2, filename_impedance, wave_incident_direction, polarization):
+    """
+        Computes the current and voltage vector resulting from the scattering of an incident wave on a structure.
+
+        This function uses meshed data and calculated impedance data to solve the method of moments (MoM) equations,
+        modeling the electromagnetic response of a structure.
+
+        Parameters:
+            * filename_mesh_2 : str, path to the file containing the meshed data (_mesh2 file).
+            * filename_impedance : str, path to the file containing the impedance data (_impedance file).
+            * wave_incident_direction : n-d-array (3,), direction of propagation of the incident wave (unit vector).
+            * polarization : n-d-array (3,), vector describing the polarization of the incident electric field
+              (e.g., 'x' or 'y' direction).
+
+        Returns:
+            * frequency : float, frequency used in the electromagnetic calculation (Hz).
+            * omega : float, associated angular frequency (rad/s).
+            * mu : float, magnetic permeability of free space (H/m).
+            * epsilon : float, permittivity of free space (F/m).
+            * light_speed_c : float, speed of light in vacuum (m/s).
+            * eta : float, characteristic impedance of free space (Ω).
+            * voltage : n-d-array, voltage vector resulting from the MoM equations (Z * I = V).
+            * current : n-d-array, current vector solving the MoM equations.
+
+        Behavior:
+            1. Loads the meshed data and impedance data from the specified files.
+            2. Computes the wave vector `kv` from the incident wave direction and the wave number 'k'.
+            3. Initializes a 'voltage' vector (MoM RHS) from edge contributions and scalar products related to associated triangles.
+            4. Solves the linear system of MoM equations to obtain the 'current' vector.
+            5. Displays computation time for solving the linear system.
+
+        Notes:
+            * The method relies on the accuracy of the provided meshed and impedance data.
+            * The incident wave direction ('wave_incident_direction') and polarization must be properly
+              normalized to ensure consistent results.
+    """
+    # Guard against combining a mesh2 file and an impedance file that were
+    # generated from different meshes (e.g. the mesh was re-generated but the
+    # impedance matrix wasn't recomputed).
+    verify_mesh_fingerprint(filename_mesh_2, filename_impedance)
+
+    # Load meshed data (points, triangles, edges, rho vectors)
+    _, triangles, edges, vecteurs_rho = DataManager_rwg2.load_data(filename_mesh_2)
+    # Load impedance data (frequency, EM parameters, Z matrix)
+    frequency, omega, mu, epsilon, light_speed_c, eta, matrice_z = DataManager_rwg3.load_data(filename_impedance)
+
+    # Compute physical constants
+    k = omega / light_speed_c               # Wave number
+    kv = k * wave_incident_direction        # Incident wave vector
+
+    # Initialize voltage vector (MoM RHS)
+    voltage = np.zeros(edges.total_number_of_edges, dtype=complex)
+    
+    # === Prepare triangle centers associated with edges ===
+    centers_plus = triangles.triangles_center[:, triangles.triangles_plus]    # (3, N_edges)
+    centers_minus = triangles.triangles_center[:, triangles.triangles_minus]  # (3, N_edges)
+
+    # === Compute scalar products kv . r_plus and kv . r_minus ===
+    scalar_product_plus = np.einsum('i,ij->j', kv, centers_plus)   # (N_edges,)
+    scalar_product_minus = np.einsum('i,ij->j', kv, centers_minus) # (N_edges,)
+
+    # === Compute complex wave factors (em_plus and em_minus) ===
+    # Broadcasting : (3, 1) * (1, N_edges) -> (3, N_edges)
+    em_plus = polarization[:, None] * np.exp(-1j * scalar_product_plus)[None, :]
+    em_minus = polarization[:, None] * np.exp(-1j * scalar_product_minus)[None, :]
+
+    # === Scalar products with rho vectors ===
+    # em_plus and vecteur_rho_plus are both (3, N_edges)
+    scalar_plus = np.einsum('ij,ij->j', em_plus, vecteurs_rho.vecteur_rho_plus)   # (N_edges,)
+    scalar_minus = np.einsum('ij,ij->j', em_minus, vecteurs_rho.vecteur_rho_minus) # (N_edges,)
+
+    # === Assemble the final "voltage" vector ===
+    voltage = edges.edges_length * 0.5 * (scalar_plus + scalar_minus)  # (N_edges,)
+
+    # Solve the linear system (Z * I = V) to obtain the current vector
+    current = np.linalg.solve(matrice_z, voltage)
+
+    return frequency, omega, mu, epsilon, light_speed_c, eta, voltage, current
+
+def calculate_current_radiation(path, feed_point, voltage_amplitude, 
+                                excitation_unit_vector=None, gap_width=0.05, voltage_phase=None, lossy_conductor=False, impedance_zs=None):
+    """
+    Calculates the currents, input impedance, and radiated power for one or multiple antenna ports.
+
+    This function solves the Method of Moments (MoM) system, rectifies the current flow 
+    based on physical consistency (Re(Z) > 0), and returns detailed metrics for each feed.
+
+    Parameters:
+        path : object, contains attributes path.mat_mesh2 and path.mat_impedance.
+        feed_point : n-d-array, coordinates of the feed point(s). Can be (3,) or (N, 3).
+        voltage_amplitude : float or list, amplitude of the excitation signal.
+        excitation_unit_vector : str or n-d-array, direction of the gap excitation.
+        gap_width : float, physical width of the gap source.
+        voltage_phase : float or list, phase of the excitation in radians.
+
+    Returns:
+        frequency : float, operating frequency (Hz).
+        omega : float, angular frequency (rad/s).
+        mu, epsilon : float, vacuum constants.
+        light_speed_c : float, speed of light (m/s).
+        eta : float, free space impedance (Ohm).
+        voltage_vector : n-d-array, the global excitation vector.
+        current_vector : n-d-array, solved currents for all edges.
+        port_results : list, list of dicts containing 'current', 'impedance', 'power', 
+                       and 'source_voltage' for each individual port.
+    """
+    # Guard against combining a mesh2 file and an impedance file that were
+    # generated from different meshes (e.g. the mesh was re-generated but the
+    # impedance matrix wasn't recomputed).
+    verify_mesh_fingerprint(path.mat_mesh2, path.mat_impedance)
+
+    # Load meshed and impedance data
+    points, triangles, edges, vecteurs_rho = DataManager_rwg2.load_data(path.mat_mesh2)
+    frequency, _, _, _, _, _, matrice_z = DataManager_rwg3.load_data(path.mat_impedance)
+
+    # 1. Initialize the global voltage vector and retrieve feeding indices per port
+    voltage, all_feeding_edges = multiple_gap_sources(
+        triangles, edges, vecteurs_rho, voltage_amplitude, feed_point,
+        excitation_unit_vector, gap_width, voltage_phase
+    )
+
+    if lossy_conductor:
+        Gram_rwg = rwg_gram_matrix(edges, triangles, points)
+        Z_material = impedance_zs * Gram_rwg
+        Z_lossy = matrice_z + Z_material
+        current = np.linalg.solve(Z_lossy, voltage)
+    else:
+        current = np.linalg.solve(matrice_z, voltage)
+
+    port_results = compute_port_results(voltage, current, all_feeding_edges,
+                                         voltage_amplitude, feed_point)
+
+    # Returns the environmental constants, global vectors, and the list of port-specific data
+    return frequency, voltage, current, port_results
+
+
+def compute_port_results(voltage, current, all_feeding_edges, voltage_amplitude, feed_point, verbose=True):
+    """
+    Compute per-port input impedance, power, and effective gap current from a
+    solved (voltage, current) pair, given the feeding-edge groups returned by
+    `multiple_gap_sources`.
+
+    Extracted from `calculate_current_radiation` so that a frequency sweep
+    (which solves Z(f)*I=V for many frequencies without reloading mesh/port
+    data each time -- see solver.utils.frequency_sweep) can reuse the exact
+    same port-metric formulas instead of re-deriving them.
+
+    Parameters
+    ----------
+    voltage             : complex (E,)  global excitation vector
+    current             : complex (E,)  solved current vector (Z^-1 @ voltage)
+    all_feeding_edges   : list of int ndarray, per port (from multiple_gap_sources)
+    voltage_amplitude   : float or array-like, per-port excitation amplitude
+    feed_point          : array-like, coordinates of the feed point(s)
+    verbose             : bool, print per-port P_in/Q_in/Z_in and the total input power
+
+    Returns
+    -------
+    port_results : list of dicts with keys 'port_index', 'location',
+                   'gap_current', 'impedance', 'power', 'source_voltage'
+    """
+    if verbose:
+        # P_in = 0.5 Re(V·I*) — the only formula consistent with the MoM energy identity
+        P_in_total = 0.5 * np.real(np.dot(voltage, np.conj(current)))
+        print(f"Total input power P_in = 0.5*Re(V·I*) = {P_in_total:.6e} W")
+
+    feed_points_2d = np.atleast_2d(feed_point)
+    num_feed_group_edges = len(all_feeding_edges)
+    port_results = []
+
+    for i in range(num_feed_group_edges):
+        feeding_edges = all_feeding_edges[i]
+
+        if feeding_edges.size == 0:
+            if verbose:
+                print(f"Warning: Port {i} at {feed_points_2d[i]} has no feeding edges.")
+            continue
+
+        amp = voltage_amplitude[i] if not np.isscalar(voltage_amplitude) else voltage_amplitude
+
+        V_port = voltage[feeding_edges]
+        I_port = current[feeding_edges]
+        S_port    = 0.5 * np.dot(V_port, np.conj(I_port))   # complex power S = P + jQ
+        P_in_port = np.real(S_port)
+        Q_in_port = np.imag(S_port)
+
+        # I_eff such that ½ Re(V₀·I_eff*) = P_in_port → Z_in = V₀/I_eff
+        gap_current_eff = 2.0 * np.conj(S_port) / amp if amp != 0 else 0j
+        impedance = amp / gap_current_eff if np.abs(gap_current_eff) > 0 else np.inf
+
+        if verbose:
+            print(f"Port {i}: P_in = {P_in_port:.4e} W  |  Q_in = {Q_in_port:.4e} VAR"
+                  f"  |  Z_in = {impedance:.4f} Ohm")
+
+        port_results.append({
+            'port_index': i,
+            'location': feed_points_2d[i],
+            'gap_current': gap_current_eff,
+            'impedance': impedance,
+            'power': P_in_port,
+            'source_voltage': amp
+        })
+
+    return port_results
+
+class DataManager_rwg4:
+    """
+        A class to manage saving and loading data related to electromagnetic wave problems,
+        such as scattering or radiation, using MATLAB files.
+
+        Methods:
+            * save_data_for_scattering : Save data related to wave scattering.
+            * save_data_for_radiation : Save data related to radiation.
+            * load_data : Load data from a MATLAB file.
+    """
+    @staticmethod
+    def save_data_for_scattering(filename_mesh2, save_folder_name, frequency,
+                                 omega, mu, epsilon, light_speed_c, eta,
+                                 wave_incident_direction, polarization, voltage, current):
+        """
+            Saves data related to electromagnetic wave scattering into a MATLAB file.
+
+            Parameters:
+                * filename_mesh2 (str) : Name of the mesh file used for simulation.
+                * save_folder_name (str) : Directory where data will be saved.
+                * frequency (float) : Wave frequency.
+                * omega (float) : Angular frequency.
+                * mu (float) : Magnetic permeability of the medium.
+                * epsilon (float) : Electric permittivity of the medium.
+                * light_speed_c (float) : Speed of light in the medium.
+                * eta (float) : Impedance of the medium.
+                * wave_incident_direction (np.n-d-array) : Direction of the incident wave.
+                * polarization (np.n-d-array) : Polarization of the incident wave.
+                * voltage (np.n-d-array) : Simulated voltages.
+                * current (np.n-d-array) : Simulated currents.
+
+            Returns:
+            save_file_name (str) : Name of the generated save file.
+        """
+        # Construct file name
+        base_name = os.path.splitext(os.path.basename(filename_mesh2))[0]
+        base_name = base_name.replace('_mesh2', '')  # Remove '_mesh2' part
+        save_file_name = base_name + '_current.mat'  # Add '_current' suffix
+        full_save_path = os.path.join(save_folder_name, save_file_name)
+
+        # Check and create directory if needed
+        if not os.path.exists(save_folder_name):
+            os.makedirs(save_folder_name)
+
+        # Save data including wave incident direction and polarization
+        data = {
+            'frequency': frequency,
+            'omega': omega,
+            'mu': mu,
+            'epsilon': epsilon,
+            'light_speed_c': light_speed_c,
+            'eta': eta,
+            'wave_incident_direction': wave_incident_direction,
+            'polarization': polarization,
+            'voltage': voltage,
+            'current': current
+        }
+
+        # Save the data
+        savemat(full_save_path, data)
+
+        return save_file_name
+
+    @staticmethod
+    def save_data_for_radiation(path, frequency, omega, mu, epsilon, light_speed_c, eta,
+                                voltage, current, gap_currents, gap_voltages, impedances, feed_powers):
+        """
+        Saves electromagnetic radiation data for one or multiple ports into a MATLAB file.
+
+        Parameters:
+            path : object, contains path.mat_current attribute.
+            frequency, omega, mu, epsilon, light_speed_c, eta : float, physical constants and frequency.
+            voltage : np.ndarray, global excitation vector (Z-matrix RHS).
+            current : np.ndarray, global solved current vector.
+            gap_currents : np.ndarray, array of complex currents for each port.
+            gap_voltages : np.ndarray, array of complex voltages for each port.
+            impedances : np.ndarray, array of complex input impedances for each port.
+            feed_powers : np.ndarray, array of active power values for each port.
+
+        Returns:
+            None
+        """
+        data = {
+            'frequency': frequency,
+            'omega': omega,
+            'mu': mu,
+            'epsilon': epsilon,
+            'light_speed_c': light_speed_c,
+            'eta': eta,
+            'voltage': voltage,
+            'current': current,
+            'gap_currents': gap_currents,
+            'gap_voltages': gap_voltages,
+            'impedances': impedances,
+            'feed_powers': feed_powers
+        }
+
+        savemat(path.mat_current, data)
+
+    @staticmethod
+    def load_data(filename, radiation=False, scattering=False):
+        """
+        Loads data from a MATLAB file, handling either radiation or scattering results.
+
+        Parameters:
+            filename (str) : Full path to the file to load.
+            radiation (bool) : If True, expects and returns antenna feed port data.
+            scattering (bool) : If True, expects and returns incident wave data.
+
+        Returns:
+            tuple : Extracted data in the order defined by the saving process.
+
+        Raises:
+            ValueError: if neither `radiation` nor `scattering` is set.
+            MeshDataError: if the file is missing or its contents are
+                malformed (missing/invalid keys). Chained from the original
+                exception.
+        """
+        if not scattering and not radiation:
+            raise ValueError("You must specify either 'radiation=True' or 'scattering=True'.")
+
+        data = load_matfile_or_raise(filename)
+
+        try:
+            # 1. Common global parameters extraction
+            frequency = data['frequency'].squeeze()
+            omega = data['omega'].squeeze()
+            mu = data['mu'].squeeze()
+            epsilon = data['epsilon'].squeeze()
+            light_speed_c = data['light_speed_c'].squeeze()
+            eta = data['eta'].squeeze()
+            voltage = data['voltage'].squeeze()
+            current = data['current'].squeeze()
+
+            # 2. Scattering-specific logic
+            if scattering:
+                if 'wave_incident_direction' not in data or 'polarization' not in data:
+                    raise KeyError("Missing scattering keys in file.")
+                wave_incident_direction = data['wave_incident_direction'].squeeze()
+                polarization = data['polarization'].squeeze()
+                return (frequency, omega, mu, epsilon, light_speed_c, eta,
+                        wave_incident_direction, polarization, voltage, current)
+
+            # 3. Radiation-specific logic (Updated for multi-port support)
+            required_keys = ['gap_currents', 'gap_voltages', 'impedances', 'feed_powers']
+            if not all(k in data for k in required_keys):
+                raise KeyError("Missing radiation port keys in file.")
+            gap_currents = data['gap_currents'].squeeze()
+            gap_voltages = data['gap_voltages'].squeeze()
+            impedances = data['impedances'].squeeze()
+            feed_powers = data['feed_powers'].squeeze()
+
+            # Return in the exact order as specified in the calculation return
+            return (frequency, omega, mu, epsilon, light_speed_c, eta,
+                    voltage, current, gap_currents, gap_voltages, impedances, feed_powers)
+
+        except KeyError as e:
+            raise MeshDataError(
+                f"'{filename}' is missing expected key {e}. It may have been "
+                f"generated by an older/incompatible version of the pipeline, "
+                f"or with the wrong radiation/scattering flag."
+            ) from e
+        except ValueError as e:
+            raise MeshDataError(f"'{filename}' contains malformed data: {e}") from e

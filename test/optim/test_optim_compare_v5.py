@@ -13,7 +13,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 _spec = importlib.util.spec_from_file_location(
-    "compare_v5", ROOT / "backend/antenna_simulation/euraap_challenge/compare_v5.py")
+    "compare_v5", ROOT / "solver/antenna_simulation/euraap_challenge/compare_v5.py")
 cmp = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(cmp)
 

@@ -14,18 +14,18 @@ kaleido>=0.2.0        # Static plotly exports (PNG, PDF) used by radiation_algor
 # =============================================
 # Meshing and EM utilities
 # =============================================
-gmsh>=4.8.0            # Mesh generation / .msh <-> .mat conversion (backend/utils/gmsh_function.py)
+gmsh>=4.8.0            # Mesh generation / .msh <-> .mat conversion (solver/utils/gmsh_function.py)
 
 # =============================================
 # Testing
 # =============================================
-pytest>=7.0.0           # Test suite: `python -m pytest test/` and backend/**/tests/ (see CLAUDE.md)
+pytest>=7.0.0           # Test suite: `python -m pytest test/` and solver/**/tests/ (see CLAUDE.md)
 
 # =============================================
 # Performance optimization
 # =============================================
 numba>=0.56.0           # Not yet used by any current code path; reserved for parallelising the
-                         # O(E^2) impedance-matrix fill (backend/utils/impmet.py) via numba.prange,
+                         # O(E^2) impedance-matrix fill (solver/utils/impmet.py) via numba.prange,
                          # see CLAUDE.md "Planned Extensions -> Optimization algorithms".
 
 # =============================================
@@ -38,15 +38,15 @@ scikit-rf>=0.22.0        # Not yet imported by any current code path; listed for
 # Optional: local Cython acceleration layer
 # =============================================
 # Only needed to run `python setup.py build_ext --inplace` (see CLAUDE.md "Setup").
-# backend/rwg/cython_rwg/ does not exist yet -- nothing to build until that
+# solver/rwg/cython_rwg/ does not exist yet -- nothing to build until that
 # extension module is actually written; installing Cython is a no-op until then.
 # Cython>=3.0.0
 
 # =============================================
 # Optional: GPU acceleration (CuPy)
 # =============================================
-# impedance_matrix_z_sweep_gpu (backend/utils/impmet.py) auto-detects a usable
-# CUDA GPU via backend/utils/compute_backend.py and falls back to NumPy/CPU if
+# impedance_matrix_z_sweep_gpu (solver/utils/impmet.py) auto-detects a usable
+# CUDA GPU via solver/utils/compute_backend.py and falls back to NumPy/CPU if
 # this package is missing or no GPU is present -- it is NOT a hard requirement.
 # Install the wheel matching your driver's CUDA version (see `nvidia-smi`,
 # "CUDA Version" in the header): cupy-cuda12x for CUDA 12.x, cupy-cuda11x for
@@ -56,9 +56,9 @@ scikit-rf>=0.22.0        # Not yet imported by any current code path; listed for
 # cupy-cuda12x[ctk]>=13.0.0
 
 # =============================================
-# Optional: profiling tools (backend/performance/)
+# Optional: profiling tools (solver/performance/)
 # =============================================
-# Both are imported inside try/except in backend/performance/profile_simulate_plate.py
+# Both are imported inside try/except in solver/performance/profile_simulate_plate.py
 # and silently disable the corresponding profiling mode if missing -- optional,
 # not required to run or test the solver itself.
 # line_profiler>=4.0.0

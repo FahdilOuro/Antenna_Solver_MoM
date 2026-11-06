@@ -7,12 +7,12 @@ geometric reparametrisation, and a mini 3-element design evaluation.
 import numpy as np
 import pytest
 
-from backend.optim import ReducedMultiport
-from backend.optim.components import (
+from solver.optim import ReducedMultiport
+from solver.optim.components import (
     IDEAL, JOHANSON_S603DS, Capacitor, ComponentModel, IdealReactance, bracketing_parts,
     effective_reactance, series_impedance, snap_to_kit,
 )
-from backend.optim.outer import (
+from solver.optim.outer import (
     BayesianOptimizer, extent_bounds, inverse_stick_breaking, spacings_from_params, stick_breaking,
 )
 
@@ -169,10 +169,10 @@ def test_bo_resume_reproduces_uninterrupted_run(tmp_path):
 
 # --------------------------------------------------------------------------- mini design evaluation
 def test_mini_three_element_design():
-    from backend.optim.design_eval import DesignContext, evaluate_design
-    from backend.optim.geometries import parallel_strip_array
-    from backend.rwg.rwg3 import calculate_z_matrice
-    from backend.utils.impmet import rwg_gram_matrix
+    from solver.optim.design_eval import DesignContext, evaluate_design
+    from solver.optim.geometries import parallel_strip_array
+    from solver.rwg.rwg3 import calculate_z_matrice
+    from solver.utils.impmet import rwg_gram_matrix
 
     w = 4e-3
     m = parallel_strip_array([0.18] * 3, w, [0.03, 0.03], n_width=2, cell_length=0.0225)

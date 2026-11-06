@@ -8,8 +8,8 @@ The diagonal system provides exact analytical ground-truth eigenvalues.
 import numpy as np
 import pytest
 
-from backend.cma.cma_parameters import CMAParameters
-from backend.cma.eigen_solver import GeneralizedEigenSolver
+from solver.cma.cma_parameters import CMAParameters
+from solver.cma.eigen_solver import GeneralizedEigenSolver
 
 
 class TestDiagonalSystem:

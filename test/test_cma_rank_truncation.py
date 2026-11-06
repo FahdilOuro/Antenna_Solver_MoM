@@ -14,9 +14,9 @@ the expected answer is known in advance rather than inferred from the solver.
 import numpy as np
 import pytest
 
-from backend.cma.cma_parameters import CMAParameters
-from backend.cma.eigen_solver import GeneralizedEigenSolver
-from backend.cma.mode_diagnostics import mode_report, format_mode_report
+from solver.cma.cma_parameters import CMAParameters
+from solver.cma.eigen_solver import GeneralizedEigenSolver
+from solver.cma.mode_diagnostics import mode_report, format_mode_report
 
 N = 24
 RANK = 7

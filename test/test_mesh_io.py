@@ -1,6 +1,6 @@
 """
-Tests for backend/utils/mesh_io.py and the error-handling / consistency-check
-behaviour it brought to DataManager_rwg1..4 (backend/rwg/rwg1..4.py).
+Tests for solver/utils/mesh_io.py and the error-handling / consistency-check
+behaviour it brought to DataManager_rwg1..4 (solver/rwg/rwg1..4.py).
 
 Background
 ----------
@@ -24,11 +24,11 @@ import numpy as np
 import pytest
 from scipy.io import savemat
 
-from backend.rwg.rwg1 import Points, Triangles, DataManager_rwg1
-from backend.rwg.rwg2 import Vecteurs_Rho, DataManager_rwg2
-from backend.rwg.rwg3 import DataManager_rwg3
-from backend.rwg.rwg4 import DataManager_rwg4
-from backend.utils.mesh_io import (
+from solver.rwg.rwg1 import Points, Triangles, DataManager_rwg1
+from solver.rwg.rwg2 import Vecteurs_Rho, DataManager_rwg2
+from solver.rwg.rwg3 import DataManager_rwg3
+from solver.rwg.rwg4 import DataManager_rwg4
+from solver.utils.mesh_io import (
     MeshDataError, MeshConsistencyError,
     compute_mesh_fingerprint, read_mesh_fingerprint, verify_mesh_fingerprint,
 )

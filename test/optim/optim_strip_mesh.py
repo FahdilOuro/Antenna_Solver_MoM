@@ -1,6 +1,6 @@
 """
-Flat-strip mesh for the backend.optim tests: a thin wrapper around
-backend.optim.geometries.planar.tensor_grid_mesh with uniform grid lines
+Flat-strip mesh for the solver.optim tests: a thin wrapper around
+solver.optim.geometries.planar.tensor_grid_mesh with uniform grid lines
 (np.linspace), keeping the small helper API the step-1 tests use.
 
 Rectangle [-Lx/2, Lx/2] x [-Ly/2, Ly/2] in z = 0, (nx x ny) cells, 2 triangles
@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from backend.optim.geometries.planar import tensor_grid_mesh
+from solver.optim.geometries.planar import tensor_grid_mesh
 
 
 @dataclass

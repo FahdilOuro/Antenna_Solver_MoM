@@ -19,8 +19,8 @@ breakage shows up here regardless of mesh shape.
 import numpy as np
 import pytest
 
-from backend.rwg.rwg1 import Points, Triangles
-from backend.utils.impmet import impedance_matrix_z
+from solver.rwg.rwg1 import Points, Triangles
+from solver.utils.impmet import impedance_matrix_z
 
 EPSILON = 8.854e-12
 MU = 1.257e-6

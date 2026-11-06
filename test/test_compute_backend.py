@@ -1,5 +1,5 @@
 """
-Tests for backend/utils/compute_backend.py.
+Tests for solver/utils/compute_backend.py.
 
 Context
 -------
@@ -15,13 +15,13 @@ threshold benchmark across mesh sizes up to E=1007.
 These tests check the *decision logic* itself (deterministic, independent
 of whether a GPU is actually present on the machine running the tests) --
 not the underlying kernels, which are covered by
-backend/utils/quadrature/tests/test_impedance_sweep_gpu_regression.py.
+solver/utils/quadrature/tests/test_impedance_sweep_gpu_regression.py.
 """
 
 import numpy as np
 import pytest
 
-from backend.utils.compute_backend import (
+from solver.utils.compute_backend import (
     GPU_AVAILABLE, DEFAULT_GPU_EDGE_THRESHOLD, should_use_gpu,
     get_array_module, to_numpy, describe_backend,
 )
