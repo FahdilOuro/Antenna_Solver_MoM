@@ -212,8 +212,11 @@ def load_cst(cst_root, r_ref_v5bp=CST_V5BP_PORT_OHM):
     """
     cst_root = Path(cst_root)
     out = {"V5a": {}, "V5b": {}, "V5bp": {}, "eff": []}
-    v5a = next((p for p in sorted(cst_root.rglob("*")) if p.is_dir()
-                and p.name.lower().startswith("v5a")), None)
+    # shallowest folder named V5a* (the CST export), never a MoM case folder such as mom/V5a_dipole_*
+    # (Windows path ordering is case-insensitive, so "mom/..." would otherwise come before "V5a")
+    v5a = min((p for p in cst_root.rglob("*") if p.is_dir() and p.name.lower().startswith("v5a")
+               and "mom" not in (q.lower() for q in p.relative_to(cst_root).parts[:-1])),
+              key=lambda p: (len(p.relative_to(cst_root).parts), p.name), default=None)
     if v5a is not None:
         out["V5a"] = _load_cst_dir(v5a)
         cut = _find(v5a, ["*theta*90*0.9*.txt", "*cut*0.9*.txt"])
