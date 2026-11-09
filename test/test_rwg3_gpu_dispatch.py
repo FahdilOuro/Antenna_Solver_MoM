@@ -1,6 +1,6 @@
 """
 Tests for the size-based GPU/CPU dispatch in calculate_z_matrice and
-calculate_z_matrice_sweep (backend/rwg/rwg3.py).
+calculate_z_matrice_sweep (solver/rwg/rwg3.py).
 
 Context
 -------
@@ -9,7 +9,7 @@ are enough triangle pairs to amortise its fixed overhead -- measured on the
 reference NVIDIA T600 (workflow.md, "GPU acceleration (CuPy)") to lose
 below ~E=57 RWG edges and win comfortably above it. calculate_z_matrice and
 calculate_z_matrice_sweep therefore pick their implementation via
-backend.utils.compute_backend.should_use_gpu(E, use_gpu), not
+solver.utils.compute_backend.should_use_gpu(E, use_gpu), not
 unconditionally: small meshes keep using the original per-pair
 implementation even when a GPU is present, since it was measured faster
 there.
@@ -23,9 +23,9 @@ already covered by test_impedance_sweep_gpu_regression.py).
 import numpy as np
 import pytest
 
-from backend.rwg.rwg1 import Points, Triangles
-from backend.rwg.rwg3 import calculate_z_matrice, calculate_z_matrice_sweep, calculate_z_matrice_lumped_elements
-from backend.utils.impmet import impedance_matrix_z, impedance_matrix_z_sweep
+from solver.rwg.rwg1 import Points, Triangles
+from solver.rwg.rwg3 import calculate_z_matrice, calculate_z_matrice_sweep, calculate_z_matrice_lumped_elements
+from solver.utils.impmet import impedance_matrix_z, impedance_matrix_z_sweep
 
 EPSILON = 8.854e-12
 MU      = 1.257e-6
@@ -80,7 +80,7 @@ def test_calculate_z_matrice_use_gpu_true_forces_batched_path():
     raw_points, raw_triangles = _six_triangle_mesh()
     points_obj, tri_obj, edges_obj = _build_rwg_objects(raw_points, raw_triangles)
 
-    from backend.utils.compute_backend import GPU_AVAILABLE
+    from solver.utils.compute_backend import GPU_AVAILABLE
     if not GPU_AVAILABLE:
         with pytest.raises(RuntimeError, match="no usable CUDA GPU"):
             calculate_z_matrice(points_obj, tri_obj, edges_obj, FREQ, use_gpu=True)
@@ -119,7 +119,7 @@ def test_calculate_z_matrice_lumped_elements_dispatch_consistent():
     omega, mu, epsilon, c, eta, Z_default, imp_default = calculate_z_matrice_lumped_elements(
         points_obj, tri_obj, edges_obj, FREQ, LoadPoint, LoadValue, LoadDir)
 
-    from backend.utils.compute_backend import GPU_AVAILABLE
+    from solver.utils.compute_backend import GPU_AVAILABLE
     if not GPU_AVAILABLE:
         pytest.skip("no usable CUDA GPU on this machine to cross-check the forced-GPU path")
 

@@ -1,5 +1,5 @@
 """
-Tests for cross-frequency mode tracking (backend/cma/mode_tracking.py).
+Tests for cross-frequency mode tracking (solver/cma/mode_tracking.py).
 
 The thing being tested is an identity claim -- "column k is the same physical
 mode at every frequency" -- so the fixtures are built the only way that claim
@@ -19,9 +19,9 @@ import types
 import numpy as np
 import pytest
 
-from backend.cma.cma_frequency_sweep import CMASweepData, DataManager_cma_sweep
+from solver.cma.cma_frequency_sweep import CMASweepData, DataManager_cma_sweep
 
-from backend.cma.mode_tracking import (
+from solver.cma.mode_tracking import (
     EVENT_AVOIDED_CROSSING, EVENT_DEGENERACY, EVENT_LOW_CORRELATION, EVENT_SWAP,
     ModeTracker, ModeTrackingResult, TECACorrection, TrackingParameters,
     correlation_matrix, get_correction, track_sweep,
@@ -502,8 +502,8 @@ ANTENNA_NAME = "unittest_cma_tracking_strip"
 def strip_path():
     """A tiny strip, coarse mesh so a real Z(f) sweep stays fast."""
     import gmsh
-    from backend.utils.file_path import setup_save_file_paths
-    from backend.utils.gmsh_function import setup_performance_config, generate_and_save_mesh
+    from solver.utils.file_path import setup_save_file_paths
+    from solver.utils.gmsh_function import setup_performance_config, generate_and_save_mesh
 
     path = setup_save_file_paths(ANTENNA_NAME)
     mm = 1e-3
@@ -532,7 +532,7 @@ def test_cma_frequency_sweep_tracks_a_real_structure(strip_path):
     round trip, and tracked eigenvalue curves that vary less step to step than
     the untracked ones wherever the labels move at all.
     """
-    from backend.cma.cma_frequency_sweep import cma_frequency_sweep
+    from solver.cma.cma_frequency_sweep import cma_frequency_sweep
 
     sweep = cma_frequency_sweep(strip_path, 300e6, 900e6, n_points=7, n_modes=4,
                                 use_gpu=False, write_report=True)

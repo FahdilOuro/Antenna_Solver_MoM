@@ -19,8 +19,8 @@ identically on a machine with or without a GPU.
 import numpy as np
 import pytest
 
-import backend.rwg.rwg3 as rwg3
-from backend.utils.compute_backend import (
+import solver.rwg.rwg3 as rwg3
+from solver.utils.compute_backend import (
     GPU_AVAILABLE, gpu_free_memory_bytes, gpu_has_headroom_for, gpu_runtime_errors,
 )
 

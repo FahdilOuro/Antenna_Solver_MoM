@@ -43,6 +43,13 @@ flowchart LR
 
 Note the CMA branch leaves the pipeline at the impedance matrix, *before* any excitation: characteristic modes depend on the geometry alone, so no feed or port is needed to compute them.
 
+### Repository Layout
+
+- `solver/` — the MoM solver, a Python package imported as `solver.*` (RWG pipeline, fields, CMA, optimisation tools, example notebooks).
+- `interface/` — the front end (user interface); see [`interface/README.md`](interface/README.md).
+- `test/` — test suite (`python -m pytest test/`).
+- `data/` — meshes and intermediate results.
+
 ### Data Files
 
 The antenna mesh data files should be placed in the data/antennas_mesh/ directory.
@@ -88,52 +95,52 @@ The antenna mesh data files should be placed in the data/antennas_mesh/ director
 
 ## Gallery
 
-All images below come straight out of the current solver, generated from the notebooks they're linked under (GPU-accelerated impedance assembly where the mesh is large enough — see `backend/utils/compute_backend.py`).
+All images below come straight out of the current solver, generated from the notebooks they're linked under (GPU-accelerated impedance assembly where the mesh is large enough — see `solver/utils/compute_backend.py`).
 
 ### 4-port circularly polarized CubeSat antenna
 
-Notebook: [`backend/antenna_simulation/Nice_Cube/Nice_Cube_radiation.ipynb`](backend/antenna_simulation/Nice_Cube/Nice_Cube_radiation.ipynb) — a CubeSat-shaped structure with 4 solar panels, each fed 90° out of phase to produce circular polarization (RHCP/LHCP).
+Notebook: [`solver/antenna_simulation/Nice_Cube/Nice_Cube_radiation.ipynb`](solver/antenna_simulation/Nice_Cube/Nice_Cube_radiation.ipynb) — a CubeSat-shaped structure with 4 solar panels, each fed 90° out of phase to produce circular polarization (RHCP/LHCP).
 
 <p align="center">
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/nice_cube_surface_current.png" width=48%>
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/nice_cube_gain_pattern_3d.png" width=48%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/plot_figures/nice_cube_surface_current.png" width=48%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/plot_figures/nice_cube_gain_pattern_3d.png" width=48%>
 </p>
 <p align="center">
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/nice_cube_rhcp_gain_3d.png" width=48%>
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/nice_cube_lhcp_gain_3d.png" width=48%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/plot_figures/nice_cube_rhcp_gain_3d.png" width=48%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/plot_figures/nice_cube_lhcp_gain_3d.png" width=48%>
 </p>
 <p align="center">
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/nice_cube_directivity_polar.png" width=38%>
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/nice_cube_s11_sweep.png" width=58%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/plot_figures/nice_cube_directivity_polar.png" width=38%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/plot_figures/nice_cube_s11_sweep.png" width=58%>
 </p>
 
 *Left to right, top to bottom: mesh + surface current at the 4 feed points; total 3D gain pattern; RHCP and LHCP gain patterns (the two lobes reflect the 4-port phasing); elevation/azimuth directivity cuts; S-parameters swept over the 4 ports.*
 
 ### Bowtie antenna
 
-Notebook: [`backend/antenna_simulation/radiation_antenna/bowtie_antenna.ipynb`](backend/antenna_simulation/radiation_antenna/bowtie_antenna.ipynb) — a classic single-feed bowtie, resonant near 75 MHz.
+Notebook: [`solver/antenna_simulation/radiation_antenna/bowtie_antenna.ipynb`](solver/antenna_simulation/radiation_antenna/bowtie_antenna.ipynb) — a classic single-feed bowtie, resonant near 75 MHz.
 
 <p align="center">
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/bowtie_surface_current.png" width=48%>
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/bowtie_gain_pattern_3d.png" width=48%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/plot_figures/bowtie_surface_current.png" width=48%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/plot_figures/bowtie_gain_pattern_3d.png" width=48%>
 </p>
 <p align="center">
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/bowtie_directivity_polar.png" width=38%>
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/bowtie_s11_sweep.png" width=58%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/plot_figures/bowtie_directivity_polar.png" width=38%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/plot_figures/bowtie_s11_sweep.png" width=58%>
 </p>
 
 *The S11 sweep dips below -10 dB around 65-105 MHz — a clean, well-matched resonance.*
 
 ### Multi-turn loop antenna
 
-Notebook: [`backend/antenna_simulation/radiation_antenna/loop4_antenna.ipynb`](backend/antenna_simulation/radiation_antenna/loop4_antenna.ipynb) — a small multi-turn loop (mesh translated directly from Makarov's original MATLAB book examples).
+Notebook: [`solver/antenna_simulation/radiation_antenna/loop4_antenna.ipynb`](solver/antenna_simulation/radiation_antenna/loop4_antenna.ipynb) — a small multi-turn loop (mesh translated directly from Makarov's original MATLAB book examples).
 
 <p align="center">
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/loop4_surface_current.png" width=48%>
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/loop4_gain_pattern_3d.png" width=48%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/plot_figures/loop4_surface_current.png" width=48%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/plot_figures/loop4_gain_pattern_3d.png" width=48%>
 </p>
 <p align="center">
-<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/plot_figures/loop4_directivity_polar.png" width=40%>
+<img src="https://github.com/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/plot_figures/loop4_directivity_polar.png" width=40%>
 </p>
 
 ## Characteristic Mode Analysis (CMA)
@@ -144,7 +151,7 @@ $$X \, J_n = \lambda_n \, R \, J_n$$
 
 The characteristic currents `J_n` are properties of the **geometry alone** — no feed, no excitation. They tell you *how a shape wants to radiate* before you decide where to put a port, which is what makes CMA a design tool rather than just an analysis one. A mode is resonant where `λ_n = 0`.
 
-Available from `backend/cma/`:
+Available from `solver/cma/`:
 
 | Quantity | Function |
 |---|---|
@@ -160,35 +167,35 @@ Validation: on a rectangular loop, the eigenvalue spectrum, the PSD structure of
 
 ### Rectangular loop antenna
 
-Notebook: [`backend/antenna_simulation/cma_implementation/loop_antenna.ipynb`](backend/antenna_simulation/cma_implementation/loop_antenna.ipynb) — a 480 × 240 mm rectangular loop (40 mm strip), analysed over 100–300 MHz.
+Notebook: [`solver/antenna_simulation/cma_implementation/loop_antenna.ipynb`](solver/antenna_simulation/cma_implementation/loop_antenna.ipynb) — a 480 × 240 mm rectangular loop (40 mm strip), analysed over 100–300 MHz.
 
 Characteristic currents of the first three modes. Black arrows show the direction the modal current flows in; colour is its magnitude.
 
 <p align="center">
-<img src="backend/antenna_simulation/plot_figures/cma_loop_mode1_current.png" width=32%>
-<img src="backend/antenna_simulation/plot_figures/cma_loop_mode2_current.png" width=32%>
-<img src="backend/antenna_simulation/plot_figures/cma_loop_mode3_current.png" width=32%>
+<img src="solver/antenna_simulation/plot_figures/cma_loop_mode1_current.png" width=32%>
+<img src="solver/antenna_simulation/plot_figures/cma_loop_mode2_current.png" width=32%>
+<img src="solver/antenna_simulation/plot_figures/cma_loop_mode3_current.png" width=32%>
 </p>
 
 The far field each of those modes radiates on its own:
 
 <p align="center">
-<img src="backend/antenna_simulation/plot_figures/cma_loop_mode1_farfield.png" width=32%>
-<img src="backend/antenna_simulation/plot_figures/cma_loop_mode2_farfield.png" width=32%>
-<img src="backend/antenna_simulation/plot_figures/cma_loop_mode3_farfield.png" width=32%>
+<img src="solver/antenna_simulation/plot_figures/cma_loop_mode1_farfield.png" width=32%>
+<img src="solver/antenna_simulation/plot_figures/cma_loop_mode2_farfield.png" width=32%>
+<img src="solver/antenna_simulation/plot_figures/cma_loop_mode3_farfield.png" width=32%>
 </p>
 
 ### Rectangular plate
 
-Notebook: [`backend/antenna_simulation/cma_implementation/plate_cma.ipynb`](backend/antenna_simulation/cma_implementation/plate_cma.ipynb) — an 80 × 40 mm plate at 1 GHz.
+Notebook: [`solver/antenna_simulation/cma_implementation/plate_cma.ipynb`](solver/antenna_simulation/cma_implementation/plate_cma.ipynb) — an 80 × 40 mm plate at 1 GHz.
 
 <p align="center">
-<img src="backend/antenna_simulation/plot_figures/cma_plate_mode1_current.png" width=48%>
-<img src="backend/antenna_simulation/plot_figures/cma_plate_mode2_current.png" width=48%>
+<img src="solver/antenna_simulation/plot_figures/cma_plate_mode1_current.png" width=48%>
+<img src="solver/antenna_simulation/plot_figures/cma_plate_mode2_current.png" width=48%>
 </p>
 <p align="center">
-<img src="backend/antenna_simulation/plot_figures/cma_plate_mode1_farfield.png" width=48%>
-<img src="backend/antenna_simulation/plot_figures/cma_plate_mode2_farfield.png" width=48%>
+<img src="solver/antenna_simulation/plot_figures/cma_plate_mode1_farfield.png" width=48%>
+<img src="solver/antenna_simulation/plot_figures/cma_plate_mode2_farfield.png" width=48%>
 </p>
 
 *Mode 1 concentrates its current along the two long edges, flowing in the same direction — the plate's dipole-like mode, and its far field is the matching donut, with the null along the current axis.*
@@ -198,7 +205,7 @@ Notebook: [`backend/antenna_simulation/cma_implementation/plate_cma.ipynb`](back
 Some notebooks in this project include dynamic Plotly outputs that may not render correctly on GitHub.
 To properly view them, please use [nbviewer](https://nbviewer.jupyter.org/) — for example, paste in:
 
-https://nbviewer.org/github/FahdilOuro/Antenna_Solver_MoM/blob/main/backend/antenna_simulation/Nice_Cube/Nice_Cube_radiation.ipynb
+https://nbviewer.org/github/FahdilOuro/Antenna_Solver_MoM/blob/main/solver/antenna_simulation/Nice_Cube/Nice_Cube_radiation.ipynb
 
 ## Tutorial
 

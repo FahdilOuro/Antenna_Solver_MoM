@@ -1,5 +1,5 @@
 """
-Tests for multiple_gap_sources (backend/utils/gap_source.py).
+Tests for multiple_gap_sources (solver/utils/gap_source.py).
 
 Context
 -------
@@ -28,7 +28,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from backend.utils.gap_source import multiple_gap_sources, GapSourceError
+from solver.utils.gap_source import multiple_gap_sources, GapSourceError
 
 
 def _make_mesh(tri_centers, edge_pairs, rho_plus, rho_minus, edge_lengths=None):
