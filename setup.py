@@ -1,35 +1,45 @@
-from setuptools import setup, find_packages, Extension
-from Cython.Build import cythonize
-import numpy as np
 import os
 
-# Search for all .pyx files in rwg/cython_rwg/
-cython_modules = []
-cython_dir = os.path.join("rwg", "cython_rwg")
+from setuptools import setup, find_namespace_packages, Extension
 
-for filename in os.listdir(cython_dir):
-    if filename.endswith(".pyx"):
-        module_name = f"rwg.cython_rwg.{filename[:-4]}"  # Example: rwg.cython_rwg.rwg1
-        file_path = os.path.join(cython_dir, filename)
-        cython_modules.append(
+# Optional Cython acceleration layer.
+#
+# Every .pyx file in solver/rwg/cython_rwg/ is compiled as an extension module
+# (e.g. solver/rwg/cython_rwg/kernel.pyx -> solver.rwg.cython_rwg.kernel).
+# That folder does not exist yet, and nothing in the solver depends on it, so
+# the package installs as pure Python and Cython is only needed once .pyx files
+# are added:
+#     python setup.py build_ext --inplace
+cython_dir = os.path.join("solver", "rwg", "cython_rwg")
+pyx_files = sorted(f for f in os.listdir(cython_dir) if f.endswith(".pyx")) if os.path.isdir(cython_dir) else []
+
+ext_modules = []
+if pyx_files:
+    import numpy as np
+    from Cython.Build import cythonize
+
+    ext_modules = cythonize(
+        [
             Extension(
-                module_name,
-                [file_path],
+                "solver.rwg.cython_rwg." + f[:-4],
+                [os.path.join(cython_dir, f)],
                 include_dirs=[np.get_include()],
             )
-        )
+            for f in pyx_files
+        ],
+        compiler_directives={"language_level": "3"},
+    )
 
 setup(
     name='Antenna_Solver_MoM',
     version='1.1.0',
-    packages=find_packages(),
-    ext_modules=cythonize(
-        cython_modules,
-        compiler_directives={"language_level": "3"}
+    # solver/ has no __init__.py (namespace package), hence find_namespace_packages.
+    # The example notebooks, their data and the profiling scripts are not part of
+    # the installed package.
+    packages=find_namespace_packages(
+        include=["solver", "solver.*"],
+        exclude=["solver.antenna_simulation", "solver.antenna_simulation.*",
+                 "solver.performance", "solver.performance.*", "*.__pycache__"],
     ),
-    include_dirs=[np.get_include()],
+    ext_modules=ext_modules,
 )
-
-# To compile the Cython extensions, you can use the following command:
-# python setup.py build_ext --inplace
-# Make sure Cython is installed in your Python environment.

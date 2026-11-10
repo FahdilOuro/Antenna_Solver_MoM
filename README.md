@@ -84,14 +84,14 @@ The antenna mesh data files should be placed in the data/antennas_mesh/ director
         ```bash
         pip install -r requirements.txt
         ```
-    - Alternatively, you can install the project and dependencies in editable mode with:
+    - Then install the `solver` package itself in editable mode, so that `import solver` works from any directory (the example notebooks need it):
         ```bash
         pip install -e .
         ```
 
-5. **Explore the example scripts**:
+5. **Explore the example notebooks**:
 
-    Explore the example scripts in the `examples` folder to learn how to use the solver for different antenna designs.
+    Explore the Jupyter notebooks in [`solver/antenna_simulation/`](solver/antenna_simulation/) (one folder per topic: radiation, scattering, CMA, gap sources, frequency sweeps, ...) to learn how to use the solver for different antenna designs. Paths such as `data/gmsh_files/` are relative to the working directory, so a notebook run from its own folder reads and writes the `data/` folder next to it.
 
 ## Gallery
 

@@ -1,43 +1,26 @@
-import sys
-from pathlib import Path
-from PySide6.QtGui import QGuiApplication
-from PySide6.QtQml import QQmlApplicationEngine
-from PySide6.QtCore import QUrl
+"""
+Entry point of Antenna Solver MoM.
 
-# Import controllers
-from frontend.controllers.project_manager import ProjectManager
+There is no graphical interface yet: the front end will live in interface/
+(see interface/README.md). The previous Qt/QML entry point imported a
+`frontend` package that no longer exists; it is kept in the git history
+(commit 8704b65) for when the interface is built.
+
+The solver is used from Python, typically in a Jupyter notebook:
+
+    from solver.utils.file_path import setup_save_file_paths
+    from solver.src.radiation_algorithm.radiation_algorithm import radiation_algorithm
+
+    path = setup_save_file_paths("my_antenna")      # expects data/gmsh_files/my_antenna.msh
+    radiation_algorithm(path, frequency=75e6, feed_point=[0, 0, 0],
+                        excitation_unit_vector='y', gap_width=0.05)
+
+Examples: solver/antenna_simulation/ (one notebook per antenna).
+"""
 
 
 def main():
-    """
-    Main entry point for the Method of Moments solver application.
-    Initializes Qt application, registers QML types, and loads the main QML window.
-    """
-    # Create Qt application instance
-    app = QGuiApplication(sys.argv)
-    app.setOrganizationName("MoMSolver")
-    app.setApplicationName("Method of Moments Solver")
-    
-    # Create QML engine
-    engine = QQmlApplicationEngine()
-    
-    # Create and register ProjectManager controller
-    project_manager = ProjectManager()
-    engine.rootContext().setContextProperty("projectManager", project_manager)
-    
-    # Get the path to the main QML file
-    qml_file = Path(__file__).resolve().parent / "frontend" / "qml" / "MainWindow.qml"
-    
-    # Load the main QML file
-    engine.load(QUrl.fromLocalFile(str(qml_file)))
-    
-    # Check if QML loaded successfully
-    if not engine.rootObjects():
-        print("Error: Failed to load QML file")
-        sys.exit(-1)
-    
-    # Execute the application
-    sys.exit(app.exec())
+    print(__doc__)
 
 
 if __name__ == "__main__":
