@@ -1,0 +1,5 @@
+# Build output and the local build environment (see README.md)
+_build/
+.venv/
+source/api/generated/
+.ipynb_checkpoints/

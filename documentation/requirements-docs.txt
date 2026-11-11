@@ -1,0 +1,21 @@
+# Tools needed to BUILD the documentation website (not to run the solver).
+# Install them in their own environment, see documentation/README.md.
+#
+# Versions are pinned so that a build today and a build in two years give the
+# same site. Each pin was at least two weeks old when chosen (2026-11-11).
+
+# --- Site generator, Markdown, theme ---------------------------------------
+sphinx==9.1.1
+myst-parser==5.1.0             # Markdown (MyST) instead of reStructuredText
+pydata-sphinx-theme==0.23.0    # layout used by NumPy and SciPy
+sphinx-design==0.7.0           # cards, grids, badges, tabs
+sphinx-copybutton==0.5.2       # "copy" button on code blocks
+sphinxcontrib-bibtex==2.7.0    # citations from source/references.bib
+
+# --- Imported by autodoc to read the solver's docstrings --------------------
+# Same versions as the antenna_solver environment the solver is developed in.
+# gmsh and cupy are NOT installed: conf.py mocks them (autodoc_mock_imports).
+numpy==2.1.3
+scipy==1.14.1
+matplotlib==3.9.4
+plotly==6.2.0

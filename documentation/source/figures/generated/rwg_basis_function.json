@@ -1,0 +1,52 @@
+{
+  "figure": "rwg_basis_function.svg",
+  "notebook": "documentation/figure_notebooks/theory_rwg_basis_function.ipynb",
+  "solver_commit": "7c348a7",
+  "generated": "2026-11-11",
+  "solver_calls": [
+    "solver.rwg.rwg1.Triangles.get_edges",
+    "solver.rwg.rwg1.filter_complexes_jonctions",
+    "solver.rwg.rwg2.Vecteurs_Rho.calculate_vecteurs_rho"
+  ],
+  "mesh": {
+    "plate_m": [
+      0.1,
+      0.06
+    ],
+    "element_size_m": 0.02,
+    "triangles": 42,
+    "rwg_functions": 55
+  },
+  "edge_index": 47,
+  "checks": {
+    "rho_plus_equals_centroid_minus_free_vertex": true,
+    "rho_minus_equals_free_vertex_minus_centroid": true,
+    "normal_component_on_edge_n_from_Tplus": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "normal_component_on_edge_n_from_Tminus": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "max_normal_component_on_outer_edges": 3.3306690738754696e-16,
+    "divergence_Tplus_numeric_vs_l_over_A": [
+      150.2397636341267,
+      150.23976363288958
+    ],
+    "divergence_Tminus_numeric_vs_minus_l_over_A": [
+      -150.23976363745788,
+      -150.2397636328897
+    ]
+  }
+}

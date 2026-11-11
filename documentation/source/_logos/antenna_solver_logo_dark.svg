@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Antenna Solver MoM</title>
+  <desc id="desc">Two joined RWG triangles with a current arrow crossing their common edge.</desc>
+  <defs>
+    <clipPath id="mark">
+      <path d="M32 5.5 58 32 32 58.5 6 32Z"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#mark)">
+    <path d="M6 32 32 5.5V58.5Z" fill="#79B5FF"/>
+    <path d="M32 5.5 58 32 32 58.5Z" fill="#F2AA68"/>
+    <path d="M32 5.5V58.5" fill="none" stroke="#D9E6F5" stroke-width="1.8"/>
+    <path d="M14.5 32H45" fill="none" stroke="#101D2E" stroke-width="4.2" stroke-linecap="round"/>
+    <path d="m39.5 24.8 9 7.2-9 7.2" fill="none" stroke="#101D2E" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <path d="M32 5.5 58 32 32 58.5 6 32Z" fill="none" stroke="#D9E6F5" stroke-width="2.2" stroke-linejoin="round"/>
+</svg>

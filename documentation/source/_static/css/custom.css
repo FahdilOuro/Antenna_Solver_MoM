@@ -1,0 +1,446 @@
+/* ==========================================================================
+   Antenna Solver MoM - visual identity on top of pydata-sphinx-theme.
+
+   1. Fonts            Iosevka, self-hosted (_static/fonts/iosevka, OFL 1.1)
+   2. Colours          from the logo: blue = T+, amber = T- of an RWG pair
+   3. Interaction      large targets (>= 44 x 44 px), subtle "floating" hover
+   4. Landing page     hero, pipeline diagram
+   5. Content          admonitions, status line, generated figures, tables
+   ========================================================================== */
+
+
+/* --- 1. Fonts ------------------------------------------------------------- */
+
+@font-face {
+  font-family: "Iosevka";
+  src: url("../fonts/iosevka/iosevka-latin-400-normal.woff2") format("woff2");
+  font-weight: 100 549;           /* regular face serves the light/regular range */
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Iosevka";
+  src: url("../fonts/iosevka/iosevka-latin-400-italic.woff2") format("woff2");
+  font-weight: 100 549;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Iosevka";
+  src: url("../fonts/iosevka/iosevka-latin-700-normal.woff2") format("woff2");
+  font-weight: 550 900;           /* the theme's semibold headings (600) use the bold face */
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Iosevka";
+  src: url("../fonts/iosevka/iosevka-latin-700-italic.woff2") format("woff2");
+  font-weight: 550 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  /* Base text size. 12pt = 16px on screen. Every size of the theme is in rem,
+     so this one value scales the whole site. */
+  --mom-font-size: 12pt;
+  --mom-font-stack: "Iosevka", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --pst-font-family-base: var(--mom-font-stack);
+  --pst-font-family-heading: var(--mom-font-stack);
+  --pst-font-family-monospace: var(--mom-font-stack);
+}
+html {
+  font-size: var(--mom-font-size);
+}
+
+
+/* --- 2. Colours (each has a light and a dark value) ------------------------ */
+
+html[data-theme="light"] {
+  --pst-color-primary: #2563a6;          /* logo blue (T+) */
+  --pst-color-primary-bg: #e4eefa;
+  --pst-color-secondary: #a85a12;        /* logo amber, darkened to stay readable as text */
+  --pst-color-secondary-bg: #fbeedf;
+  --pst-color-link: #2563a6;
+  --pst-color-link-hover: #a85a12;
+  --mom-tplus: #2563a6;
+  --mom-tminus: #e28a36;                 /* logo amber (T-), for graphics only */
+  --mom-hover-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --mom-focus: #2563a6;
+}
+
+html[data-theme="dark"] {
+  --pst-color-primary: #79b5ff;
+  --pst-color-primary-bg: #15263c;
+  --pst-color-secondary: #f2aa68;
+  --pst-color-secondary-bg: #33240f;
+  --pst-color-link: #79b5ff;
+  --pst-color-link-hover: #f2aa68;
+  --mom-tplus: #79b5ff;
+  --mom-tminus: #f2aa68;
+  /* A 4 % black shadow is invisible on a dark page: same offset and blur,
+     more opacity, so that the elevation reads the same in both themes. */
+  --mom-hover-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --mom-focus: #79b5ff;
+}
+
+
+/* --- 3. Interaction --------------------------------------------------------
+
+   Rules applied everywhere:
+   - every navigation target is at least 44 x 44 px (WCAG 2.5.5); links inside
+     a sentence are the exception the guideline allows, but small inline
+     targets (footnote marks) get an invisible enlarged hit area;
+   - a clickable block reacts as a whole: lift of 2 px + light shadow;
+   - transitions last 180 ms (perceived as instantaneous);
+   - nothing moves for visitors who ask for reduced motion.
+   ------------------------------------------------------------------------- */
+
+:root {
+  --mom-target: 44px;
+  --mom-motion: 180ms;
+  --mom-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Header: navigation links and icon buttons */
+.bd-header .navbar-nav .nav-link,
+.bd-header .navbar-nav .dropdown-toggle {
+  min-height: var(--mom-target);
+  display: flex;
+  align-items: center;
+}
+.bd-header .navbar-header-items__end button,
+.bd-header .navbar-header-items__end a,
+.bd-header .navbar-persistent--container button,
+.bd-header .navbar-persistent--mobile button,
+.bd-header .primary-toggle,
+.bd-header .secondary-toggle {
+  min-width: var(--mom-target);
+  min-height: var(--mom-target);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Left navigation, page table of contents, "Edit on GitHub", breadcrumbs */
+.bd-sidenav a,
+.bd-toc-nav a,
+.editthispage a,
+.bd-sidebar-primary .sidebar-primary-item a,
+.bd-breadcrumbs a {
+  min-height: var(--mom-target);
+  display: flex;
+  align-items: center;
+}
+.bd-breadcrumbs a {
+  display: inline-flex;
+}
+
+/* Previous / next page: one large block each */
+.prev-next-area a {
+  min-height: calc(var(--mom-target) * 1.5);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  transition: background-color var(--mom-motion) var(--mom-ease);
+}
+.prev-next-area a:hover {
+  background-color: var(--pst-color-primary-bg);
+}
+
+/* Copy button of code blocks */
+button.copybtn {
+  width: var(--mom-target);
+  height: var(--mom-target);
+}
+
+/* Footnote marks [1]: larger invisible hit area, no layout change */
+a.footnote-reference {
+  padding: 0.6em 0.35em;
+  margin: -0.6em -0.15em;
+}
+
+/* Cards: a clickable card floats as one block (title, text and image) */
+.sd-card {
+  border-radius: 0.6rem;
+  transition:
+    transform var(--mom-motion) var(--mom-ease),
+    box-shadow var(--mom-motion) var(--mom-ease),
+    border-color var(--mom-motion) var(--mom-ease);
+}
+.sd-card:has(.sd-stretched-link) {
+  min-height: var(--mom-target);
+  cursor: pointer;
+}
+/* Flat at rest (sphinx-design adds a permanent shadow), elevated on hover */
+.sd-card.sd-shadow-sm,
+.sd-card {
+  box-shadow: none !important;
+}
+.sd-card:has(.sd-stretched-link):hover,
+.sd-card:has(.sd-stretched-link:focus-visible) {
+  transform: translateY(-2px);
+  box-shadow: var(--mom-hover-shadow) !important;
+  border-color: var(--pst-color-primary);
+}
+.sd-card:has(.sd-stretched-link) .sd-card-title {
+  transition: color var(--mom-motion) var(--mom-ease);
+}
+.sd-card:has(.sd-stretched-link):hover .sd-card-title,
+.sd-card:has(.sd-stretched-link:focus-visible) .sd-card-title {
+  color: var(--pst-color-primary);
+}
+.sd-card:has(.sd-stretched-link:focus-visible) {
+  outline: 3px solid var(--mom-focus);
+  outline-offset: 3px;
+}
+.sd-stretched-link:focus-visible {
+  outline: none;              /* the whole card shows the focus instead */
+}
+
+/* Hero buttons */
+.mom-hero .mom-actions a {
+  min-height: var(--mom-target);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  transition:
+    transform var(--mom-motion) var(--mom-ease),
+    box-shadow var(--mom-motion) var(--mom-ease),
+    border-color var(--mom-motion) var(--mom-ease);
+}
+.mom-hero .mom-actions a:hover,
+.mom-hero .mom-actions a:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: var(--mom-hover-shadow);
+}
+.mom-hero .mom-actions a:focus-visible {
+  outline: 3px solid var(--mom-focus);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sd-card,
+  .mom-hero .mom-actions a,
+  .mom-pipeline .box,
+  figure.mom-generated {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+
+/* --- 4. Landing page ------------------------------------------------------ */
+
+.mom-hero {
+  padding: 2.5rem 0 1.5rem;
+  border-bottom: 1px solid var(--pst-color-border);
+  margin-bottom: 2rem;
+}
+.mom-hero .mom-tagline {
+  font-size: 1.15rem;
+  color: var(--pst-color-text-muted);
+  max-width: 46rem;
+  margin: 0 0 1.4rem;
+}
+.mom-hero .mom-actions a {
+  margin: 0 0.5rem 0.6rem 0;
+  border-radius: 0.5rem;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid var(--pst-color-primary);
+}
+.mom-hero .mom-actions a.mom-primary {
+  background: var(--pst-color-primary);
+  color: var(--pst-color-background);
+}
+.mom-hero .mom-actions a.mom-secondary {
+  color: var(--pst-color-primary);
+}
+
+/* Pipeline diagram (inline SVG, every box is a link) */
+.mom-pipeline {
+  margin: 1rem 0 2rem;
+}
+.mom-pipeline svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  font-family: var(--mom-font-stack);
+  overflow: visible;
+}
+.mom-pipeline a,
+.mom-pipeline a text {
+  text-decoration: none !important;
+}
+.mom-pipeline a:focus {
+  outline: none;
+}
+.mom-pipeline .box {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    transform var(--mom-motion) var(--mom-ease),
+    filter var(--mom-motion) var(--mom-ease);
+}
+.mom-pipeline .box rect {
+  fill: var(--pst-color-surface);
+  stroke: var(--pst-color-border);
+  stroke-width: 1.5;
+  transition: fill var(--mom-motion) var(--mom-ease), stroke var(--mom-motion) var(--mom-ease);
+}
+.mom-pipeline .box.core rect {
+  stroke: var(--pst-color-primary);
+}
+.mom-pipeline .box.branch rect {
+  stroke: var(--mom-tminus);
+  stroke-dasharray: 5 3;
+}
+.mom-pipeline a:hover .box,
+.mom-pipeline a:focus-visible .box {
+  transform: translateY(-2px);
+  filter: drop-shadow(var(--mom-pipeline-shadow, 0 2px 4px rgba(0, 0, 0, 0.06)));
+}
+html[data-theme="dark"] .mom-pipeline {
+  --mom-pipeline-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+.mom-pipeline a:hover .box rect,
+.mom-pipeline a:focus-visible .box rect {
+  fill: var(--pst-color-primary-bg);
+}
+.mom-pipeline a:focus-visible .box rect {
+  stroke-width: 3;
+}
+.mom-pipeline .title {
+  fill: var(--pst-color-text-base);
+  font-weight: 700;
+  font-size: 18px;
+}
+.mom-pipeline .sub {
+  fill: var(--pst-color-text-muted);
+  font-size: 15px;
+}
+.mom-pipeline .flow {
+  stroke: var(--pst-color-text-muted);
+  stroke-width: 1.6;
+  fill: none;
+}
+.mom-pipeline .flow.branch {
+  stroke: var(--mom-tminus);
+  stroke-dasharray: 5 3;
+}
+.mom-pipeline .head {
+  fill: var(--pst-color-text-muted);
+}
+.mom-pipeline .head.branch {
+  fill: var(--mom-tminus);
+}
+.mom-pipeline .caption {
+  fill: var(--pst-color-text-muted);
+  font-size: 15px;
+  font-style: italic;
+}
+
+
+/* --- 5. Content ----------------------------------------------------------- */
+
+/* Admonitions: general theory vs. what this solver implements */
+.admonition.in-solver,
+div.admonition.in-solver {
+  border-color: var(--pst-color-primary);
+}
+.admonition.in-solver > .admonition-title {
+  background-color: var(--pst-color-primary-bg);
+}
+.admonition.in-solver > .admonition-title::after {
+  color: var(--pst-color-primary);
+  content: "\f121";   /* code icon */
+}
+.admonition.theory,
+div.admonition.theory {
+  border-color: var(--mom-tminus);
+}
+.admonition.theory > .admonition-title {
+  background-color: var(--pst-color-secondary-bg);
+}
+.admonition.theory > .admonition-title::after {
+  color: var(--mom-tminus);
+  content: "\f02d";   /* book icon */
+}
+
+/* Page status line */
+.mom-status {
+  margin: -0.4rem 0 1.4rem;
+  font-size: 0.9rem;
+  color: var(--pst-color-text-muted);
+}
+
+/* Figures generated by the solver.
+   The whole figure (image + caption) is one clickable block that opens the
+   full-size image: the image link is stretched over the figure, and the links
+   inside the caption stay on top of it. */
+figure.mom-generated {
+  position: relative;
+  padding: 0.75rem;
+  border: 1px solid var(--pst-color-border);
+  border-radius: 0.6rem;
+  transition:
+    transform var(--mom-motion) var(--mom-ease),
+    box-shadow var(--mom-motion) var(--mom-ease),
+    border-color var(--mom-motion) var(--mom-ease);
+}
+figure.mom-generated:has(a.image-reference) {
+  cursor: zoom-in;
+}
+figure.mom-generated a.image-reference::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 0.6rem;
+}
+figure.mom-generated figcaption a {
+  position: relative;
+  z-index: 1;
+}
+figure.mom-generated:has(a.image-reference):hover,
+figure.mom-generated:has(a.image-reference:focus-visible) {
+  transform: translateY(-2px);
+  box-shadow: var(--mom-hover-shadow);
+  border-color: var(--pst-color-primary);
+}
+figure.mom-generated a.image-reference:focus-visible {
+  outline: none;
+}
+figure.mom-generated:has(a.image-reference:focus-visible) {
+  outline: 3px solid var(--mom-focus);
+  outline-offset: 3px;
+}
+/* Matplotlib figures are drawn on white: keep them on white in dark mode,
+   and undo the dimming the theme applies to images (their colours carry
+   meaning, e.g. T+ blue / T- amber). */
+figure.mom-generated img {
+  background: #ffffff;
+  border-radius: 0.4rem;
+  padding: 0.5rem;
+}
+html[data-theme="dark"] .mom-generated img {
+  filter: none !important;
+}
+.mom-provenance {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--pst-color-text-muted);
+  margin-top: 0.3rem;
+}
+
+/* Long function names in the "On this page" column wrap instead of overflowing */
+.bd-toc-nav code,
+.bd-sidebar-secondary code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Symbol tables */
+table.mom-symbols td:first-child {
+  white-space: nowrap;
+}
