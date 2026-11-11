@@ -117,9 +117,11 @@ def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=Fa
     """
     Generates a modern and professional polar plot of the antenna directivity pattern.
     
-    This function processes MoM simulation data to visualize the radiation intensity 
-    in the Phi = 0° and Phi = 90° planes with enhanced aesthetics. The 90° angle 
-    is positioned at the top of the plot for specific visualization requirements.
+    This function processes MoM simulation data to visualize the radiation intensity
+    in two cuts, on a circle of radius 100 m:
+      * the YZ plane (phi = 90°), plotted against the angle measured from +y towards +z;
+      * the XY plane (theta = 90°), plotted against phi (from +x towards +y).
+    The 90° angle is positioned at the top of the plot.
 
     Parameters:
         path (Namespace): Object containing file paths (mesh, current, gain_power).
@@ -154,8 +156,8 @@ def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=Fa
     points_yz = compute_circle_points(radius, points_count, plane="yz")
     points_xy = compute_circle_points(radius, points_count, plane="xy")
     
-    polar_0 = compute_polar(points_yz, points_count, eta, complex_k, dipole_moment, dipole_center, total_power)
-    polar_90 = compute_polar(points_xy, points_count, eta, complex_k, dipole_moment, dipole_center, total_power)
+    polar_yz = compute_polar(points_yz, points_count, eta, complex_k, dipole_moment, dipole_center, total_power)
+    polar_xy = compute_polar(points_xy, points_count, eta, complex_k, dipole_moment, dipole_center, total_power)
     
     if show or save_image:
         # Style configuration
@@ -170,8 +172,9 @@ def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=Fa
         ax.set_theta_direction(1) # Counter-clockwise
 
         # Plot data with vibrant colors
-        ax.plot(theta, polar_0, color='#FF5733', label=r'Elevation Plane $\phi = 0^\circ$ (YZ)', linewidth=2.5)
-        ax.plot(theta, polar_90, color='#3357FF', label=r'Azimuth Plane $\Theta = 90^\circ$ (XY)', linewidth=2.5, linestyle='--')
+        # The YZ plane is phi = 90° in spherical coordinates (the XZ plane is phi = 0°).
+        ax.plot(theta, polar_yz, color='#FF5733', label=r'Elevation Plane $\phi = 90^\circ$ (YZ)', linewidth=2.5)
+        ax.plot(theta, polar_xy, color='#3357FF', label=r'Azimuth Plane $\theta = 90^\circ$ (XY)', linewidth=2.5, linestyle='--')
         
         # Grid and Ticks
         # Set ticks every 30 degrees
@@ -198,7 +201,10 @@ def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=Fa
 
 def antenna_circular_directivity_pattern(path, polar_type='RHCP', mode='radiation', show=True, save_image=False):
     """
-    Generates a polar plot for RHCP or LHCP directivity pattern in Phi=0 and Phi=90 planes.
+    Generates a polar plot of the RHCP or LHCP partial directivity in two cuts, on a
+    circle of radius 100 m:
+      * the YZ plane (phi = 90°), plotted against the angle measured from +y towards +z;
+      * the XZ plane (phi = 0°), plotted against the angle measured from +x towards +z.
     """
     print(f"--- GENERATING {polar_type} POLAR PATTERN ---")
 
@@ -215,13 +221,13 @@ def antenna_circular_directivity_pattern(path, polar_type='RHCP', mode='radiatio
     radius = 100
     theta_axis = np.linspace(0, 2 * np.pi, points_count)
     
-    points_yz = compute_circle_points(radius, points_count, plane="yz") # Phi = 0°
-    points_xz = compute_circle_points(radius, points_count, plane="xz") # Phi = 90°
+    points_yz = compute_circle_points(radius, points_count, plane="yz") # Phi = 90°
+    points_xz = compute_circle_points(radius, points_count, plane="xz") # Phi = 0°
 
     # 3. Compute polar data in dBic
-    polar_0 = compute_circular_polar(points_yz, points_count, eta, complex_k, 
-                                     dipole_moment, dipole_center, total_power, polar_type)
-    polar_90 = compute_circular_polar(points_xz, points_count, eta, complex_k, 
+    polar_yz = compute_circular_polar(points_yz, points_count, eta, complex_k,
+                                      dipole_moment, dipole_center, total_power, polar_type)
+    polar_xz = compute_circular_polar(points_xz, points_count, eta, complex_k,
                                       dipole_moment, dipole_center, total_power, polar_type)
 
     # 4. Visualization
@@ -240,10 +246,10 @@ def antenna_circular_directivity_pattern(path, polar_type='RHCP', mode='radiatio
 
         # Plotting
         color = '#FF5733' if polar_type == 'RHCP' else '#3357FF'
-        ax.plot(theta_axis, polar_0, color=color, linewidth=2.5,
-                label=rf'{polar_type} - Plane $\phi = 0^\circ$ (YZ)')
-        ax.plot(theta_axis, polar_90, color=color, linewidth=2, linestyle='--', 
-                label=rf'{polar_type} - Plane $\phi = 90^\circ$ (XZ)')
+        ax.plot(theta_axis, polar_yz, color=color, linewidth=2.5,
+                label=rf'{polar_type} - Plane $\phi = 90^\circ$ (YZ)')
+        ax.plot(theta_axis, polar_xz, color=color, linewidth=2, linestyle='--',
+                label=rf'{polar_type} - Plane $\phi = 0^\circ$ (XZ)')
 
         # Grid and Labels
         ax.set_thetagrids(np.arange(0, 360, 30))

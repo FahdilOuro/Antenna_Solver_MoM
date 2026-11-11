@@ -168,10 +168,17 @@ def compute_circular_components(e_theta, e_phi):
         
     Notes
     -----
-    The phase difference (delta_phi = phase_phi - phase_theta) determines 
-    the polarization:
-    - If delta_phi = +90 deg: The wave is purely RHCP.
-    - If delta_phi = -90 deg: The wave is purely LHCP.
+    For |E_theta| = |E_phi|, the phase difference
+    delta_phi = phase(E_phi) - phase(E_theta) determines the polarization:
+
+    - delta_phi = -90 deg (E_phi = -j E_theta): the wave is purely RHCP
+      (lhcp = 0).
+    - delta_phi = +90 deg (E_phi = +j E_theta): the wave is purely LHCP
+      (rhcp = 0).
+
+    Check: at theta = 0 (theta_hat = x, phi_hat = y, propagation along +z),
+    E = x - j y gives the real field x cos(wt) + y sin(wt), which rotates
+    from x to y, i.e. clockwise for an observer looking along +z: RHCP.
     """
     # Constant for normalization
     inv_sqrt2 = 1.0 / np.sqrt(2)
