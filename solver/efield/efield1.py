@@ -9,6 +9,30 @@ from solver.rwg.rwg2 import DataManager_rwg2
 from solver.rwg.rwg4 import DataManager_rwg4
 from solver.utils.dipole_parameters import *
 
+
+def compute_rcs(e_scattered, distance, polarization):
+    """
+    Radar cross section at a finite distance:
+
+        RCS = 4 pi r^2 |E_s|^2 / |E_0|^2      (m^2)
+
+    Parameters:
+        * e_scattered : (3,) complex, scattered electric field at the observation point (V/m).
+        * distance : float, distance r from the origin to the observation point (m).
+        * polarization : (3,) real or complex, the incident field vector E_0 given to the
+          scattering solve (scattering_algorithm / rwg4.calculate_current_scattering use it
+          as is, without normalising it, so |E_0| is its norm, in V/m).
+
+    The incident power density is |E_0|^2 / (2 eta) and the scattered one |E_s|^2 / (2 eta),
+    so the ratio does not depend on the amplitude chosen for the incident wave.
+    """
+    e0_squared = float(np.sum(np.abs(np.asarray(polarization)) ** 2))
+    if e0_squared == 0.0:
+        raise ValueError("The incident field vector (polarization) is zero: the RCS is undefined.")
+    es_squared = float(np.sum(np.abs(np.asarray(e_scattered)) ** 2))
+    return 4 * np.pi * distance ** 2 * es_squared / e0_squared
+
+
 def calculate_electric_magnetic_field_at_point(path, observation_point, mode='radiation'):
     """
         Calculate and display electric fields, magnetic fields, Poynting vector, energy, and Radar Cross Section (RCS)
@@ -41,8 +65,9 @@ def calculate_electric_magnetic_field_at_point(path, observation_point, mode='ra
     # 1. Load mesh and current data from MAT files
     _, triangles, edges, *_ = DataManager_rwg2.load_data(path.mat_mesh2)
 
+    polarization = None
     if mode == 'scattering':
-        frequency, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(path.mat_current, scattering=True)
+        frequency, omega, _, _, light_speed_c, eta, _, polarization, _, current = DataManager_rwg4.load_data(path.mat_current, scattering=True)
     elif mode == 'radiation':
         frequency, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(path.mat_current, radiation=True)
     else:
@@ -94,10 +119,9 @@ def calculate_electric_magnetic_field_at_point(path, observation_point, mode='ra
 
     # Radar Cross Section (RCS) is a measure of an object's ability to reflect or scatter electromagnetic waves.
     # It is mainly used in radar applications to describe the apparent scale of the object in radar scattering terms.
-    # 10. Compute Radar Cross Section (RCS)
-    e_field_dot_conj = np.sum(np.real(e_field_total * np.conj(e_field_total)))
+    # 10. Compute Radar Cross Section (RCS), normalised by the incident field |E_0|^2
     if mode == 'scattering':
-        rcs = 4 * np.pi * (norm_observation_point ** 2) * e_field_dot_conj
+        rcs = compute_rcs(e_field_total, norm_observation_point, polarization)
 
         print('')
         print(f"RCS = {rcs}")
@@ -120,8 +144,9 @@ def analyze_point_fields_polarization(path, observation_point, mode='radiation')
     # 1. Load mesh and current data from MAT files
     _, triangles, edges, *_ = DataManager_rwg2.load_data(path.mat_mesh2)
 
+    polarization = None
     if mode == 'scattering':
-        _, omega, _, _, light_speed_c, eta, _, _, _, current = DataManager_rwg4.load_data(path.mat_current, scattering=True)
+        _, omega, _, _, light_speed_c, eta, _, polarization, _, current = DataManager_rwg4.load_data(path.mat_current, scattering=True)
     elif mode == 'radiation':
         _, omega, _, _, light_speed_c, eta, _, current, *_ = DataManager_rwg4.load_data(path.mat_current, radiation=True)
     else:
@@ -198,8 +223,7 @@ def analyze_point_fields_polarization(path, observation_point, mode='radiation')
     print(f"  Intensity (u)         : {u:.5e} W/sr")
 
     if mode == 'scattering':
-        e_dot_conj = np.sum(np.real(e_field_total * np.conj(e_field_total)))
-        rcs = 4 * np.pi * (r ** 2) * e_dot_conj
+        rcs = compute_rcs(e_field_total, r, polarization)
         print(f"\n[Radar Cross Section]")
         print(f"  RCS : {rcs:.5e} m²")
     

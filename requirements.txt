@@ -17,6 +17,12 @@ kaleido>=0.2.0        # Static plotly exports (PNG, PDF) used by radiation_algor
 gmsh>=4.8.0            # Mesh generation / .msh <-> .mat conversion (solver/utils/gmsh_function.py)
 
 # =============================================
+# Optimisation
+# =============================================
+scikit-learn>=1.0      # Gaussian-process regression of the Bayesian outer loop
+                       # (solver/optim/outer.py, BayesianOptimizer); tested with 1.9.1
+
+# =============================================
 # Testing
 # =============================================
 pytest>=7.0.0           # Test suite: `python -m pytest test/` and solver/**/tests/ (see CLAUDE.md)
