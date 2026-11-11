@@ -440,8 +440,11 @@ html[data-theme="dark"] .mom-generated img {
   overflow-wrap: anywhere;
 }
 
-/* Long code names inside table cells wrap instead of being cut off
-   (Sphinx puts inline code in span.pre, which forbids line breaks) */
+/* Long inline code names (in text and tables) wrap instead of overflowing the
+   column (Sphinx puts inline code in span.pre, which forbids line breaks).
+   Code blocks (pre) are not affected. */
+.bd-content code.literal,
+.bd-content code.literal span.pre,
 .bd-content table code,
 .bd-content table code span.pre {
   white-space: normal;

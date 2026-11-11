@@ -1,22 +1,243 @@
 # Excitations and input impedance
 
 {.mom-status}
-{bdg-secondary-line}`Planned` Outline of a future page.
+{bdg-info}`Draft` Written from `solver/utils/gap_source.py`, `solver/rwg/rwg4.py`, `solver/rwg/rwg3.py` and `solver/utils/gmsh_function.py` at commit `935470d`, awaiting review.
 
-The right-hand side $V$ of $Z I = V$: how a feed or an incident wave enters the system, and how
-the input impedance and power are read from the solution.
+The right-hand side $V$ of $Z\,I = V$ is the incident field tested by the RWG functions,
+$V_m = \int_S \mathbf f_m\cdot\mathbf E^i\,dS$ ({eq}`eq-vm`). This page describes the three ways the
+solver builds it (a voltage across a gap, an incident plane wave, lumped loads that modify $Z$), and
+how the input impedance and power of a port are read from the solution.
 
-**This page will cover**
+## The idea
 
-- The gap source of `solver.utils.gap_source.multiple_gap_sources` (enhanced gap model, Ding et al.
-  2013, eq. 7, as cited in the code): window of width `gap_width` around each feed point,
-  amplitude and phase per port.
-- Choosing `gap_width` relative to the wavelength and to the mesh
-  (`gmsh_function.mesh_and_gap_parameters`).
-- Port results (`rwg4.compute_port_results`): $P_\mathrm{in} = \tfrac12\mathrm{Re}(V\cdot I^*)$ per
-  port and the input impedance derived from it.
-- The plane-wave right-hand side for scattering (`rwg4.calculate_current_scattering`).
-- Lumped R, L, C loads (`rwg3.calculate_z_matrice_lumped_elements`) and ports defined by a cut
-  (`solver/optim/ports.py`).
-- Known issue: the power budget of multi-port gap excitation (see
-  {doc}`../validation/feature-status`).
+A real antenna is fed by a transmission line connected across a small gap. The MoM model replaces
+the line by a voltage imposed across that gap: a strong field confined to a narrow band of the
+surface. Everything that follows (input impedance, reflection, efficiency) depends on how that band
+is modelled, so the feed model matters as much as the impedance matrix for port quantities, while the
+radiation pattern is much less sensitive to it {footcite:p}`ding2013`.
+
+## The gap source
+
+### Model
+
+The solver implements the **enhanced gap source** of {footcite:t}`ding2013`. Instead of a delta
+function on a single "feeding edge" (the model of {footcite:t}`makarov2001`, which ignores the gap
+width and makes the result depend on which edge is chosen), the impressed field is uniform over a gap
+of width $W$ along the feed direction $\hat{\mathbf e}$:
+
+```{math}
+:label: eq-gap-field
+\mathbf E^i = \frac{V}{W}\,\hat{\mathbf e}\quad\text{in the gap},
+\qquad
+\mathbf E^i = \mathbf 0\quad\text{elsewhere},
+```
+
+and **every** RWG function with a triangle in the gap is fed, not only one. Testing {eq}`eq-gap-field`
+with $\mathbf f_m$ and one point per triangle (the centroid) gives eq. (7) of the paper:
+
+```{math}
+:label: eq-gap-vm
+V_m = \frac{\ell_m V}{2W}\Big[\chi_m^+\,\boldsymbol\rho_m^{c+}\cdot\hat{\mathbf e}
++ \chi_m^-\,\boldsymbol\rho_m^{c-}\cdot\hat{\mathbf e}\Big],
+```
+
+where $\chi_m^\pm = 1$ if the centroid of $T_m^\pm$ is in the gap and 0 otherwise, and
+$\boldsymbol\rho_m^{c\pm}$ are the centroid vectors of {doc}`rwg-basis-functions`. Several ports can be
+fed together, each with its own amplitude and phase: their contributions to $V$ add up.
+
+### The window: a cube, not a band
+
+In the paper, "in the gap" means a band $|z - z_\mathrm{feed}| \le W/2$ along the feed direction,
+across the whole conductor. **The solver uses a cube of side $W$ centred on the feed point**: a
+triangle is in the gap when its centroid is within $W/2$ of the feed point on all three coordinates.
+
+This was a deliberate change, documented in the code and pinned by `test/test_gap_source.py`. At a
+junction between surfaces, such as a monopole standing on a ground plate, the band also catches distant
+triangles that merely share the feed coordinate: on one monopole mesh it excited 198 of 296 edges,
+most of the ground plate. The cube keeps the feed local.
+
+The price is the opposite case: **on a conductor wider than $W$, the cube covers only the middle of
+the gap**, and if no centroid falls inside it the solver raises `GapSourceError`
+({numref}`fig-exc-window`).
+
+```{figure} ../figures/generated/excitation_gap_window.svg
+:name: fig-exc-window
+:class: mom-generated
+:width: 100%
+:target: ../_images/excitation_gap_window.svg
+:alt: Close-up of a strip mesh around the feed. A shaded vertical band marks the gap, a smaller dashed square inside it marks the solver's window. Five edges in the gap are drawn in blue with their excitation values in millivolts.
+
+The gap of a 5 cm strip, $W$ = 25 mm, with one cell across the width (44 triangles). Shaded band: the
+gap as defined by Ding et al.; dashed square: the window of the solver. The four centroids of the gap
+triangles (at $|y| = 8.3$ mm) are inside the window, so the five RWG edges of the gap are fed (blue,
+values of $V_m$ for $V$ = 1 V; the sign of the diagonals follows their orientation). With
+$W < 16.7$ mm the same centroids fall outside the window and nothing is fed.
+[Generated by `documentation/figure_notebooks/theory_excitations.ipynb` on solver commit `935470d`. Click to enlarge.]{.mom-provenance}
+```
+
+### Choosing the gap width
+
+`gmsh_function.mesh_and_gap_parameters(frequency, resolution=20, gap_fraction=0.15, n_edges_min=3)`
+proposes a mesh size and a gap width together: $W$ = `gap_fraction` × λ, a cell size of λ/`resolution`,
+reduced if needed so that at least `n_edges_min` cells fit in the gap. Its docstring gives the
+reasoning: keeping $W$ a fixed fraction of the wavelength, rather than tying it to the mesh, lets the
+input impedance converge as the mesh is refined. It warns when the cell falls below λ/100 or when
+$W$ exceeds 0.2 λ.
+
+## Input impedance and power of a port
+
+`rwg4.compute_port_results` reads each port from the solution $I$ through the complex power delivered
+by the gap, summed over the fed edges of that port:
+
+```{math}
+:label: eq-port-power
+S_\mathrm{port} = \tfrac12\sum_{m\in\text{port}} V_m I_m^*,
+\qquad
+P_\mathrm{in} = \mathrm{Re}\,S_\mathrm{port},
+\qquad
+Z_\mathrm{in} = \frac{|V|^2}{2\,S_\mathrm{port}^*}.
+```
+
+This is the impedance that, driven by $V$, absorbs the same complex power. It is consistent with the
+energy balance $P_\mathrm{in} = \tfrac12\mathrm{Re}\{V^\mathsf T I^*\}$ used for the efficiency.
+
+The paper defines it differently, from the current across one edge of the gap:
+$Z = V/(I_m\ell_m)$, its eq. (9). The two coincide when the gap model is **admissible** in the sense of
+the paper: the same current crosses every edge of the gap. On the validation case below the current
+varies by 1.4 % to 2 % across the gap and the two definitions differ by less than 1 Ω.
+
+The multi-port excitation (several gaps fed together) has a known open issue: the radiated power does
+not balance the input power (see {doc}`../validation/feature-status`). The paper treats a single gap;
+whether the gaps involved satisfy the admissible condition is one of the things to check.
+
+## Validation: the thin strip of Ding et al.
+
+{footcite:t}`ding2013` give the input impedance of a centre-fed strip (75 MHz, 2 m × 5 cm) for five
+gap widths and four or five mesh densities (their Table I). The solver was run on the same case with
+a structured mesh built to match their description: one cell across the width, the gap meshed with
+the 5 RWG edges of their Fig. 1, identical segments elsewhere, the same triangle counts.
+
+```{figure} ../figures/generated/excitation_strip_impedance.svg
+:name: fig-exc-strip
+:class: mom-generated
+:width: 100%
+:target: ../_images/excitation_strip_impedance.svg
+:alt: Resistance and reactance against number of triangles. Solver curves for gap widths of 100, 50 and 25 millimetres lie within one or two ohms of the published squares on the finest meshes. The published values for 12.5 and 6.25 millimetre gaps have no solver curve.
+
+Input impedance of the strip against the number of triangles. Solid lines: solver, power definition
+{eq}`eq-port-power`; dashed: the same solution read with the paper's eq. (9); open squares: Ding et
+al., Table I, new model. On the finest mesh (164 triangles) the solver gives 89.3+48.3j, 90.4+47.3j and
+91.4+46.6j Ω for $W$ = 100, 50 and 25 mm, against 90+48j, 92+47j and 92+47j Ω. On the coarsest mesh
+the reactance is 5 to 6 Ω above the published values. The two narrowest gaps (12.5 and 6.25 mm) raise
+`GapSourceError` with this one-cell-wide mesh, as explained above.
+[Generated by `documentation/figure_notebooks/theory_excitations.ipynb` on solver commit `935470d`; all values in `excitations.json`. Click to enlarge.]{.mom-provenance}
+```
+
+The meshes are of the same kind but not identical (the paper does not give them in full), so an
+agreement within 1–2 Ω on the fine meshes is what can be expected.
+
+## Plane-wave excitation
+
+For scattering, `rwg4.calculate_current_scattering` uses the incident plane wave
+$\mathbf E^i = \mathbf E_0\,e^{-jk\hat{\mathbf k}\cdot\mathbf r}$ with the centroid rule
+{eq}`eq-vm-centroid`. `wave_incident_direction` is $\hat{\mathbf k}$ and `polarization` is
+$\mathbf E_0$ (its magnitude is the amplitude in V/m). Neither is normalised by the code: pass a unit
+direction and a polarisation perpendicular to it.
+
+## Lumped loads
+
+`rwg3.calculate_z_matrice_lumped_elements(..., LoadPoint, LoadValue, LoadDir)` places series R, L, C
+loads. For each load:
+
+1. the impedance is $\Delta Z = j\omega L + 1/(j\omega C) + R$ (`compute_lumped_impedance`). A value
+   `None` or 0 for $L$ or $R$ means absent; `None` for $C$ means no capacitor (it is replaced by
+   $10^{64}$ F, a short circuit); $C = 0$ is refused;
+2. the loaded edge is the edge closest to `LoadPoint` whose direction is perpendicular to `LoadDir`
+   (tolerance $10^{-3}$ on $|\hat{\mathbf u}_\mathrm{edge}\cdot\hat{\mathbf d}|$), so that the load
+   current flows along `LoadDir`;
+3. the load is added to the diagonal: $Z_{mm} \leftarrow Z_{mm} + \ell_m^2\,\Delta Z$.
+
+A load therefore sits on **one** RWG edge. On a conductor several cells wide, a load across the whole
+width needs one load per edge, or the port model of `solver/optim/ports.py`, which places a cut across
+all the edges of a line (see {doc}`reduced-multiport`).
+
+## In this solver
+
+:::{admonition} Theory vs. implementation
+:class: theory
+
+Where each excitation lives, and its parameters.
+:::
+
+```{list-table}
+:header-rows: 1
+:widths: 40 60
+
+* - Function
+  - Role
+* - `gap_source.multiple_gap_sources(triangles, edges, vecteurs_rho, voltage_amplitude, feed_points, excitation_unit_vector, gap_width, phases=None)`
+  - {eq}`eq-gap-vm` for one or several ports; returns $V$ and the fed edges of each port; raises
+    `GapSourceError` when a port feeds nothing
+* - `rwg4.compute_port_results(voltage, current, all_feeding_edges, voltage_amplitude, feed_point)`
+  - {eq}`eq-port-power` for each port: gap current, $Z_\mathrm{in}$, $P_\mathrm{in}$
+* - `rwg4.calculate_current_scattering(...)`
+  - plane-wave right-hand side and solve
+* - `rwg3.calculate_z_matrice_lumped_elements(...)`, `compute_lumped_impedance`
+  - lumped R, L, C loads
+* - `gmsh_function.mesh_and_gap_parameters`, `check_simulation_stability`
+  - choice of mesh size and gap width, plausibility check of $Z_\mathrm{in}$
+```
+
+`radiation_algorithm` and `frequency_sweep` expose the gap parameters as `feed_point`,
+`voltage_amplitude`, `voltage_phase`, `excitation_unit_vector` and `gap_width` (default 0.05 m). In a
+sweep, $V$ does not depend on frequency and is built once. The reflection coefficient of each port
+is computed from its $Z_\mathrm{in}$ against `Z0`, with all ports driven together (an active value,
+not an entry of the scattering matrix).
+
+**Tests.** `test/test_gap_source.py` (window localisation at a junction, several ports, error when
+nothing is fed), `test/test_frequency_sweep.py` (the sweep reproduces `radiation_algorithm` frequency
+by frequency, with and without losses).
+
+## Assumptions and limits
+
+- One point per triangle for $V$: the field of the gap is sampled at the centroids only.
+- The cube window: on a conductor wider than $W$, only the central part of the gap is fed, and nothing
+  if no centroid falls in the cube. Mesh the gap so that some centroids lie within $W/2$ of the feed
+  point in every direction, or use a gap at least as wide as the conductor.
+- The excitation axis is one of `'x'`, `'y'`, `'z'`: a feed along an oblique direction is not
+  supported.
+- $Z_\mathrm{in}$ is defined from the complex power; it equals the paper's edge-current definition
+  only when the gap is admissible.
+- Lumped loads act on a single edge.
+
+## Continue
+
+::::{grid} 1 1 3 3
+:gutter: 3
+
+:::{grid-item-card} {fas}`arrow-right` Next: lossy conductors
+:link: lossy-conductors
+:link-type: doc
+
+Real metals through a surface impedance
+:::
+
+:::{grid-item-card} {fas}`play` Use it: radiation
+:link: ../user-guide/radiation
+:link-type: doc
+
+Feeding an antenna with `radiation_algorithm`
+:::
+
+:::{grid-item-card} {fas}`clipboard-check` Feature status
+:link: ../validation/feature-status
+:link-type: doc
+
+Known issue of the multi-port power budget
+:::
+::::
+
+## References
+
+```{footbibliography}
+```
