@@ -135,6 +135,10 @@ All of them are in `source/_static/css/custom.css`.
   Nothing moves when the visitor's system asks for reduced motion.
 - **Generated figures** use the class `mom-generated` and a `:target:` pointing to the image itself:
   the whole figure, caption included, then opens the full-size image.
+- **Resizable columns.** `_static/js/resizable-sidebars.js` adds a handle between each sidebar and the
+  page (drag, double-click to reset, arrow keys when focused); the width is kept in the reader's
+  browser. It only acts where the sidebars are columns (from 960 px wide for the left one, 1200 px for
+  the right one) and never while the left one is collapsed.
 
 ## API reference
 

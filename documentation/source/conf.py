@@ -173,6 +173,8 @@ html_theme = "pydata_sphinx_theme"
 html_title = "Antenna Solver MoM"
 html_static_path = ["_static"]
 html_css_files = ["css/custom.css"]
+# Drag handles to resize the left and right columns (width remembered per browser).
+html_js_files = ["js/resizable-sidebars.js"]
 # The logos live outside _static/: Sphinx and the theme copy them there themselves.
 html_favicon = "_logos/antenna_solver_logo_light.svg"
 html_last_updated_fmt = "%Y-%m-%d"

@@ -230,6 +230,77 @@ a.footnote-reference {
 }
 
 
+/* Resizable sidebars (see _static/js/resizable-sidebars.js).
+   The script sets --mom-sidebar-*-width on <html>; these rules hand them to
+   the theme, only where the sidebars are columns (not drawers) and never
+   while the left one is collapsed (.pst-squeeze). The handle's hit area is
+   24 px wide over the full height, with a 2 px line shown on hover/focus. */
+@media (min-width: 960px) {
+  .bd-sidebar-primary:not(.pst-squeeze) {
+    --pst-sidebar-primary-width: var(--mom-sidebar-primary-width, 25%);
+  }
+}
+@media (min-width: 1200px) {
+  html {
+    --pst-sidebar-secondary: var(--mom-sidebar-secondary-width, 17rem);
+  }
+}
+.mom-resizer {
+  display: none;
+  position: sticky;
+  top: var(--pst-header-height);
+  align-self: flex-start;
+  flex: 0 0 24px;
+  width: 24px;
+  height: calc(100vh - var(--pst-header-height));
+  margin: 0 -12px;
+  z-index: 10;
+  cursor: col-resize;
+  touch-action: none;
+}
+@media (min-width: 960px) {
+  .mom-resizer--primary { display: block; }
+}
+@media (min-width: 1200px) {
+  .mom-resizer--secondary { display: block; }
+}
+.bd-sidebar-primary.pst-squeeze + .mom-resizer {
+  display: none !important;
+}
+.mom-resizer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 11px;
+  width: 2px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background-color var(--mom-motion) var(--mom-ease);
+}
+.mom-resizer:hover::before,
+.mom-resizer:focus-visible::before,
+.mom-resizer.is-active::before {
+  background: var(--pst-color-primary);
+}
+.mom-resizer:focus-visible {
+  outline: none;
+}
+.mom-resizer:focus-visible::before {
+  width: 4px;
+  left: 10px;
+}
+html.mom-resizing,
+html.mom-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+html.mom-resizing .bd-sidebar-primary,
+html.mom-resizing .bd-sidebar-secondary {
+  transition: none !important;
+}
+
+
 /* --- 4. Landing page ------------------------------------------------------ */
 
 .mom-hero {
