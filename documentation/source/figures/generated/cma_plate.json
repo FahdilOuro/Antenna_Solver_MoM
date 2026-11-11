@@ -1,0 +1,67 @@
+{
+  "figures": [
+    "cma_plate_sweep.svg",
+    "cma_plate_currents.svg"
+  ],
+  "notebook": "documentation/figure_notebooks/theory_characteristic_modes.ipynb",
+  "solver_commit": "2106e70",
+  "generated": "2026-11-11",
+  "cma_parameters": {
+    "n_modes": 12,
+    "solver": "regularized",
+    "sort_by": "magnitude",
+    "regularization_epsilon": 1e-10,
+    "rank_tol": 1e-06
+  },
+  "mesh": {
+    "plate_m": [
+      0.1,
+      0.05
+    ],
+    "element_size_m": 0.007,
+    "triangles": 284,
+    "rwg_functions": 403
+  },
+  "sweep_hz": [
+    500000000.0,
+    3500000000.0,
+    61
+  ],
+  "regularisation_warnings": 0,
+  "tracking_summary": "Mode tracking: 12 modes over 61 frequencies (metric='R', correction='none')\n  accepted correlation: min 0.7594, median 0.9998\n  assignment margin:    min 0.2014\n  swap               18\n  degeneracy         27",
+  "spurious_in_sweep": 113,
+  "spurious_among_plotted_modes": {
+    "mode 1": 0,
+    "mode 2": 0,
+    "mode 3": 3,
+    "mode 4": 3
+  },
+  "resonances_ghz": [
+    {
+      "tracked_mode": 1,
+      "f_ghz": 1.3239
+    },
+    {
+      "tracked_mode": 5,
+      "f_ghz": 3.0711
+    }
+  ],
+  "rank_R_at_1e-6": {
+    "0.5 GHz": 12,
+    "2.0 GHz": 27,
+    "3.5 GHz": 44
+  },
+  "at_first_resonance": {
+    "f_ghz": 1.3239,
+    "lambda": [
+      -0.01435,
+      -4.23874,
+      9.67849
+    ],
+    "verdict": [
+      "PHYSICAL",
+      "PHYSICAL",
+      "PHYSICAL"
+    ]
+  }
+}
