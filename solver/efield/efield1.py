@@ -95,7 +95,7 @@ def calculate_electric_magnetic_field_at_point(path, observation_point, mode='ra
     print(f"\ne_field_total of {path.name} at the observation point {observation_point} is :")
     print(f"{e_field_total[0].real : .7f} {"+" if e_field_total[0].imag >= 0 else "-"}{abs(e_field_total[0].imag) : .7f}i V/m")
     print(f"{e_field_total[1].real : .7f} {"+" if e_field_total[1].imag >= 0 else "-"}{abs(e_field_total[1].imag) : .7f}i V/m")
-    print(f"{e_field_total[2].real : .7f} {"+" if e_field_total[1].imag >= 0 else "-"}{abs(e_field_total[2].imag) : .7f}i V/m")
+    print(f"{e_field_total[2].real : .7f} {"+" if e_field_total[2].imag >= 0 else "-"}{abs(e_field_total[2].imag) : .7f}i V/m")
 
     print('')
 
