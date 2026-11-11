@@ -551,13 +551,17 @@ def test_cma_frequency_sweep_tracks_a_real_structure(strip_path):
         assert np.allclose(np.sort(tracked.eigenvalues[i]),
                            np.sort(sweep.eigenvalues[i]))
 
-    # Where tracking actually moved a label, it did so to make the curves
-    # smoother; where it did not, the two views coincide.
+    # Where tracking actually moved a label, the curves must not get rougher;
+    # where it did not, the two views coincide. A relabelling can leave the
+    # total jump unchanged (the same differences summed in another order),
+    # so the comparison allows equality up to rounding: a strict '<' failed
+    # by one ulp (24085.965238110795 vs 24085.96523811079) depending on the
+    # order in which the test suite ran.
     if not np.array_equal(sweep.tracking.order,
                           np.tile(np.arange(4), (7, 1))):
         jump_raw = np.abs(np.diff(sweep.eigenvalues, axis=0)).sum()
         jump_tracked = np.abs(np.diff(tracked.eigenvalues, axis=0)).sum()
-        assert jump_tracked < jump_raw
+        assert jump_tracked <= jump_raw * (1 + 1e-12)
 
     # The permutation reached the .mat, and the report has the section.
     reloaded = DataManager_cma_sweep.load_data(strip_path.mat_cma_sweep)
