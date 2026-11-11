@@ -55,8 +55,18 @@ def test_runtime_error_tuple_is_usable_in_an_except_clause():
     assert all(isinstance(e, type) and issubclass(e, BaseException) for e in errors)
 
 
-def test_worth_trying_declines_and_explains_when_the_matrix_cannot_fit(capsys):
-    """A Z of E=20000 x 41 frequencies is ~244 GB: no device has that."""
+def test_worth_trying_declines_and_explains_when_the_matrix_cannot_fit(capsys, monkeypatch):
+    """
+    A Z of E=20000 x 41 frequencies is ~244 GB: no device has that.
+
+    The device is simulated (4 GB free), so that the decision and its message
+    are checked on every machine. Without a GPU the real memory check cannot
+    measure anything and always answers "room" (it may only veto the GPU), so
+    the real device would never reach the refusal path there.
+    """
+    free = 4 * 2 ** 30
+    monkeypatch.setattr(rwg3, "gpu_free_memory_bytes", lambda: free)
+    monkeypatch.setattr(rwg3, "gpu_has_headroom_for", lambda required, safety_factor=3.0: free >= required * safety_factor)
     assert rwg3._gpu_is_worth_trying(20000, 41, "unit-test") is False
     out = capsys.readouterr().out
     assert "GPU skipped" in out

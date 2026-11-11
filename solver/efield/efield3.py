@@ -8,6 +8,38 @@ from solver.rwg.rwg2 import DataManager_rwg2
 from solver.rwg.rwg4 import DataManager_rwg4
 from solver.utils.dipole_parameters import *
 
+# Range shown below the maximum of a polar cut, in dB. A sample that falls exactly in a
+# null of the pattern is -200 dB or lower; without a floor the radial axis then spans
+# hundreds of dB and squeezes the useful part of the pattern against the outer circle.
+DEFAULT_POLAR_DYNAMIC_RANGE_DB = 40.0
+
+
+def clip_to_dynamic_range(curves_db, dynamic_range=DEFAULT_POLAR_DYNAMIC_RANGE_DB):
+    """
+    Floor polar cuts (dB) at `dynamic_range` dB below their common maximum, for display.
+
+    Parameters:
+        curves_db : sequence of 1-D arrays in dB, plotted on the same axes (they share one floor)
+        dynamic_range : float in dB, or None to return the curves unchanged
+
+    Returns:
+        clipped : list of arrays, each value floored (non-finite values set to the floor)
+        (floor, top) : the radial limits to use, or None if dynamic_range is None
+    """
+    curves = [np.asarray(c, dtype=float) for c in curves_db]
+    if dynamic_range is None:
+        return curves, None
+    if dynamic_range <= 0:
+        raise ValueError(f"dynamic_range must be positive (dB), got {dynamic_range}.")
+    finite = np.concatenate([c[np.isfinite(c)] for c in curves])
+    if finite.size == 0:
+        raise ValueError("No finite value to plot: the radiated field is zero everywhere on the cut.")
+    top = float(finite.max())
+    floor = top - float(dynamic_range)
+    clipped = [np.where(np.isfinite(c), np.maximum(c, floor), floor) for c in curves]
+    return clipped, (floor, top)
+
+
 def compute_circle_points(radius, num_points, plane="yz"):
     """
     Computes observation points arranged in a circle on a specified plane.
@@ -113,7 +145,8 @@ def compute_circular_polar(observation_points, numbers_of_points, eta, complex_k
     polar_dbic = 10 * np.log10(np.maximum(4 * np.pi * u_circular / total_power, 1e-12))
     return polar_dbic
 
-def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=False):
+def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=False,
+                                dynamic_range=DEFAULT_POLAR_DYNAMIC_RANGE_DB):
     """
     Generates a modern and professional polar plot of the antenna directivity pattern.
     
@@ -128,6 +161,8 @@ def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=Fa
         mode (str): Simulation mode, either 'radiation' or 'scattering'.
         show (bool): If True, displays the plot.
         save_image (bool): If True, saves the plot as a high-resolution PDF.
+        dynamic_range (float or None): dB shown below the maximum of the two cuts
+            (default 40); lower values are drawn at that floor. None plots the raw values.
     """
     # Load data
     _, triangles, edges, *_ = DataManager_rwg2.load_data(path.mat_mesh2)
@@ -171,10 +206,13 @@ def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=Fa
         ax.set_theta_offset(0) 
         ax.set_theta_direction(1) # Counter-clockwise
 
-        # Plot data with vibrant colors
+        # Plot data with vibrant colors, floored at `dynamic_range` dB below the maximum
+        (plot_yz, plot_xy), limits = clip_to_dynamic_range([polar_yz, polar_xy], dynamic_range)
         # The YZ plane is phi = 90° in spherical coordinates (the XZ plane is phi = 0°).
-        ax.plot(theta, polar_yz, color='#FF5733', label=r'Elevation Plane $\phi = 90^\circ$ (YZ)', linewidth=2.5)
-        ax.plot(theta, polar_xy, color='#3357FF', label=r'Azimuth Plane $\theta = 90^\circ$ (XY)', linewidth=2.5, linestyle='--')
+        ax.plot(theta, plot_yz, color='#FF5733', label=r'Elevation Plane $\phi = 90^\circ$ (YZ)', linewidth=2.5)
+        ax.plot(theta, plot_xy, color='#3357FF', label=r'Azimuth Plane $\theta = 90^\circ$ (XY)', linewidth=2.5, linestyle='--')
+        if limits is not None:
+            ax.set_rlim(limits[0], limits[1] + 1.0)
         
         # Grid and Ticks
         # Set ticks every 30 degrees
@@ -199,12 +237,16 @@ def antenna_directivity_pattern(path, mode='radiation', show=True, save_image=Fa
         else:
             plt.close()
 
-def antenna_circular_directivity_pattern(path, polar_type='RHCP', mode='radiation', show=True, save_image=False):
+def antenna_circular_directivity_pattern(path, polar_type='RHCP', mode='radiation', show=True, save_image=False,
+                                         dynamic_range=DEFAULT_POLAR_DYNAMIC_RANGE_DB):
     """
     Generates a polar plot of the RHCP or LHCP partial directivity in two cuts, on a
     circle of radius 100 m:
       * the YZ plane (phi = 90°), plotted against the angle measured from +y towards +z;
       * the XZ plane (phi = 0°), plotted against the angle measured from +x towards +z.
+
+    dynamic_range (float or None): dB shown below the maximum of the two cuts (default 40);
+    lower values are drawn at that floor. None plots the raw values.
     """
     print(f"--- GENERATING {polar_type} POLAR PATTERN ---")
 
@@ -246,10 +288,13 @@ def antenna_circular_directivity_pattern(path, polar_type='RHCP', mode='radiatio
 
         # Plotting
         color = '#FF5733' if polar_type == 'RHCP' else '#3357FF'
-        ax.plot(theta_axis, polar_yz, color=color, linewidth=2.5,
+        (plot_yz, plot_xz), limits = clip_to_dynamic_range([polar_yz, polar_xz], dynamic_range)
+        ax.plot(theta_axis, plot_yz, color=color, linewidth=2.5,
                 label=rf'{polar_type} - Plane $\phi = 90^\circ$ (YZ)')
-        ax.plot(theta_axis, polar_xz, color=color, linewidth=2, linestyle='--',
+        ax.plot(theta_axis, plot_xz, color=color, linewidth=2, linestyle='--',
                 label=rf'{polar_type} - Plane $\phi = 0^\circ$ (XZ)')
+        if limits is not None:
+            ax.set_rlim(limits[0], limits[1] + 1.0)
 
         # Grid and Labels
         ax.set_thetagrids(np.arange(0, 360, 30))
@@ -267,28 +312,32 @@ def antenna_circular_directivity_pattern(path, polar_type='RHCP', mode='radiatio
         else:
             plt.close()
 
-def display_rhcp_polar_pattern(path, mode='radiation', show=True, save_image=False):
+def display_rhcp_polar_pattern(path, mode='radiation', show=True, save_image=False,
+                               dynamic_range=DEFAULT_POLAR_DYNAMIC_RANGE_DB):
     """
-    Wrapper to generate the RHCP (Right-Hand Circular Polarization) 
+    Wrapper to generate the RHCP (Right-Hand Circular Polarization)
     polar directivity pattern.
     """
     return antenna_circular_directivity_pattern(
-        path=path, 
-        polar_type='RHCP', 
-        mode=mode, 
-        show=show, 
-        save_image=save_image
+        path=path,
+        polar_type='RHCP',
+        mode=mode,
+        show=show,
+        save_image=save_image,
+        dynamic_range=dynamic_range
     )
 
-def display_lhcp_polar_pattern(path, mode='radiation', show=True, save_image=False):
+def display_lhcp_polar_pattern(path, mode='radiation', show=True, save_image=False,
+                               dynamic_range=DEFAULT_POLAR_DYNAMIC_RANGE_DB):
     """
-    Wrapper to generate the LHCP (Left-Hand Circular Polarization) 
+    Wrapper to generate the LHCP (Left-Hand Circular Polarization)
     polar directivity pattern.
     """
     return antenna_circular_directivity_pattern(
-        path=path, 
-        polar_type='LHCP', 
-        mode=mode, 
-        show=show, 
-        save_image=save_image
+        path=path,
+        polar_type='LHCP',
+        mode=mode,
+        show=show,
+        save_image=save_image,
+        dynamic_range=dynamic_range
     )

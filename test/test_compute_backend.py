@@ -73,4 +73,7 @@ def test_to_numpy_roundtrip_on_active_backend():
 def test_describe_backend_is_a_nonempty_string():
     desc = describe_backend()
     assert isinstance(desc, str) and len(desc) > 0
-    assert ("GPU" in desc) == GPU_AVAILABLE
+    # The CPU description also contains "GPU" ("CPU (no usable CUDA GPU detected: ...)"),
+    # so check how it starts, not whether the word appears.
+    assert desc.startswith("GPU") == GPU_AVAILABLE
+    assert desc.startswith("CPU") == (not GPU_AVAILABLE)

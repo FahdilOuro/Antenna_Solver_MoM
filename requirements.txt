@@ -23,6 +23,12 @@ scikit-learn>=1.0      # Gaussian-process regression of the Bayesian outer loop
                        # (solver/optim/outer.py, BayesianOptimizer); tested with 1.9.1
 
 # =============================================
+# Notebooks
+# =============================================
+notebook>=7.0           # Jupyter, to run the example notebooks of solver/antenna_simulation/;
+                        # tested with 7.5.5
+
+# =============================================
 # Testing
 # =============================================
 pytest>=7.0.0           # Test suite: `python -m pytest test/` and solver/**/tests/ (see CLAUDE.md)
