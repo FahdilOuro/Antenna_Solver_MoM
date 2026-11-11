@@ -156,9 +156,11 @@ fixes.
 - **Gap source.** `gap_source.multiple_gap_sources` feeds every RWG function that has at least one
   of its two triangles with its centroid inside a cube of side $W$ (`gap_width`) centred on the feed
   point; only the triangles inside the cube contribute. The field is along the axis
-  `excitation_unit_vector` (`'x'`, `'y'` or `'z'`). The code refers to it as the enhanced gap
-  source model of {footcite:t}`ding2013` (eq. 7). Several ports can be fed at once, each with its
-  own amplitude and phase.
+  `excitation_unit_vector` (`'x'`, `'y'` or `'z'`). This is eq. (7) of the enhanced gap source
+  model of {footcite:t}`ding2013`, with one generalisation: the paper's window is a band of width
+  $W$ along the excitation axis, the code's a cube around the feed point, so that a feed at a
+  junction between surfaces does not excite distant triangles (see {doc}`excitations`). Several
+  ports can be fed at once, each with its own amplitude and phase.
 - **Fields from the currents.** Once $\mathbf J$ is known, the fields in space are not computed with
   {eq}`eq-field-of-current` directly: `solver/efield/` replaces each RWG function by a small dipole
   (see {doc}`radiated-fields`).
