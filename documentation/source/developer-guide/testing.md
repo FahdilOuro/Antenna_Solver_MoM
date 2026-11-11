@@ -10,6 +10,6 @@
 - What each group of tests protects (golden values, physical invariants such as scale invariance and
   positive semi-definiteness of $R$, CPU/GPU agreement, reduced-model exactness).
 - The legacy scripts excluded from collection (`test/conftest.py`), the golden test that still
-  asserts the former `fill_mode="mirror"` values, and the CMA tracking test that depends on a
-  non-deterministic gmsh mesh.
+  asserts the former `fill_mode="mirror"` values, and tests built on gmsh meshes, which change from
+  run to run when gmsh uses several threads (see {doc}`../theory/numerical-limits`).
 - Writing a new test: build the mesh inside the test, write files under `tmp_path`.

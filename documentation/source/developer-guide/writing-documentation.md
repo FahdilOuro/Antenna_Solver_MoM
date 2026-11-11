@@ -135,6 +135,11 @@ All of them are in `source/_static/css/custom.css`.
   Nothing moves when the visitor's system asks for reduced motion.
 - **Generated figures** use the class `mom-generated` and a `:target:` pointing to the image itself:
   the whole figure, caption included, then opens the full-size image.
+- **Light and dark mode.** One button in the header (`_templates/theme-toggle.html`,
+  `_static/js/theme-toggle.js`), not the theme's three-entry dropdown: the site opens in the
+  visitor's system mode, and a click switches to the other one. Switching back to the system's mode
+  makes the site follow the system again. The choice is kept in the visitor's browser. The icon shows
+  the mode a click leads to (a moon in light mode, a sun in dark mode).
 - **Resizable columns.** `_static/js/resizable-sidebars.js` adds a handle between each sidebar and the
   page (drag, double-click to reset, arrow keys when focused); the width is kept in the reader's
   browser. It only acts where the sidebars are columns (from 960 px wide for the left one, 1200 px for

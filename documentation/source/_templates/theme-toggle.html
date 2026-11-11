@@ -1,0 +1,10 @@
+{# One-click light/dark switch, replacing the theme's three-entry "Color mode" dropdown.
+   The page starts in the visitor's system mode; a click switches to the other one
+   (see _static/js/theme-toggle.js). Both icons are in the button and custom.css shows the one
+   for the mode a click leads to (Font Awesome turns each <i> into an <svg>, so the spans carry
+   the classes). Hidden without JavaScript, like the theme's own switcher. #}
+<button type="button" class="btn btn-sm nav-link pst-navbar-icon mom-theme-toggle pst-js-only"
+        aria-label="{{ _('Switch to dark mode') }}" title="{{ _('Switch to dark mode') }}">
+  <span class="mom-theme-icon mom-theme-icon--to-dark" aria-hidden="true"><i class="fa-solid fa-moon fa-lg fa-fw"></i></span>
+  <span class="mom-theme-icon mom-theme-icon--to-light" aria-hidden="true"><i class="fa-solid fa-sun fa-lg fa-fw"></i></span>
+</button>

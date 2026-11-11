@@ -115,12 +115,24 @@ html[data-theme="dark"] {
 .bd-header .navbar-persistent--container button,
 .bd-header .navbar-persistent--mobile button,
 .bd-header .primary-toggle,
-.bd-header .secondary-toggle {
+.bd-header .secondary-toggle,
+.bd-sidebar-primary .sidebar-header-items__end button,
+.bd-sidebar-primary .sidebar-header-items__end a {
   min-width: var(--mom-target);
   min-height: var(--mom-target);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Light/dark switch (_templates/theme-toggle.html): one button, the icon shows
+   the mode a click leads to: a moon in light mode, a sun in dark mode. */
+.mom-theme-toggle .mom-theme-icon {
+  display: inline-flex;
+}
+html[data-theme="dark"] .mom-theme-toggle .mom-theme-icon--to-dark,
+html:not([data-theme="dark"]) .mom-theme-toggle .mom-theme-icon--to-light {
+  display: none;
 }
 
 /* Left navigation, page table of contents, "Edit on GitHub", breadcrumbs */

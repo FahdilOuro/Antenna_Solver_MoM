@@ -173,8 +173,9 @@ html_theme = "pydata_sphinx_theme"
 html_title = "Antenna Solver MoM"
 html_static_path = ["_static"]
 html_css_files = ["css/custom.css"]
-# Drag handles to resize the left and right columns (width remembered per browser).
-html_js_files = ["js/resizable-sidebars.js"]
+# Drag handles to resize the left and right columns (width remembered per browser),
+# and the one-click light/dark switch (_templates/theme-toggle.html).
+html_js_files = ["js/resizable-sidebars.js", "js/theme-toggle.js"]
 # The logos live outside _static/: Sphinx and the theme copy them there themselves.
 html_favicon = "_logos/antenna_solver_logo_light.svg"
 html_last_updated_fmt = "%Y-%m-%d"
@@ -192,7 +193,9 @@ html_theme_options = {
     ],
     "navbar_align": "left",
     "header_links_before_dropdown": 6,
-    "navbar_end": ["theme-switcher", "navbar-icon-links"],
+    # theme-toggle: one click switches light/dark, starting from the system mode
+    # (replaces the theme's three-entry "theme-switcher" dropdown).
+    "navbar_end": ["theme-toggle", "navbar-icon-links"],
     "navbar_persistent": ["search-button"],
     "show_toc_level": 2,
     "show_nav_level": 1,

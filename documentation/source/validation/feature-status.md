@@ -1,7 +1,7 @@
 # Feature status
 
 {.mom-status}
-{bdg-info}`Draft` Established by reading the code and running the test suite at commit `7c348a7` (2026-11-11).
+{bdg-info}`Draft` Established by reading the code at commit `7c348a7` (2026-11-11); test suite re-run at commit `a0d0b21` (2026-11-11).
 
 The state of every feature of the solver, including what does not work. A feature is
 {bdg-success-line}`Stable` when it is covered by automated tests, {bdg-warning-line}`Experimental`
@@ -91,13 +91,15 @@ module.
 
 ## Test suite
 
-At commit `7c348a7`: 551 tests pass, 2 are skipped, 3 fail.
+At commit `a0d0b21` (`python -m pytest test/ solver/`): 559 tests pass, 2 are skipped, 2 fail.
 
 - `test_impedance_matrix_matches_golden` (2 cases): the frozen values were computed with the former
   `fill_mode="mirror"`; the default is now `"full_sym"`, checked by `test_impedance_fill_mode.py`.
-- `test_cma_frequency_sweep_tracks_a_real_structure`: passes about one run in three. Its gmsh mesh is
-  not deterministic with several threads and the test compares two values that can be equal to the
-  last digit with a strict inequality.
+
+`test_cma_frequency_sweep_tracks_a_real_structure` used to fail once in a while: its gmsh mesh changes
+from run to run when gmsh uses several threads (see {doc}`../theory/numerical-limits`), and it compared
+two numbers that can be equal to the last digit with a strict inequality. The comparison now allows
+equality up to rounding (commit `5738844`).
 
 Nine early scripts in `test/` are excluded from collection (`test/conftest.py`): they need `.mat`
 files that are not in the repository.
