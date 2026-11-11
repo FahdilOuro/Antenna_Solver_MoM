@@ -745,32 +745,42 @@ def impedance_matrix_z_sweep_gpu(edges_data, triangles_data, points_data, freque
     Same result as impedance_matrix_z_sweep, restructured so the FAR and
     EDGE/VERTEX categories -- which dominate the pair COUNT for any mesh of
     practical size -- are assembled as a handful of large batched tensor
-    operations instead of a Python-level loop over every (m,n) pair. This is
-    the prerequisite identified in workflow.md ("frequency_sweep one-time
-    precompute" / GPU audit) before GPU acceleration can help at all: the
-    original per-pair loop does tiny (~12x12 or 49x49 element) work per
-    iteration, so replacing numpy with cupy INSIDE that loop would be slower
-    than the CPU version -- GPU kernel-launch/PCIe overhead would dominate
-    over up to 4*E^2 sub-pair iterations. Batching first, then running the
-    batches on whichever array backend is active, is what actually pays off.
+    operations instead of a Python-level loop over every (m,n) pair. This
+    restructuring is what makes GPU acceleration worthwhile at all: the
+    per-pair loop does tiny (~12x12 or 81x81 element) work per iteration, so
+    replacing numpy with cupy INSIDE that loop would be slower than the CPU
+    version -- GPU kernel-launch/PCIe overhead would dominate over up to
+    4*E^2 sub-pair iterations. Batching first, then running the batches on
+    whichever array backend is active, is what actually pays off.
 
     Categorisation (SELF/EDGE/VERTEX/FAR) is computed for all 4*E^2 sub-pairs
     at once via vertex-index comparison (vectorised equivalent of
-    classify_triangle_pair), then:
-      - FAR and EDGE+VERTEX pairs (identical maths, EDGE/VERTEX only using a
-        higher-order quadrature rule -- see impedance_matrix_z) are each
-        assembled in chunks of `chunk_size` pairs as batched tensor
-        contractions, on `xp` = cupy if a usable GPU was detected
-        (solver.utils.compute_backend), else numpy.
-      - SELF pairs keep the original per-pair Duffy quadrature on CPU: they
-        number O(N_tri), a small fraction of the O(E^2) total, and Duffy's
-        node count varies per pair (irregular work), which does not batch as
-        cleanly as the regular categories. Batching the 90%+ of pairs that
-        ARE regular already captures most of the available speedup.
+    classify_triangle_pair). The quadrature scheme is the one of
+    impedance_matrix_z, category by category:
+      - FAR pairs: the degree-`quad_order` rule on both triangles, assembled
+        in chunks of `chunk_size` pairs as batched tensor contractions, on
+        `xp` = cupy if a usable GPU was detected (solver.utils.compute_backend),
+        else numpy.
+      - EDGE and VERTEX pairs: the degree-`near_order` rule on both triangles,
+        batched the same way (smaller chunks, see `chunk_size`), WITH the
+        singularity extraction of impedance_matrix_z. The scalar-potential
+        kernel is split as G = (exp(-jkR) - 1)/R + 1/R: the bounded part is
+        integrated with the rule, and the 1/R part in closed form over the
+        source triangle (quadrature.analytic_singular.inv_R_over_triangle_batch,
+        evaluated once with NumPy on the host, then scaled by pref_Phi(f)).
+        The vector-potential term keeps the plain rule (it is smaller by
+        about (k*h)^2/4).
+      - SELF pairs keep the per-pair Gauss (outer, `self_outer_order`) /
+        Duffy (inner, `duffy_order`) quadrature on CPU: they number O(N_tri),
+        a small fraction of the O(E^2) total, and their work is irregular,
+        which does not batch as cleanly as the regular categories. Batching
+        the 90%+ of pairs that ARE regular already captures most of the
+        available speedup.
+    The matrix is then completed according to `fill_mode` (_finish_fill).
 
     Every Z_all[i] matches impedance_matrix_z_sweep(frequencies)[i] to
-    numerical precision (float64/complex128 arithmetic reordering only --
-    see workflow.md for the measured CPU-restructure and GPU benchmarks).
+    numerical precision (float64/complex128 arithmetic reordering only);
+    test_impedance_sweep_gpu_regression.py checks it.
 
     Parameters
     ----------
