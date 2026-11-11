@@ -440,6 +440,14 @@ html[data-theme="dark"] .mom-generated img {
   overflow-wrap: anywhere;
 }
 
+/* Long code names inside table cells wrap instead of being cut off
+   (Sphinx puts inline code in span.pre, which forbids line breaks) */
+.bd-content table code,
+.bd-content table code span.pre {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* Symbol tables */
 table.mom-symbols td:first-child {
   white-space: nowrap;
