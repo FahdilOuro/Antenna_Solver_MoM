@@ -77,6 +77,9 @@ scikit-rf>=0.22.0        # Not yet imported by any current code path; listed for
 # memory_profiler>=0.61.0
 
 # =============================================
-# Frontend Qt/QML (unused)
+# Graphical interface (interface/, run with `python -m interface.gui`)
 # =============================================
-# PySide6>=6.4.0
+# Not needed to use the solver from Python or notebooks.
+PySide6>=6.5         # Qt widgets (main window, docks, tree, tables)
+pyvista>=0.43        # 3-D view of meshes and results (VTK)
+pyvistaqt>=0.11      # embeds the PyVista view in a Qt window
