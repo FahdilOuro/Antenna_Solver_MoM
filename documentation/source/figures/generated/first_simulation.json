@@ -1,0 +1,27 @@
+{
+  "notebook": "documentation/figure_notebooks/guide_first_simulation.ipynb",
+  "solver_commit": "4282bf8",
+  "generated": "2026-11-11",
+  "plotly_version": "6.2.0",
+  "figures": {
+    "first_simulation_current": [
+      "first_simulation_current.png",
+      "first_simulation_current.html"
+    ],
+    "first_simulation_pattern": [
+      "first_simulation_pattern.png",
+      "first_simulation_pattern.html"
+    ],
+    "first_simulation_polar": [
+      "first_simulation_polar.png"
+    ]
+  },
+  "mesh_size_m": 0.016666666666666666,
+  "gap_width_m": 0.05,
+  "n_edges": 144,
+  "z_in_ohm": [
+    72.73771385788041,
+    4.08573838081387
+  ],
+  "p_in_w": 0.006852392711906691
+}

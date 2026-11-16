@@ -58,7 +58,14 @@ most of the ground plate. The cube keeps the feed local.
 
 The price is the opposite case: **on a conductor wider than $W$, the cube covers only the middle of
 the gap**, and if no centroid falls inside it the solver raises `GapSourceError`
-({numref}`fig-exc-window`).
+({numref}`fig-exc-window`). When some centroids fall inside, the cells near the edges of the
+conductor are simply not fed, and the input impedance is wrong without any warning.
+
+The test is made on centroids, so a triangle is fed entirely or not at all. **When the edges of the gap
+are not mesh lines**, the fed length, and with it the applied voltage, changes from one mesh to the
+next; on a gmsh-meshed dipole the input resistance then ranged from 63 to 182 Ω instead of 72 Ω.
+{doc}`../user-guide/mesh-size` measures both effects and shows how to draw the gap so that its edges
+are mesh lines.
 
 ```{figure} ../figures/generated/excitation_gap_window.svg
 :name: fig-exc-window

@@ -163,9 +163,32 @@ def _docstring_verbatim_fallback(app, what, name, obj, options, lines):
     lines[:] = ["::", ""] + ["    " + line for line in original.splitlines()] + [""]
 
 
+def _copy_plotly_js(app, exception):
+    """
+    Copy plotly.min.js into _static/plotly/ of the built site.
+
+    Interactive figures (Plotly fragments exported by the figure notebooks with
+    include_plotlyjs=False) load it from there. It is taken from the plotly
+    package pinned in requirements-docs.txt, the version the notebooks use, so
+    the library is neither stored in the repository nor fetched from a CDN.
+    """
+    if exception is not None or app.builder.format != "html":
+        return
+    import shutil
+
+    import plotly
+
+    source = Path(plotly.__file__).parent / "package_data" / "plotly.min.js"
+    target = Path(app.outdir) / "_static" / "plotly" / "plotly.min.js"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
+
+
 def setup(app):
     # After napoleon (priority 500), so the NumPy conversion is what gets checked.
     app.connect("autodoc-process-docstring", _docstring_verbatim_fallback, priority=600)
+    # plotly.js for the interactive figures (see _static/js/live-figures.js).
+    app.connect("build-finished", _copy_plotly_js)
 
 
 # -- HTML output -----------------------------------------------------------
@@ -175,7 +198,9 @@ html_static_path = ["_static"]
 html_css_files = ["css/custom.css"]
 # Drag handles to resize the left and right columns (width remembered per browser),
 # and the one-click light/dark switch (_templates/theme-toggle.html).
-html_js_files = ["js/resizable-sidebars.js", "js/theme-toggle.js"]
+html_js_files = ["js/resizable-sidebars.js", "js/theme-toggle.js",
+                 # moves interactive Plotly views into their figures (see the file header)
+                 "js/live-figures.js"]
 # The logos live outside _static/: Sphinx and the theme copy them there themselves.
 html_favicon = "_logos/antenna_solver_logo_light.svg"
 html_last_updated_fmt = "%Y-%m-%d"

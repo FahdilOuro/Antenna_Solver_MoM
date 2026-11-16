@@ -1,7 +1,7 @@
 # Feature status
 
 {.mom-status}
-{bdg-info}`Draft` Established by reading the code at commit `7c348a7` (2026-11-11); test suite re-run at commit `a0d0b21` (2026-11-11).
+{bdg-info}`Draft` Established by reading the code at commit `7c348a7` (2026-11-11); test suite re-run at commit `a6a4cfd` (2026-11-11).
 
 The state of every feature of the solver, including what does not work. A feature is
 {bdg-success-line}`Stable` when it is covered by automated tests, {bdg-warning-line}`Experimental`
@@ -91,7 +91,8 @@ module.
 
 ## Test suite
 
-At commit `a0d0b21` (`python -m pytest test/ solver/`): 559 tests pass, 2 are skipped, 2 fail.
+At commit `a6a4cfd` (`python -m pytest test/ solver/`, with a GPU): 563 tests pass, 2 are skipped,
+2 fail. Without CuPy, `python -m pytest test/` on a fresh install: 218 pass, 2 are skipped.
 
 - `test_impedance_matrix_matches_golden` (2 cases): the frozen values were computed with the former
   `fill_mode="mirror"`; the default is now `"full_sym"`, checked by `test_impedance_fill_mode.py`.

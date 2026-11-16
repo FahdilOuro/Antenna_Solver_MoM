@@ -8,6 +8,7 @@ it.
 :maxdepth: 1
 
 geometry-and-meshing
+mesh-size
 radiation
 frequency-sweep
 scattering

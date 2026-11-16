@@ -509,6 +509,17 @@ figure.mom-generated img {
 html[data-theme="dark"] .mom-generated img {
   filter: none !important;
 }
+/* Interactive (Plotly) view of a figure, moved into it by _static/js/live-figures.js.
+   It replaces the image and its "enlarge" link, so the figure is no longer one
+   clickable block: dragging rotates the view instead. */
+.mom-live-figure {
+  background: #ffffff;
+  border-radius: 0.4rem;
+  overflow: hidden;
+}
+figure.mom-live .mom-live-figure {
+  margin-bottom: 0.5rem;
+}
 .mom-provenance {
   display: block;
   font-size: 0.82rem;

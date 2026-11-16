@@ -110,6 +110,39 @@ hand and never copied from older images:
 - the page embeds the figure with the class `mom-generated` and says in the caption which notebook
   and which commit produced it.
 
+### Interactive figures (Plotly)
+
+The 3D views the solver draws with Plotly (surface currents, patterns) can be shown interactive: the
+reader rotates and zooms them in the page. The notebook exports each such figure twice:
+
+- a static image (`name.png`, with `fig.write_image`), shown by a normal `{figure}` directive, which
+  keeps the caption and the number and is what readers without JavaScript (and print) see;
+- an HTML fragment (`name.html`, `fig.to_html(full_html=False, include_plotlyjs=False)`) wrapped in
+  `<div class="mom-live-figure pst-js-only">`.
+
+The page loads plotly.js once, then includes the fragment right before the figure:
+
+````markdown
+```{raw} html
+<script src="../_static/plotly/plotly.min.js"></script>
+```
+
+```{raw} html
+:file: ../figures/generated/name.html
+```
+
+```{figure} ../figures/generated/name.png
+...
+```
+````
+
+`_static/js/live-figures.js` moves the live view into the figure, in place of the image and of its
+"enlarge" link. plotly.js is not stored in the repository: `conf.py` copies it at build time from the
+`plotly` package pinned in `requirements-docs.txt`, the same version as the notebooks
+(`first_simulation.json` records it). A 3D pattern on the observation sphere weighs about 0.5 MB.
+
+### Refreshing a figure
+
 To refresh a figure after a change in the solver, re-run its notebook with the `antenna_solver`
 environment, from the `figure_notebooks/` folder:
 
