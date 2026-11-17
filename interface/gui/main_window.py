@@ -25,17 +25,20 @@ def _mm(value_m: float) -> str:
 
 class MainWindow(QMainWindow):
 
-    def __init__(self):
+    def __init__(self, view3d_theme: dict | None = None):
+        """view3d_theme: colours of the 3-D view, as returned by
+        interface.gui.theme.apply_theme ("background", "edges")."""
         super().__init__()
         self.setWindowTitle("Antenna Solver MoM")
         self.resize(1400, 850)
 
         self.mesh: SurfaceMesh | None = None
         self._show_edges = True
+        self.view3d_theme = view3d_theme or {"background": "#f3f3f3", "edges": "#1a1a1a"}
 
         # Central widget: the 3-D view (a VTK render window inside Qt).
         self.plotter = QtInteractor(self)
-        self.plotter.set_background("#f3f3f3")
+        self.plotter.set_background(self.view3d_theme["background"])
         self.plotter.add_axes()
         self.setCentralWidget(self.plotter.interactor)
 
@@ -153,7 +156,7 @@ class MainWindow(QMainWindow):
             rgb=True,
             show_scalar_bar=False,
             show_edges=self._show_edges,
-            edge_color="#1a1a1a",
+            edge_color=self.view3d_theme["edges"],
             line_width=0.5,
         )
         if camera is not None:

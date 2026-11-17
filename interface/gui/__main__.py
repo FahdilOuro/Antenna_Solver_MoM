@@ -12,6 +12,7 @@ os.environ.setdefault("QT_API", "pyside6")
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from interface.gui.main_window import MainWindow  # noqa: E402
+from interface.gui.theme import apply_theme  # noqa: E402
 
 
 def main() -> int:
@@ -19,7 +20,9 @@ def main() -> int:
     app.setApplicationName("Antenna Solver MoM")
     app.setOrganizationName("LEAT")
 
-    window = MainWindow()
+    view3d_theme = apply_theme(app, "Light")
+
+    window = MainWindow(view3d_theme=view3d_theme)
     window.show()
 
     # Optional: a .msh path on the command line is opened at start-up.
