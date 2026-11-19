@@ -45,6 +45,40 @@ where $\chi_m^\pm = 1$ if the centroid of $T_m^\pm$ is in the gap and 0 otherwis
 $\boldsymbol\rho_m^{c\pm}$ are the centroid vectors of {doc}`rwg-basis-functions`. Several ports can be
 fed together, each with its own amplitude and phase: their contributions to $V$ add up.
 
+### Triangles cut by the gap: exact integration
+
+Eq. {eq}`eq-gap-vm` counts a triangle **entirely or not at all**, according to where its centroid
+falls. That is exact when the edges of the gap are lines of the mesh, as on the meshes of the paper,
+where the gap is meshed on purpose. A mesher such as gmsh usually lets the gap edges cut through
+triangles; each of them is then fed in full or not at all, and the voltage actually applied jumps from
+one mesh to the next.
+
+The solver integrates {eq}`eq-gap-field` exactly instead. $\mathbf f_m$ is linear on a triangle and
+$\mathbf E^i$ is constant in the gap, so the integral over the part of $T_m^\pm$ inside the gap, of
+area $A_m^{\pm,\mathrm{in}}$ and centroid $\mathbf r_m^{\pm,\mathrm{in}}$, is exact with that one point:
+
+```{math}
+:label: eq-gap-vm-exact
+V_m = \frac{\ell_m V}{2W}\left[
+\frac{A_m^{+,\mathrm{in}}}{A_m^+}\Big(\boldsymbol\rho_m^{c+} + \mathbf r_m^{+,\mathrm{in}} - \mathbf r_m^{c+}\Big)
++ \frac{A_m^{-,\mathrm{in}}}{A_m^-}\Big(\boldsymbol\rho_m^{c-} - \mathbf r_m^{-,\mathrm{in}} + \mathbf r_m^{c-}\Big)
+\right]\cdot\hat{\mathbf e} .
+```
+
+The 0-or-1 of $\chi_m^\pm$ becomes the **fraction of the triangle that lies in the gap**, and
+$\boldsymbol\rho$ is taken at the centroid of that fraction. For a triangle entirely in the gap the
+fraction is 1 and the two centroids coincide: this is exactly {eq}`eq-gap-vm`.
+
+**What it changes, in short:** the voltage applied by the gap no longer depends on where the mesh
+happens to cut the gap. On meshes whose gap edges are mesh lines nothing changes (the comparison with
+Ding et al. below is the same); on the others, the input impedance stops jumping from one mesh to the
+next and converges as the mesh is refined (a gmsh dipole whose gap edges cut through triangles gave 80, 182, 77 and 63 Ω at λ/20, λ/30, λ/60 and λ/120; it now gives 71.4, 71.8, 72.7 and 73.0 Ω, against 71.6, 71.9, 72.7 and 73.0 Ω with the gap drawn as its own surface, see {doc}`../user-guide/mesh-size`).
+
+`multiple_gap_sources` uses {eq}`eq-gap-vm-exact` when it is given the vertex coordinates (argument
+`points`), as `radiation_algorithm` and `frequency_sweep` do since commit `52b5eb6`; without
+them it keeps {eq}`eq-gap-vm`. `test/test_gap_source_partial.py` checks it against an independent
+Monte-Carlo integration of {eq}`eq-gap-field`.
+
 ### The window: a cube, not a band
 
 In the paper, "in the gap" means a band $|z - z_\mathrm{feed}| \le W/2$ along the feed direction,
@@ -58,14 +92,13 @@ most of the ground plate. The cube keeps the feed local.
 
 The price is the opposite case: **on a conductor wider than $W$, the cube covers only the middle of
 the gap**, and if no centroid falls inside it the solver raises `GapSourceError`
-({numref}`fig-exc-window`). When some centroids fall inside, the cells near the edges of the
-conductor are simply not fed, and the input impedance is wrong without any warning.
-
-The test is made on centroids, so a triangle is fed entirely or not at all. **When the edges of the gap
-are not mesh lines**, the fed length, and with it the applied voltage, changes from one mesh to the
-next; on a gmsh-meshed dipole the input resistance then ranged from 63 to 182 Ω instead of 72 Ω.
-{doc}`../user-guide/mesh-size` measures both effects and shows how to draw the gap so that its edges
-are mesh lines.
+({numref}`fig-exc-window`). When part of the conductor is inside, the cells near its edges are simply
+not fed and the input impedance is wrong: on a 40 mm strip with a 30 mm gap, the input resistance fell
+from 79 Ω to 1.2 Ω as the strip was divided into more cells across. Since commit `52b5eb6`,
+`multiple_gap_sources` emits a `GapSourceWarning` in that case: a triangle of the gap that reaches
+beyond the cube across the conductor, on a surface containing the feed direction, next to a fed
+triangle. Surfaces perpendicular to the feed direction, such as the ground plate under a monopole, are
+not flagged. {doc}`../user-guide/mesh-size` measures both effects of the window.
 
 ```{figure} ../figures/generated/excitation_gap_window.svg
 :name: fig-exc-window
