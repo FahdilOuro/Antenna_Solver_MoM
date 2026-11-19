@@ -130,9 +130,10 @@ def calculate_current_radiation(path, feed_point, voltage_amplitude,
     frequency, _, _, _, _, _, matrice_z = DataManager_rwg3.load_data(path.mat_impedance)
 
     # 1. Initialize the global voltage vector and retrieve feeding indices per port
+    #    (points: eq. 7 integrated exactly over triangles cut by the gap window)
     voltage, all_feeding_edges = multiple_gap_sources(
         triangles, edges, vecteurs_rho, voltage_amplitude, feed_point,
-        excitation_unit_vector, gap_width, voltage_phase
+        excitation_unit_vector, gap_width, voltage_phase, points=points
     )
 
     if lossy_conductor:
