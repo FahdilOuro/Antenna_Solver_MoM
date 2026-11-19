@@ -183,9 +183,10 @@ def frequency_sweep(path, freq_start, freq_stop, feed_point, n_points=41, voltag
           f"triangles, {E} edges\n")
 
     # 3. Gap-source excitation vector -- frequency-independent, computed ONCE
+    #    (points: eq. 7 integrated exactly over triangles cut by the gap window)
     voltage, all_feeding_edges = multiple_gap_sources(
         triangles, edges, vecteurs_rho, voltage_amplitude, feed_point,
-        excitation_unit_vector, gap_width, voltage_phase
+        excitation_unit_vector, gap_width, voltage_phase, points=points
     )
 
     # 4. Gram matrix for the lossy-conductor SIBC term -- pure geometry, ONCE
